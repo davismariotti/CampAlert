@@ -9,7 +9,6 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 interface RecreationApi {
-
     companion object {
         val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
     }
@@ -21,7 +20,5 @@ interface RecreationApi {
             .format(
                 dateFormatter
             )
-
     ): Call<Campground>
-
 }

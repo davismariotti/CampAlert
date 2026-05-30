@@ -20,7 +20,6 @@ import java.time.LocalDate
 @Testcontainers
 @TestPropertySource(properties = ["spring.jpa.properties.hibernate.ddl-auto=create-drop"])
 class SearchRequestRepositoryTest {
-
     companion object {
         @Container
         @ServiceConnection
@@ -61,7 +60,8 @@ class SearchRequestRepositoryTest {
     }
 
     private fun searchRequest(
-        loops: List<String>? = listOf("wildcat"),
+        loops: List<String>? =
+            listOf("wildcat"),
         completed: Boolean = false
     ) = SearchRequest(
         startDay = LocalDate.of(2026, 7, 4),

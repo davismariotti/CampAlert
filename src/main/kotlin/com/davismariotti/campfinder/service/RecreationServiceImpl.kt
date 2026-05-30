@@ -12,27 +12,33 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 @Service
-class RecreationServiceImpl(val recreationApi: RecreationApi, val pushoverService: PushoverService) :
-    RecreationService {
-
+class RecreationServiceImpl(
+    val recreationApi: RecreationApi,
+    val pushoverService: PushoverService
+) : RecreationService {
     override fun checkAvailability(searchRequest: SearchRequest) {
         // Find months
         val endNight = searchRequest.startDay.plusDays(searchRequest.nights.toLong())
         var monthStart = searchRequest.startDay.withDayOfMonth(1)
-        var campground: Campground = recreationApi.getCampgroundAvailability(
-            searchRequest.campsiteId, monthStart.atStartOfDay().atZone(ZoneOffset.UTC).format(
-                dateFormatter
-            )
-        ).execute()
-            .body()!!
-
-        while (monthStart.isBeforeMonth(endNight.plusMonths(1))) {
-            recreationApi.getCampgroundAvailability(
-                searchRequest.campsiteId, monthStart.atStartOfDay().atZone(ZoneOffset.UTC).format(
+        var campground: Campground = recreationApi
+            .getCampgroundAvailability(
+                searchRequest.campsiteId,
+                monthStart.atStartOfDay().atZone(ZoneOffset.UTC).format(
                     dateFormatter
                 )
             ).execute()
-                .body()?.let { fetchedCampground ->
+            .body()!!
+
+        while (monthStart.isBeforeMonth(endNight.plusMonths(1))) {
+            recreationApi
+                .getCampgroundAvailability(
+                    searchRequest.campsiteId,
+                    monthStart.atStartOfDay().atZone(ZoneOffset.UTC).format(
+                        dateFormatter
+                    )
+                ).execute()
+                .body()
+                ?.let { fetchedCampground ->
                     campground = campground.mergeWith(fetchedCampground)
                 }
             monthStart = monthStart.plusMonths(1)
@@ -43,9 +49,7 @@ class RecreationServiceImpl(val recreationApi: RecreationApi, val pushoverServic
         campground.removeExtraDates(searchRequest.startDay, endNight)
         campground.filterByAvailability()
 
-
         pushoverService.pushMessage(searchRequest, campground)
-
     }
 
     private fun Campground.filterByLoops(loops: List<String>?) {
@@ -60,7 +64,6 @@ class RecreationServiceImpl(val recreationApi: RecreationApi, val pushoverServic
             campsites.filterValues { it.minimumNumberOfPeople <= groupSize && it.maximumNumberOfPeople >= groupSize }
     }
 
-
     private fun Campground.removeExtraDates(startDay: LocalDate, endDay: LocalDate) {
         campsites.forEach {
             it.value.run {
@@ -72,23 +75,24 @@ class RecreationServiceImpl(val recreationApi: RecreationApi, val pushoverServic
 
     private fun Campground.filterByAvailability() {
         campsites =
-            campsites.filterValues { it.availabilities.values.all { availabilityType -> availabilityType == AvailabilityType.AVAILABLE } }
+            campsites.filterValues {
+                it.availabilities.values.all {
+                        availabilityType ->
+                    availabilityType == AvailabilityType.AVAILABLE
+                }
+            }
     }
-
 
     companion object {
         val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
     }
 
-    fun LocalDate.isBeforeMonth(other: LocalDate): Boolean {
-        return this.year < other.year || (this.year == other.year && this.monthValue < other.monthValue)
-    }
+    fun LocalDate.isBeforeMonth(other: LocalDate): Boolean =
+        this.year < other.year || (this.year == other.year && this.monthValue < other.monthValue)
 
     fun ZonedDateTime.isBetween(startDate: LocalDate, endDate: LocalDate): Boolean {
         val startOfDay = startDate.atStartOfDay(this.zone)
         val endOfDay = endDate.atStartOfDay(this.zone)
         return this.isAfter(startOfDay.minusNanos(1)) && this.isBefore(endOfDay)
     }
-
-
 }

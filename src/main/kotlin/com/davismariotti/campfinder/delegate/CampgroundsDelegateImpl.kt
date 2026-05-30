@@ -12,7 +12,6 @@ import java.time.format.DateTimeFormatter
 class CampgroundsDelegateImpl(
     private val recreationApi: RecreationApi
 ) : CampgroundsApiDelegate {
-
     override fun getCampground(id: Int): ResponseEntity<CampgroundResponse> {
         val campground = recreationApi.getCampgroundAvailability(id).execute().body()
             ?: return ResponseEntity.notFound().build()

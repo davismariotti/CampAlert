@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service
 class SearchRequestsDelegateImpl(
     private val searchRequestRepository: SearchRequestRepository
 ) : SearchRequestsApiDelegate {
-
     override fun listSearchRequests(completed: Boolean?): ResponseEntity<List<SearchRequestResponse>> {
         val results = if (completed != null) {
             searchRequestRepository.findByCompleted(completed)
@@ -23,7 +22,9 @@ class SearchRequestsDelegateImpl(
         return ResponseEntity.ok(results.map { it.toResponse() })
     }
 
-    override fun createSearchRequest(createSearchRequestBody: CreateSearchRequestBody): ResponseEntity<SearchRequestResponse> {
+    override fun createSearchRequest(
+        createSearchRequestBody: CreateSearchRequestBody
+    ): ResponseEntity<SearchRequestResponse> {
         val entity = SearchRequest(
             startDay = createSearchRequestBody.startDay,
             nights = createSearchRequestBody.nights,
@@ -42,7 +43,10 @@ class SearchRequestsDelegateImpl(
         return ResponseEntity.ok(entity.toResponse())
     }
 
-    override fun updateSearchRequest(id: Int, updateSearchRequestBody: UpdateSearchRequestBody): ResponseEntity<SearchRequestResponse> {
+    override fun updateSearchRequest(
+        id: Int,
+        updateSearchRequestBody: UpdateSearchRequestBody
+    ): ResponseEntity<SearchRequestResponse> {
         val existing = searchRequestRepository.findById(id).orElse(null)
             ?: return ResponseEntity.notFound().build()
         val updated = existing.copy(
@@ -63,14 +67,15 @@ class SearchRequestsDelegateImpl(
         return ResponseEntity.noContent().build()
     }
 
-    private fun SearchRequest.toResponse() = SearchRequestResponse(
-        id = this.id!!,
-        startDay = this.startDay,
-        nights = this.nights,
-        groupSize = this.groupSize,
-        campsiteId = this.campsiteId,
-        loops = this.loops,
-        name = this.name,
-        completed = this.completed
-    )
+    private fun SearchRequest.toResponse() =
+        SearchRequestResponse(
+            id = this.id!!,
+            startDay = this.startDay,
+            nights = this.nights,
+            groupSize = this.groupSize,
+            campsiteId = this.campsiteId,
+            loops = this.loops,
+            name = this.name,
+            completed = this.completed
+        )
 }

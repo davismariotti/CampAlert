@@ -13,7 +13,6 @@ class PushoverService(
     @Value("\${pushover.api_token}") private val apiToken: String,
     @Value("\${pushover.user_token}") private val userToken: String
 ) {
-
     fun pushMessage(request: SearchRequest, campground: Campground) {
         val client: PushoverClient = PushoverRestClient()
 
@@ -44,5 +43,4 @@ class PushoverService(
 
         return sb.toString()
     }
-
 }

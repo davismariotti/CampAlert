@@ -9,7 +9,6 @@ class RequestProcessor(
     val searchRequestRepository: SearchRequestRepository,
     val recreationService: RecreationService
 ) {
-
     fun processSearchRequests() {
         val searchRequests = searchRequestRepository.findByCompletedFalse()
 
