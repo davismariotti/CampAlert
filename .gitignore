@@ -41,3 +41,6 @@ out/
 
 ### Application Properties ###
 application-local.properties
+
+### Environment Variables ###
+.env
