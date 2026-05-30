@@ -82,10 +82,10 @@ tasks.register('integrationTest', Test) {
 
 openApiGenerate {
     generatorName = "kotlin-spring"
-    inputSpec = "$rootDir/src/main/resources/openapi/campfinder-api.yaml"
+    inputSpec = "$rootDir/src/main/resources/openapi/campalert-api.yaml"
     outputDir = "$buildDir/generated/openapi"
-    apiPackage = "com.davismariotti.campfinder.api"
-    modelPackage = "com.davismariotti.campfinder.api.model"
+    apiPackage = "com.davismariotti.campalert.api"
+    modelPackage = "com.davismariotti.campalert.api.model"
     configOptions = [
         delegatePattern      : "true",
         useSpringBoot3       : "true",

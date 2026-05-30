@@ -1,4 +1,4 @@
-package com.davismariotti.campfinder.recreation
+package com.davismariotti.campalert.recreation
 
 import retrofit2.Call
 import retrofit2.http.GET
@@ -16,7 +16,11 @@ interface RecreationApi {
     @GET("camps/availability/campground/{id}/month")
     fun getCampgroundAvailability(
         @Path("id") id: Int,
-        @Query("start_date") startDate: String = LocalDate.now().atStartOfDay().withDayOfMonth(1).atZone(ZoneOffset.UTC)
+        @Query("start_date") startDate: String = LocalDate
+            .now()
+            .atStartOfDay()
+            .withDayOfMonth(1)
+            .atZone(ZoneOffset.UTC)
             .format(
                 dateFormatter
             )

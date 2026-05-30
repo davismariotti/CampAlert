@@ -1,6 +1,6 @@
-package com.davismariotti.campfinder.service
+package com.davismariotti.campalert.service
 
-import com.davismariotti.campfinder.repository.SearchRequestRepository
+import com.davismariotti.campalert.repository.SearchRequestRepository
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 

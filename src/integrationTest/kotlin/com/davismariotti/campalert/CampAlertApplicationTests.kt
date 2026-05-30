@@ -1,4 +1,4 @@
-package com.davismariotti.campfinder
+package com.davismariotti.campalert
 
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest

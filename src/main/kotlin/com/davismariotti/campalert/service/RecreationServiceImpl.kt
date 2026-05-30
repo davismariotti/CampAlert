@@ -1,10 +1,10 @@
-package com.davismariotti.campfinder.service
+package com.davismariotti.campalert.service
 
-import com.davismariotti.campfinder.model.SearchRequest
-import com.davismariotti.campfinder.recreation.AvailabilityType
-import com.davismariotti.campfinder.recreation.Campground
-import com.davismariotti.campfinder.recreation.Campsite.Companion.mergeWith
-import com.davismariotti.campfinder.recreation.RecreationApi
+import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.recreation.AvailabilityType
+import com.davismariotti.campalert.recreation.Campground
+import com.davismariotti.campalert.recreation.Campsite.Companion.mergeWith
+import com.davismariotti.campalert.recreation.RecreationApi
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -76,8 +76,7 @@ class RecreationServiceImpl(
     private fun Campground.filterByAvailability() {
         campsites =
             campsites.filterValues {
-                it.availabilities.values.all {
-                        availabilityType ->
+                it.availabilities.values.all { availabilityType ->
                     availabilityType == AvailabilityType.AVAILABLE
                 }
             }

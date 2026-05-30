@@ -1,11 +1,11 @@
-package com.davismariotti.campfinder.delegate
+package com.davismariotti.campalert.delegate
 
-import com.davismariotti.campfinder.api.SearchRequestsApiDelegate
-import com.davismariotti.campfinder.api.model.CreateSearchRequestBody
-import com.davismariotti.campfinder.api.model.SearchRequestResponse
-import com.davismariotti.campfinder.api.model.UpdateSearchRequestBody
-import com.davismariotti.campfinder.model.SearchRequest
-import com.davismariotti.campfinder.repository.SearchRequestRepository
+import com.davismariotti.campalert.api.SearchRequestsApiDelegate
+import com.davismariotti.campalert.api.model.CreateSearchRequestBody
+import com.davismariotti.campalert.api.model.SearchRequestResponse
+import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
+import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.repository.SearchRequestRepository
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Service
 

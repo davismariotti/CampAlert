@@ -1,4 +1,4 @@
-# CampFinder
+# CampAlert
 
 Kotlin/Spring Boot service that monitors Recreation.gov for campground availability and sends Pushover push notifications when sites open up. Search requests are stored in PostgreSQL; a scheduler polls every 12 seconds and calls the Recreation.gov API for each pending request.
 

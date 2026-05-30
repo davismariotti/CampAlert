@@ -1,4 +1,4 @@
-package com.davismariotti.campfinder.recreation
+package com.davismariotti.campalert.recreation
 
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
@@ -23,7 +23,8 @@ class RecreationConfiguration(
             .registerModule(JavaTimeModule())
             .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        val retrofit = Retrofit.Builder()
+        val retrofit = Retrofit
+            .Builder()
             .baseUrl(baseUrl)
             .addConverterFactory(JacksonConverterFactory.create(objectMapper))
             .build()

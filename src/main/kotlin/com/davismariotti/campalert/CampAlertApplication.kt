@@ -1,4 +1,4 @@
-package com.davismariotti.campfinder
+package com.davismariotti.campalert
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication

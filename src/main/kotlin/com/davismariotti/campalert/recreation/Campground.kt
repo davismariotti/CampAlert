@@ -1,4 +1,4 @@
-package com.davismariotti.campfinder.recreation
+package com.davismariotti.campalert.recreation
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.ZonedDateTime
