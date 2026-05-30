@@ -6,7 +6,7 @@ WORKDIR /src
 
 COPY . .
 
-RUN ./gradlew assemble
+RUN ./gradlew assemble -Pversion=$VERSION
 
 RUN cp ./build/libs/CampFinder-$VERSION.jar /src/build/app.jar
 
