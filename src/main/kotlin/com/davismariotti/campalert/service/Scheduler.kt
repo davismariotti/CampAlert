@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component
 class Scheduler(
     val requestProcessor: RequestProcessor
 ) {
-    @Scheduled(fixedDelay = 12000) // 2 min
+    @Scheduled(fixedDelayString = "\${campfinder.polling.interval-ms}")
     fun execute() {
         requestProcessor.processSearchRequests()
     }

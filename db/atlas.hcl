@@ -1,4 +1,4 @@
 env "local" {
   src = "file://schema.sql"
-  url = getenv("CAMPFINDER_DB_URL")
+  url = getenv("CAMPALERT_DB_URL")
 }
