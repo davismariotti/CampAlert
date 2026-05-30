@@ -49,6 +49,36 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+sourceSets {
+    integrationTest {
+        kotlin {
+            compileClasspath += main.output + test.output
+            runtimeClasspath += main.output + test.output
+            srcDir 'src/integrationTest/kotlin'
+        }
+        resources.srcDir 'src/integrationTest/resources'
+    }
+    main {
+        kotlin {
+            srcDir "$buildDir/generated/openapi/src/main/kotlin"
+        }
+    }
+}
+
+configurations {
+    integrationTestImplementation.extendsFrom testImplementation
+    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+tasks.register('integrationTest', Test) {
+    description = 'Runs integration tests.'
+    group = 'verification'
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    useJUnitPlatform()
+    shouldRunAfter test
+}
+
 openApiGenerate {
     generatorName = "kotlin-spring"
     inputSpec = "$rootDir/src/main/resources/openapi/campfinder-api.yaml"
@@ -65,14 +95,6 @@ openApiGenerate {
         serializationLibrary : "jackson"
     ]
     ignoreFileOverride = "$rootDir/.openapi-generator-ignore"
-}
-
-sourceSets {
-    main {
-        kotlin {
-            srcDir "$buildDir/generated/openapi/src/main/kotlin"
-        }
-    }
 }
 
 compileKotlin.dependsOn tasks.openApiGenerate
