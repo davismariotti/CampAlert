@@ -1,6 +1,6 @@
-package com.davismariotti.campfinder.repository
+package com.davismariotti.campalert.repository
 
-import com.davismariotti.campfinder.model.SearchRequest
+import com.davismariotti.campalert.model.SearchRequest
 import org.springframework.data.repository.CrudRepository
 
 interface SearchRequestRepository : CrudRepository<SearchRequest, Int> {

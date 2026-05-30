@@ -14,7 +14,7 @@ if [ -z "$1" ]; then
 fi
 
 VERSION=$1
-IMAGE_NAME="davismariotti/campfinder"
+IMAGE_NAME="davismariotti/campalert"
 
 echo "Building Docker image..."
 echo "Image: ${IMAGE_NAME}"

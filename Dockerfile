@@ -8,7 +8,7 @@ COPY . .
 
 RUN ./gradlew assemble -Pversion=$VERSION
 
-RUN cp ./build/libs/CampFinder-$VERSION.jar /src/build/app.jar
+RUN cp ./build/libs/CampAlert-$VERSION.jar /src/build/app.jar
 
 FROM eclipse-temurin:21-jre AS app
 

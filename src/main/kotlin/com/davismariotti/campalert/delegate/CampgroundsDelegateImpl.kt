@@ -1,9 +1,9 @@
-package com.davismariotti.campfinder.delegate
+package com.davismariotti.campalert.delegate
 
-import com.davismariotti.campfinder.api.CampgroundsApiDelegate
-import com.davismariotti.campfinder.api.model.CampgroundResponse
-import com.davismariotti.campfinder.api.model.CampsiteResponse
-import com.davismariotti.campfinder.recreation.RecreationApi
+import com.davismariotti.campalert.api.CampgroundsApiDelegate
+import com.davismariotti.campalert.api.model.CampgroundResponse
+import com.davismariotti.campalert.api.model.CampsiteResponse
+import com.davismariotti.campalert.recreation.RecreationApi
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Service
 import java.time.format.DateTimeFormatter

@@ -1,7 +1,7 @@
-package com.davismariotti.campfinder.service
+package com.davismariotti.campalert.service
 
-import com.davismariotti.campfinder.model.SearchRequest
-import com.davismariotti.campfinder.recreation.Campground
+import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.recreation.Campground
 import net.pushover.client.PushoverClient
 import net.pushover.client.PushoverMessage
 import net.pushover.client.PushoverRestClient
@@ -17,20 +17,21 @@ class PushoverService(
         val client: PushoverClient = PushoverRestClient()
 
         client.pushMessage(
-            PushoverMessage.Builder()
+            PushoverMessage
+                .Builder()
                 .setApiToken(apiToken)
                 .setUserId(userToken)
                 .setMessage(buildMessage(campground, request))
                 .setUrl(
                     "https://www.recreation.gov/camping/campgrounds/%d".format(request.campsiteId)
-                )
-                .build()
+                ).build()
         )
     }
 
     fun buildMessage(campground: Campground, request: SearchRequest): String {
         val sb = StringBuilder()
-        sb.append("${request.name} - ${request.startDay} (${request.startDay.plusDays(request.nights.toLong())})")
+        sb
+            .append("${request.name} - ${request.startDay} (${request.startDay.plusDays(request.nights.toLong())})")
             .append("\n")
 
         // Construct the message parts for each campsite

@@ -1,4 +1,4 @@
-package com.davismariotti.campfinder.model
+package com.davismariotti.campalert.model
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
