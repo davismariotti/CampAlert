@@ -19,21 +19,16 @@ class RecreationConfiguration(
 ) {
 
     @Bean
-    fun objectMapper(): ObjectMapper {
-        return jacksonObjectMapper()
-            .registerModule(KotlinModule.Builder().build()) // Add support for Kotlin
+    fun getRecreationClient(): RecreationApi {
+        val objectMapper = jacksonObjectMapper()
+            .registerModule(KotlinModule.Builder().build())
             .registerModule(JavaTimeModule())
             .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false) // Ignore unknown fields
-    }
-
-    @Bean
-    fun getRecreationClient(objectMapper: ObjectMapper): RecreationApi {
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         val retrofit = Retrofit.Builder()
             .baseUrl(baseUrl)
-            .addConverterFactory(JacksonConverterFactory.create(objectMapper)) // Use the customized ObjectMapper
+            .addConverterFactory(JacksonConverterFactory.create(objectMapper))
             .build()
-
         return retrofit.create(RecreationApi::class.java)
     }
 }

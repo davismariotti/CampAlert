@@ -1,0 +1,317 @@
+openapi: "3.0.3"
+
+info:
+  title: CampFinder API
+  version: "2.0.0"
+
+servers:
+  - url: /api
+
+tags:
+  - name: Campgrounds
+  - name: SearchRequests
+
+paths:
+  /campgrounds/{id}:
+    get:
+      tags: [Campgrounds]
+      operationId: getCampground
+      summary: Get campground availability
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Campground availability
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampgroundResponse'
+        "404":
+          description: Campground not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "502":
+          description: Recreation.gov upstream error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /search-requests:
+    get:
+      tags: [SearchRequests]
+      operationId: listSearchRequests
+      summary: List all search requests
+      parameters:
+        - name: completed
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of search requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchRequestResponse'
+    post:
+      tags: [SearchRequests]
+      operationId: createSearchRequest
+      summary: Create a new search request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSearchRequestBody'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchRequestResponse'
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /search-requests/{id}:
+    get:
+      tags: [SearchRequests]
+      operationId: getSearchRequest
+      summary: Get a search request by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Search request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchRequestResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [SearchRequests]
+      operationId: updateSearchRequest
+      summary: Update a search request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSearchRequestBody'
+      responses:
+        "200":
+          description: Updated search request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchRequestResponse'
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [SearchRequests]
+      operationId: deleteSearchRequest
+      summary: Delete a search request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    CampgroundResponse:
+      type: object
+      required:
+        - campsites
+      properties:
+        campsites:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/CampsiteResponse'
+
+    CampsiteResponse:
+      type: object
+      required:
+        - campsiteId
+        - site
+        - loop
+        - campsiteReserveType
+        - minimumNumberOfPeople
+        - maximumNumberOfPeople
+        - availabilities
+        - quantities
+      properties:
+        campsiteId:
+          type: integer
+        site:
+          type: string
+        loop:
+          type: string
+        campsiteReserveType:
+          type: string
+        minimumNumberOfPeople:
+          type: integer
+        maximumNumberOfPeople:
+          type: integer
+        availabilities:
+          type: object
+          additionalProperties:
+            type: string
+          description: Map of ISO-8601 date-time string to availability status
+        quantities:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Map of ISO-8601 date-time string to quantity
+
+    SearchRequestResponse:
+      type: object
+      required:
+        - id
+        - startDay
+        - nights
+        - groupSize
+        - campsiteId
+        - name
+        - completed
+      properties:
+        id:
+          type: integer
+        startDay:
+          type: string
+          format: date
+        nights:
+          type: integer
+          minimum: 1
+        groupSize:
+          type: integer
+          minimum: 1
+        campsiteId:
+          type: integer
+        loops:
+          type: array
+          items:
+            type: string
+          nullable: true
+        name:
+          type: string
+        completed:
+          type: boolean
+
+    CreateSearchRequestBody:
+      type: object
+      required:
+        - startDay
+        - nights
+        - groupSize
+        - campsiteId
+        - name
+      properties:
+        startDay:
+          type: string
+          format: date
+        nights:
+          type: integer
+          minimum: 1
+        groupSize:
+          type: integer
+          minimum: 1
+        campsiteId:
+          type: integer
+        loops:
+          type: array
+          items:
+            type: string
+          nullable: true
+        name:
+          type: string
+
+    UpdateSearchRequestBody:
+      type: object
+      required:
+        - startDay
+        - nights
+        - groupSize
+        - campsiteId
+        - name
+        - completed
+      properties:
+        startDay:
+          type: string
+          format: date
+        nights:
+          type: integer
+          minimum: 1
+        groupSize:
+          type: integer
+          minimum: 1
+        campsiteId:
+          type: integer
+        loops:
+          type: array
+          items:
+            type: string
+          nullable: true
+        name:
+          type: string
+        completed:
+          type: boolean
+
+    ErrorResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+        details:
+          type: string

@@ -4,6 +4,7 @@ plugins {
     id 'org.springframework.boot' version '3.3.3'
     id 'io.spring.dependency-management' version '1.1.6'
     id 'org.jetbrains.kotlin.plugin.jpa' version '1.9.25'
+    id 'org.openapi.generator' version '7.7.0'
 }
 
 group = 'com.davismariotti'
@@ -35,11 +36,48 @@ dependencies {
 
     implementation 'com.github.sps.pushover.net:pushover-client:1.0.0'
 
+    implementation 'io.swagger.core.v3:swagger-annotations:2.2.22'
+    implementation 'jakarta.validation:jakarta.validation-api:3.0.2'
+    implementation 'jakarta.annotation:jakarta.annotation-api:2.1.1'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
     runtimeOnly 'org.postgresql:postgresql'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.jetbrains.kotlin:kotlin-test-junit5'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
+
+openApiGenerate {
+    generatorName = "kotlin-spring"
+    inputSpec = "$rootDir/src/main/resources/openapi/campfinder-api.yaml"
+    outputDir = "$buildDir/generated/openapi"
+    apiPackage = "com.davismariotti.campfinder.api"
+    modelPackage = "com.davismariotti.campfinder.api.model"
+    configOptions = [
+        delegatePattern      : "true",
+        useSpringBoot3       : "true",
+        useTags              : "true",
+        documentationProvider: "none",
+        openApiNullable      : "false",
+        enumPropertyNaming   : "UPPERCASE",
+        serializationLibrary : "jackson"
+    ]
+    ignoreFileOverride = "$rootDir/.openapi-generator-ignore"
+}
+
+sourceSets {
+    main {
+        kotlin {
+            srcDir "$buildDir/generated/openapi/src/main/kotlin"
+        }
+    }
+}
+
+compileKotlin.dependsOn tasks.openApiGenerate
+
 
 kotlin {
     compilerOptions {
