@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ktlint-format
+        name: ktlint format
+        language: system
+        entry: ./gradlew ktlintFormat
+        files: \.kt$
+        pass_filenames: false
