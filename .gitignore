@@ -65,3 +65,7 @@ application-local.properties
 
 ### Environment Variables ###
 .env
+
+### Act ###
+.secrets
+.github/act-event.json

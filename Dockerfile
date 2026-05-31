@@ -6,7 +6,8 @@ WORKDIR /src
 
 COPY . .
 
-RUN ./gradlew assemble -Pversion=$VERSION
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew assemble -Pversion=$VERSION --no-daemon
 
 RUN cp ./build/libs/CampAlert-$VERSION.jar /src/build/app.jar
 
