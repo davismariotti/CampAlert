@@ -111,6 +111,10 @@ springBoot {
     mainClass = 'com.davismariotti.campalert.CampAlertApplicationKt'
 }
 
+bootJar {
+    archiveFileName = 'app.jar'
+}
+
 tasks.named('test') {
     useJUnitPlatform()
 }

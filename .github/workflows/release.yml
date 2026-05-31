@@ -69,6 +69,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+      - name: Build JAR
+        working-directory: backend
+        run: ./gradlew bootJar -Pversion=${{ needs.release-check.outputs.new-release-version }} --no-daemon
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - if: inputs.dry_run != true
@@ -88,7 +98,6 @@ jobs:
           context: backend
           platforms: linux/amd64,linux/arm64
           push: ${{ inputs.dry_run != true }}
-          build-args: VERSION=${{ needs.release-check.outputs.new-release-version }}
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
