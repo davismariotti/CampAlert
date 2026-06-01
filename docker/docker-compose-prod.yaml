@@ -3,9 +3,15 @@ name: campalert
 services:
   app:
     image: davismariotti/campalert:latest
-    network_mode: host
-    env_file: .env.prod
     restart: unless-stopped
+    env_file: .env.prod
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.campalert.rule=Host(`api.campalert.davismariotti.com`)"
+      - "traefik.http.routers.campalert.entrypoints=web"
+      - "traefik.http.services.campalert.loadbalancer.server.port=8080"
 
   # Ephemeral dev-db used only by Atlas during migrations — no persistent volume.
   atlas-dev-db:
@@ -38,3 +44,7 @@ services:
       --to "file:///db/schema.sql"
       --dev-url "postgres://dev:dev@localhost:5433/dev?sslmode=disable"
       --auto-approve
+
+networks:
+  proxy:
+    external: true
