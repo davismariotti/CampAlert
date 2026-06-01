@@ -1,3 +1,5 @@
+name: campalert
+
 services:
   app:
     image: davismariotti/campalert:latest
