@@ -15,6 +15,8 @@ fi
 
 VERSION=$1
 IMAGE_NAME="davismariotti/campalert"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BUILD_CONTEXT="$SCRIPT_DIR/.."
 
 echo "Building Docker image..."
 echo "Image: ${IMAGE_NAME}"
@@ -75,7 +77,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         -t ${IMAGE_NAME}:${VERSION} \
         -t ${IMAGE_NAME}:latest \
         --progress=plain \
-        .
+        "$BUILD_CONTEXT"
 
     if [ $? -ne 0 ]; then
         echo ""
@@ -97,7 +99,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
             -t ${IMAGE_NAME}:${VERSION} \
             -t ${IMAGE_NAME}:latest \
             --push \
-            .
+            "$BUILD_CONTEXT"
 
         echo ""
         echo "Successfully pushed multi-arch images:"
@@ -111,5 +113,5 @@ else
     echo "Skipped build"
     echo ""
     echo "To build locally for a single platform:"
-    echo "  docker build --platform linux/amd64 --build-arg VERSION=${VERSION} -t ${IMAGE_NAME}:${VERSION} ."
+    echo "  docker build --platform linux/amd64 --build-arg VERSION=${VERSION} -t ${IMAGE_NAME}:${VERSION} $BUILD_CONTEXT"
 fi

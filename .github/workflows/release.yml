@@ -3,6 +3,9 @@ name: Release
 on:
   push:
     branches: [main]
+    paths:
+      - 'backend/**'
+      - '.releaserc.json'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -82,7 +85,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
       - uses: docker/build-push-action@v6
         with:
-          context: .
+          context: backend
           platforms: linux/amd64,linux/arm64
           push: ${{ inputs.dry_run != true }}
           build-args: VERSION=${{ needs.release-check.outputs.new-release-version }}

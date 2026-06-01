@@ -4,10 +4,10 @@
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
     ["@semantic-release/exec", {
-      "prepareCmd": "sed -i 's/^version=.*/version=${nextRelease.version}/' gradle.properties && sed -i 's/^  version: \".*\"/  version: \"${nextRelease.version}\"/' src/main/resources/openapi/campalert-api.yaml"
+      "prepareCmd": "sed -i 's/^version=.*/version=${nextRelease.version}/' backend/gradle.properties && sed -i 's/^  version: \".*\"/  version: \"${nextRelease.version}\"/' backend/src/main/resources/openapi/campalert-api.yaml"
     }],
     ["@semantic-release/git", {
-      "assets": ["gradle.properties", "src/main/resources/openapi/campalert-api.yaml"],
+      "assets": ["backend/gradle.properties", "backend/src/main/resources/openapi/campalert-api.yaml"],
       "message": "ci(release): ${nextRelease.version}\n\n${nextRelease.notes}"
     }],
     "@semantic-release/github"
