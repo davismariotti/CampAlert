@@ -73,6 +73,7 @@ application-local.properties
 
 ### Environment Variables ###
 .env
+.env.prod
 
 ### Act ###
 .secrets
