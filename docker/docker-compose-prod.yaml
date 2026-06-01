@@ -7,6 +7,7 @@ services:
     env_file: .env.prod
     networks:
       - proxy
+      - db
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.campalert.rule=Host(`api.campalert.davismariotti.com`)"
@@ -48,3 +49,6 @@ services:
 networks:
   proxy:
     external: true
+  db:
+    external: true
+    name: services_backend
