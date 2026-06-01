@@ -91,6 +91,8 @@ When asked to commit or open a PR:
 
 If the work depends on a branch that hasn't been merged yet, check whether that branch is merged into `main` before branching off it. If it isn't merged, branch off the unmerged branch and open a stacked PR targeting that branch — update the target to `main` once the base branch merges.
 
+PR descriptions should only describe the change itself — what it does and why. Do not include notes about the git process (rebasing, stacking, how it relates to other PRs, etc.).
+
 ## Tests
 
 `SearchRequestRepositoryTest` is `@Disabled` — the Testcontainers setup connects correctly but the schema isn't being created in the fresh container. Needs investigation before enabling.

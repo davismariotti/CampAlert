@@ -38,4 +38,7 @@ data class SearchRequest(
 
     @Column(name = "completed")
     val completed: Boolean,
+
+    @Column(name = "user_id")
+    val userId: Long? = null,
 )

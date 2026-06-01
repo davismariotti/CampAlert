@@ -12,6 +12,14 @@ CREATE TABLE "public"."search_requests" (
   "persons" integer NOT NULL,
   PRIMARY KEY ("id")
 );
+-- Create "users" table
+CREATE TABLE "public"."users" (
+  "id" bigserial NOT NULL,
+  "email" character varying(255) NOT NULL,
+  "password_hash" character varying(255) NOT NULL,
+  PRIMARY KEY ("id"),
+  UNIQUE ("email")
+);
 -- Create "search_requests_v2" table
 CREATE TABLE "public"."search_requests_v2" (
   "id" serial NOT NULL,
@@ -22,5 +30,7 @@ CREATE TABLE "public"."search_requests_v2" (
   "loops" json NULL,
   "name" character varying(255) NOT NULL,
   "completed" boolean NOT NULL,
-  PRIMARY KEY ("id")
+  "user_id" bigint NULL,
+  PRIMARY KEY ("id"),
+  CONSTRAINT "fk_search_requests_v2_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id")
 );

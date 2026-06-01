@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: campalert
+      POSTGRES_USER: campalert
+      POSTGRES_PASSWORD: campalert
+    ports:
+      - "5432:5432"
+    volumes:
+      - ../data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campalert -d campalert"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Ephemeral dev-db used only by Atlas for diff/planning — no persistent volume needed.
+  atlas-dev-db:
+    image: postgres:16-alpine
+    profiles: [migrate]
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: arigaio/atlas
+    profiles: [migrate]
+    depends_on:
+      db:
+        condition: service_healthy
+      atlas-dev-db:
+        condition: service_healthy
+    volumes:
+      - ../backend/db:/db
+    command: >
+      schema apply
+      --url "postgres://campalert:campalert@db:5432/campalert?sslmode=disable"
+      --to "file:///db/schema.sql"
+      --dev-url "postgres://dev:dev@atlas-dev-db:5432/dev?sslmode=disable"
+      --auto-approve
