@@ -13,7 +13,7 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 echo "Running migrations..."
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate run --rm --wait migrate
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate run --rm migrate
 
 echo "Rolling out app..."
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" rollout app
