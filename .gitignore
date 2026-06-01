@@ -7,6 +7,9 @@ build/
 
 *.DS_Store
 
+openspec/
+.claude/
+
 ### STS ###
 .apt_generated
 .classpath
@@ -61,6 +64,9 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+### Local data volumes ###
+data/
 
 ### Application Properties ###
 application-local.properties

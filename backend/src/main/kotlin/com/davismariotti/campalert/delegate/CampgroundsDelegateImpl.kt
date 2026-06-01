@@ -5,6 +5,7 @@ import com.davismariotti.campalert.api.model.CampgroundResponse
 import com.davismariotti.campalert.api.model.CampsiteResponse
 import com.davismariotti.campalert.recreation.RecreationApi
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import java.time.format.DateTimeFormatter
 
@@ -12,6 +13,7 @@ import java.time.format.DateTimeFormatter
 class CampgroundsDelegateImpl(
     private val recreationApi: RecreationApi
 ) : CampgroundsApiDelegate {
+    @PreAuthorize("isAuthenticated()")
     override fun getCampground(id: Int): ResponseEntity<CampgroundResponse> {
         val campground = recreationApi.getCampgroundAvailability(id).execute().body()
             ?: return ResponseEntity.notFound().build()

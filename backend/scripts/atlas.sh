@@ -1,56 +1,35 @@
 #!/bin/bash
 
-# Atlas schema management via Docker
+# Atlas schema management via Docker Compose
 # Usage:
 #   ./scripts/atlas.sh diff    — preview changes (schema.sql vs live DB)
-#   ./scripts/atlas.sh apply   — apply changes to live DB (with confirmation)
+#   ./scripts/atlas.sh apply   — apply changes to live DB
 #   ./scripts/atlas.sh inspect — re-inspect live DB and overwrite schema.sql
 
 set -e
 
-DB_URL="postgres://npsfinder:NBk4mZfZ7-ro7aLjK8@host.docker.internal:5432/npsfinder?sslmode=disable"
-SCHEMA_FILE="$(cd "$(dirname "$0")/../db" && pwd)/schema.sql"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCHEMA_FILE="$SCRIPT_DIR/../db/schema.sql"
+COMPOSE=(docker-compose -f "$SCRIPT_DIR/../../docker/docker-compose-dev.yaml" --profile migrate)
 COMMAND=${1:-diff}
 
-run_atlas() {
-    docker network create atlas-net 2>/dev/null || true
-
-    docker run --rm -d --name atlas-pg-dev --network atlas-net \
-        -e POSTGRES_PASSWORD=dev -e POSTGRES_USER=dev -e POSTGRES_DB=dev \
-        postgres:16-alpine >/dev/null 2>&1
-
-    # Wait for dev postgres to be ready
-    for i in $(seq 1 10); do
-        docker exec atlas-pg-dev pg_isready -U dev >/dev/null 2>&1 && break
-        sleep 1
-    done
-
-    docker run --rm --network atlas-net \
-        -v "$(dirname "$SCHEMA_FILE"):/db" \
-        arigaio/atlas "$@"
-
-    docker stop atlas-pg-dev >/dev/null 2>&1 || true
-    docker network rm atlas-net >/dev/null 2>&1 || true
-}
+DB_URL="postgres://campalert:campalert@db:5432/campalert?sslmode=disable"
+DEV_URL="postgres://dev:dev@atlas-dev-db:5432/dev?sslmode=disable"
 
 case "$COMMAND" in
     diff)
-        echo "Comparing schema.sql to live DB..."
-        run_atlas schema diff \
+        "${COMPOSE[@]}" run --rm migrate \
+            schema diff \
             --from "$DB_URL" \
             --to "file:///db/schema.sql" \
-            --dev-url "postgres://dev:dev@atlas-pg-dev:5432/dev?sslmode=disable"
+            --dev-url "$DEV_URL"
         ;;
     apply)
-        echo "Applying schema.sql to live DB..."
-        run_atlas schema apply \
-            --url "$DB_URL" \
-            --to "file:///db/schema.sql" \
-            --dev-url "postgres://dev:dev@atlas-pg-dev:5432/dev?sslmode=disable"
+        "${COMPOSE[@]}" run --rm migrate
         ;;
     inspect)
-        echo "Inspecting live DB and writing to db/schema.sql..."
-        docker run --rm arigaio/atlas schema inspect \
+        "${COMPOSE[@]}" run --rm -T migrate \
+            schema inspect \
             --url "$DB_URL" \
             --format '{{ sql . }}' \
             > "$SCHEMA_FILE"
