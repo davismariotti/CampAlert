@@ -1,0 +1,38 @@
+services:
+  app:
+    image: davismariotti/campalert:latest
+    network_mode: host
+    env_file: .env.prod
+    restart: unless-stopped
+
+  # Ephemeral dev-db used only by Atlas during migrations — no persistent volume.
+  atlas-dev-db:
+    image: postgres:16-alpine
+    network_mode: host
+    profiles: [migrate]
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: dev
+      PGPORT: "5433"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d dev -p 5433"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: arigaio/atlas
+    network_mode: host
+    profiles: [migrate]
+    depends_on:
+      atlas-dev-db:
+        condition: service_healthy
+    volumes:
+      - ../backend/db:/db
+    command: >
+      schema apply
+      --url "postgres://${DB_USERNAME}:${DB_PASSWORD}@localhost:5432/campalert?sslmode=disable"
+      --to "file:///db/schema.sql"
+      --dev-url "postgres://dev:dev@localhost:5433/dev?sslmode=disable"
+      --auto-approve
