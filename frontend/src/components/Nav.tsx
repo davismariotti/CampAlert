@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { logout } from '../api/generated/sdk.gen'
-import { useAuth } from '../features/auth/AuthContext'
+import { useAuth } from '../features/auth/useAuth'
 import { Spinner } from './ui/Spinner'
 
 export function Nav() {

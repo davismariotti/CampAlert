@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
-import { AuthProvider, useAuth } from '../features/auth/AuthContext'
+import { AuthProvider } from '../features/auth/AuthContext'
+import { useAuth } from '../features/auth/useAuth'
 import { AUTH_STORAGE_KEY } from '../api/client'
 
 function AuthDisplay() {
