@@ -1,4 +1,4 @@
-import { useState, KeyboardEvent } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { updateSearchRequest } from '../../api/generated/sdk.gen'
 import { Button } from '../../components/ui/Button'
