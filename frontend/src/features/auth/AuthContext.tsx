@@ -1,18 +1,6 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { AUTH_STORAGE_KEY } from '../../api/client'
-
-interface AuthUser {
-  id: number
-  email: string
-}
-
-interface AuthContextValue {
-  user: AuthUser | null
-  login: (user: AuthUser) => void
-  logout: () => void
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null)
+import { AuthContext, type AuthUser } from './authContext'
 
 function loadFromStorage(): AuthUser | null {
   try {
@@ -37,10 +25,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
-  return ctx
 }
