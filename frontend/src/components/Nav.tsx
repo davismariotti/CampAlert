@@ -25,9 +25,14 @@ export function Nav() {
         <span className="font-semibold">CampAlert</span>
       </Link>
 
-      <Link to="/requests" className="text-sm font-medium text-white/90 hover:text-white">
-        My Alerts
-      </Link>
+      <div className="flex items-center gap-6">
+        <Link to="/requests" className="text-sm font-medium text-white/90 hover:text-white">
+          My Alerts
+        </Link>
+        <Link to="/phone-numbers" className="text-sm font-medium text-white/90 hover:text-white">
+          Phone Numbers
+        </Link>
+      </div>
 
       <div className="flex items-center gap-3">
         <span className="text-sm text-white/70">{user.email}</span>

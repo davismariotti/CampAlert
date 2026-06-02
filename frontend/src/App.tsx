@@ -9,6 +9,7 @@ import { LoginPage } from './features/auth/LoginPage'
 import { RegisterPage } from './features/auth/RegisterPage'
 import { HomePage } from './pages/HomePage'
 import { RequestsPage } from './features/requests/RequestsPage'
+import { PhoneNumbersPage } from './features/phones/PhoneNumbersPage'
 import { getMe } from './api/generated/sdk.gen'
 import { setNavigate, AUTH_STORAGE_KEY } from './api/client'
 import { Spinner } from './components/ui/Spinner'
@@ -69,6 +70,14 @@ function AuthGate() {
           element={
             <ProtectedRoute>
               <RequestsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/phone-numbers"
+          element={
+            <ProtectedRoute>
+              <PhoneNumbersPage />
             </ProtectedRoute>
           }
         />
