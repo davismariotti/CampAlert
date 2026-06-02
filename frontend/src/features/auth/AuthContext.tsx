@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { AUTH_STORAGE_KEY } from '../../api/client'
-import { AuthContext, type AuthUser } from './authContext'
+import { AuthContext, type AuthUser } from './authState'
 
 function loadFromStorage(): AuthUser | null {
   try {
