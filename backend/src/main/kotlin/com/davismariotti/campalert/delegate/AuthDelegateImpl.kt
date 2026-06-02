@@ -36,6 +36,14 @@ class AuthDelegateImpl(
                 passwordHash = passwordEncoder.encode(registerBody.password),
             )
         )
+        val auth = authenticationManager.authenticate(
+            UsernamePasswordAuthenticationToken(registerBody.email, registerBody.password)
+        )
+        val context = SecurityContextHolder.createEmptyContext()
+        context.authentication = auth
+        SecurityContextHolder.setContext(context)
+        val session = request.getSession(true)
+        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context)
         return ResponseEntity.status(HttpStatus.CREATED).body(AuthResponse(id = user.id!!, email = user.email))
     }
 
