@@ -25,13 +25,13 @@ export function RequestEditModal({ request, onClose }: Props) {
     mutationFn: () =>
       updateSearchRequest({
         path: { id: request.id },
-        body: { name, startDay, nights, groupSize, campsiteId: request.campsiteId, loops, completed },
+        body: { name, startDay, nights, groupSize, campsiteId: request.campsiteId, loops, completed }
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['search-requests'] })
       onClose()
     },
-    onError: () => setError('Failed to update. Please try again.'),
+    onError: () => setError('Failed to update. Please try again.')
   })
 
   function addLoop(e: KeyboardEvent<HTMLInputElement>) {
@@ -55,21 +55,41 @@ export function RequestEditModal({ request, onClose }: Props) {
             <div>
               <label className="mb-1 block text-xs font-medium text-forest-600">Nights</label>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setNights((n) => Math.max(1, n - 1))}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100">−</button>
+                <button
+                  type="button"
+                  onClick={() => setNights((n) => Math.max(1, n - 1))}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
+                >
+                  −
+                </button>
                 <span className="w-6 text-center text-sm font-medium">{nights}</span>
-                <button type="button" onClick={() => setNights((n) => n + 1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100">+</button>
+                <button
+                  type="button"
+                  onClick={() => setNights((n) => n + 1)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
+                >
+                  +
+                </button>
               </div>
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-forest-600">Group size</label>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setGroupSize((n) => Math.max(1, n - 1))}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100">−</button>
+                <button
+                  type="button"
+                  onClick={() => setGroupSize((n) => Math.max(1, n - 1))}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
+                >
+                  −
+                </button>
                 <span className="w-6 text-center text-sm font-medium">{groupSize}</span>
-                <button type="button" onClick={() => setGroupSize((n) => n + 1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100">+</button>
+                <button
+                  type="button"
+                  onClick={() => setGroupSize((n) => n + 1)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
+                >
+                  +
+                </button>
               </div>
             </div>
           </div>
@@ -78,9 +98,12 @@ export function RequestEditModal({ request, onClose }: Props) {
             <label className="mb-1 block text-xs font-medium text-forest-600">Loops (press Enter to add)</label>
             <div className="flex flex-wrap gap-1 rounded-xl border border-forest-200 bg-white px-3 py-2">
               {loops.map((loop) => (
-                <button key={loop} type="button"
+                <button
+                  key={loop}
+                  type="button"
                   onClick={() => setLoops((prev) => prev.filter((l) => l !== loop))}
-                  className="flex items-center gap-1 rounded-full bg-forest-100 px-2 py-0.5 text-xs font-medium text-forest-700 hover:bg-forest-200">
+                  className="flex items-center gap-1 rounded-full bg-forest-100 px-2 py-0.5 text-xs font-medium text-forest-700 hover:bg-forest-200"
+                >
                   {loop} ×
                 </button>
               ))}
@@ -95,16 +118,24 @@ export function RequestEditModal({ request, onClose }: Props) {
           </div>
 
           <label className="flex items-center gap-2 text-sm text-forest-700">
-            <input type="checkbox" checked={completed} onChange={(e) => setCompleted(e.target.checked)}
-              className="rounded border-forest-300" />
+            <input
+              type="checkbox"
+              checked={completed}
+              onChange={(e) => setCompleted(e.target.checked)}
+              className="rounded border-forest-300"
+            />
             Mark as completed
           </label>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button loading={mutation.isPending} onClick={() => mutation.mutate()}>Save</Button>
+            <Button variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button loading={mutation.isPending} onClick={() => mutation.mutate()}>
+              Save
+            </Button>
           </div>
         </div>
       </div>

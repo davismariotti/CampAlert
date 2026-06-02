@@ -24,7 +24,7 @@ client.instance.interceptors.response.use(
       navigateFn?.('/login')
     }
     return Promise.reject(error)
-  },
+  }
 )
 
 export { client }

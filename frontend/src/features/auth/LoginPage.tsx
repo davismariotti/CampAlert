@@ -30,7 +30,7 @@ export function LoginPage() {
       } else {
         setError('Something went wrong. Please try again.')
       }
-    },
+    }
   })
 
   const canSubmit = email.trim() !== '' && password !== ''

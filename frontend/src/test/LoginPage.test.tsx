@@ -34,15 +34,11 @@ describe('LoginPage', () => {
   })
 
   it('shows error on 401', async () => {
-    vi.spyOn(sdk, 'login').mockRejectedValueOnce(
-      Object.assign(new Error(), { response: { status: 401 } })
-    )
+    vi.spyOn(sdk, 'login').mockRejectedValueOnce(Object.assign(new Error(), { response: { status: 401 } }))
     render(<Wrapper />)
     await userEvent.type(screen.getByPlaceholderText('Email'), 'a@b.com')
     await userEvent.type(screen.getByPlaceholderText('Password'), 'wrong')
     await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
-    await waitFor(() =>
-      expect(screen.getByText('Invalid email or password')).toBeInTheDocument()
-    )
+    await waitFor(() => expect(screen.getByText('Invalid email or password')).toBeInTheDocument())
   })
 })

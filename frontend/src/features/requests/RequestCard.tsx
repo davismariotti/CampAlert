@@ -17,7 +17,7 @@ export function RequestCard({ request }: Props) {
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteSearchRequest({ path: { id: request.id } }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['search-requests'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['search-requests'] })
   })
 
   const dateRange = `${request.startDay} · ${request.nights} night${request.nights !== 1 ? 's' : ''}`
@@ -55,10 +55,7 @@ export function RequestCard({ request }: Props) {
           {request.loops && request.loops.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {request.loops.map((loop) => (
-                <span
-                  key={loop}
-                  className="rounded-full bg-forest-100 px-2 py-0.5 text-xs font-medium text-forest-600"
-                >
+                <span key={loop} className="rounded-full bg-forest-100 px-2 py-0.5 text-xs font-medium text-forest-600">
                   {loop}
                 </span>
               ))}
@@ -67,17 +64,13 @@ export function RequestCard({ request }: Props) {
         </div>
       </div>
 
-      {showEdit && (
-        <RequestEditModal request={request} onClose={() => setShowEdit(false)} />
-      )}
+      {showEdit && <RequestEditModal request={request} onClose={() => setShowEdit(false)} />}
 
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-md">
             <h2 className="mb-2 font-semibold text-forest-900">Delete alert?</h2>
-            <p className="mb-6 text-sm text-forest-600">
-              "{request.name}" will be permanently removed.
-            </p>
+            <p className="mb-6 text-sm text-forest-600">"{request.name}" will be permanently removed.</p>
             <div className="flex justify-end gap-3">
               <Button variant="secondary" onClick={() => setShowConfirm(false)}>
                 Cancel

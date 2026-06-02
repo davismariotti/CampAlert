@@ -30,10 +30,10 @@ export function RequestBuilder({ campground, onClear }: Props) {
           nights,
           groupSize,
           campsiteId: campground.id,
-          loops: loops.length > 0 ? loops : null,
-        },
+          loops: loops.length > 0 ? loops : null
+        }
       }),
-    onSuccess: () => navigate('/requests'),
+    onSuccess: () => navigate('/requests')
   })
 
   function validate() {
@@ -76,20 +76,12 @@ export function RequestBuilder({ campground, onClear }: Props) {
       <div className="rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4">
           <div>
-            <Input
-              placeholder="Alert name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+            <Input placeholder="Alert name" value={name} onChange={(e) => setName(e.target.value)} />
             {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
           </div>
 
           <div>
-            <Input
-              type="date"
-              value={startDay}
-              onChange={(e) => setStartDay(e.target.value)}
-            />
+            <Input type="date" value={startDay} onChange={(e) => setStartDay(e.target.value)} />
             {errors.startDay && <p className="mt-1 text-xs text-red-600">{errors.startDay}</p>}
           </div>
 
