@@ -37,6 +37,7 @@ dependencies {
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.2'
 
     implementation 'com.github.sps.pushover.net:pushover-client:1.0.0'
+    implementation 'com.twilio.sdk:twilio:10.4.1'
 
     implementation 'io.swagger.core.v3:swagger-annotations:2.2.22'
     implementation 'jakarta.validation:jakarta.validation-api:3.0.2'

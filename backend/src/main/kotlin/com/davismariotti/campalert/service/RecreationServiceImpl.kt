@@ -1,6 +1,7 @@
 package com.davismariotti.campalert.service
 
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.recreation.AvailabilityType
 import com.davismariotti.campalert.recreation.Campground
 import com.davismariotti.campalert.recreation.Campsite.Companion.mergeWith
@@ -14,9 +15,9 @@ import java.time.format.DateTimeFormatter
 @Service
 class RecreationServiceImpl(
     val recreationApi: RecreationApi,
-    val pushoverService: PushoverService
+    val notificationRouter: NotificationRouter,
 ) : RecreationService {
-    override fun checkAvailability(searchRequest: SearchRequest) {
+    override fun checkAvailability(searchRequest: SearchRequest, user: User,) {
         // Find months
         val endNight = searchRequest.startDay.plusDays(searchRequest.nights.toLong())
         var monthStart = searchRequest.startDay.withDayOfMonth(1)
@@ -49,7 +50,7 @@ class RecreationServiceImpl(
         campground.removeExtraDates(searchRequest.startDay, endNight)
         campground.filterByAvailability()
 
-        pushoverService.pushMessage(searchRequest, campground)
+        notificationRouter.resolve(user).notify(searchRequest, campground, user)
     }
 
     private fun Campground.filterByLoops(loops: List<String>?) {

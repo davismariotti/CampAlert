@@ -1,27 +1,32 @@
 package com.davismariotti.campalert.service
 
 import com.davismariotti.campalert.repository.SearchRequestRepository
+import com.davismariotti.campalert.repository.UserRepository
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 
 @Service
 class RequestProcessor(
     val searchRequestRepository: SearchRequestRepository,
-    val recreationService: RecreationService
+    val userRepository: UserRepository,
+    val recreationService: RecreationService,
 ) {
-    fun processSearchRequests() {
-        val searchRequests = searchRequestRepository.findByCompletedFalse()
+    private val log = LoggerFactory.getLogger(javaClass)
 
-        searchRequests.forEach {
-            if (it.startDay < LocalDate.now()) {
-                searchRequestRepository.save(
-                    it.copy(
-                        completed = true
-                    )
-                )
+    fun processSearchRequests() {
+        searchRequestRepository.findByCompletedFalse().forEach { request ->
+            if (request.startDay < LocalDate.now()) {
+                searchRequestRepository.save(request.copy(completed = true))
                 return@forEach
             }
-            recreationService.checkAvailability(it)
+            if (request.pauseReason != null) return@forEach
+            val user = userRepository.findById(request.userId!!).orElse(null)
+            if (user == null) {
+                log.warn("No user found for search request=${request.id}, skipping")
+                return@forEach
+            }
+            recreationService.checkAvailability(request, user)
         }
     }
 }
