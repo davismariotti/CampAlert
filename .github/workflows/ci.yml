@@ -21,8 +21,10 @@ jobs:
           filters: |
             backend:
               - 'backend/**'
+              - 'api/**'
             frontend:
               - 'frontend/**'
+              - 'api/**'
 
   backend-lint:
     needs: changes
@@ -99,6 +101,8 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - name: Generate API types
+        run: npm run generate
       - name: Run tests
         run: npm test
 
