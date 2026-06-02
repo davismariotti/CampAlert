@@ -29,7 +29,10 @@ function AuthGate() {
     getMe()
       .then(({ data }) => {
         if (data) login(data)
-        else { logout(); navigate('/login') }
+        else {
+          logout()
+          navigate('/login')
+        }
       })
       .catch(() => {
         logout()

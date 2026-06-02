@@ -10,6 +10,6 @@ export function useCampgroundSearch(query: string) {
     queryKey: ['campgrounds', 'search', debouncedQuery],
     queryFn: () => searchCampgrounds({ query: { q: debouncedQuery } }).then((r) => r.data ?? []),
     enabled,
-    staleTime: 30_000,
+    staleTime: 30_000
   })
 }

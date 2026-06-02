@@ -14,13 +14,9 @@ export function HomePage() {
         <p className="text-forest-600">Never miss a campsite opening.</p>
       </div>
 
-      {!selected && (
-        <CampgroundSearch onSelect={(cg) => setSelected(cg)} />
-      )}
+      {!selected && <CampgroundSearch onSelect={(cg) => setSelected(cg)} />}
 
-      {selected && (
-        <RequestBuilder campground={selected} onClear={() => setSelected(null)} />
-      )}
+      {selected && <RequestBuilder campground={selected} onClear={() => setSelected(null)} />}
     </div>
   )
 }

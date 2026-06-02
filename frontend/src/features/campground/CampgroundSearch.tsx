@@ -41,27 +41,26 @@ export function CampgroundSearch({ onSelect }: Props) {
 
       {showDropdown && (
         <div className="absolute z-10 mt-1 w-full rounded-2xl bg-white shadow-md">
-          {isError && (
-            <p className="px-4 py-3 text-sm text-red-600">Failed to load results. Try again.</p>
-          )}
+          {isError && <p className="px-4 py-3 text-sm text-red-600">Failed to load results. Try again.</p>}
           {!isError && !isFetching && data?.length === 0 && (
             <p className="px-4 py-3 text-sm text-forest-400">No campgrounds found</p>
           )}
-          {!isError && (data ?? []).map((cg) => (
-            <button
-              key={cg.id}
-              type="button"
-              className="flex w-full flex-col px-4 py-3 text-left hover:bg-forest-100 first:rounded-t-2xl last:rounded-b-2xl"
-              onMouseDown={() => {
-                onSelect(cg)
-                setQuery('')
-                setOpen(false)
-              }}
-            >
-              <span className="text-sm font-medium text-forest-900">{cg.name}</span>
-              <span className="text-xs text-forest-500">ID: {cg.id}</span>
-            </button>
-          ))}
+          {!isError &&
+            (data ?? []).map((cg) => (
+              <button
+                key={cg.id}
+                type="button"
+                className="flex w-full flex-col px-4 py-3 text-left hover:bg-forest-100 first:rounded-t-2xl last:rounded-b-2xl"
+                onMouseDown={() => {
+                  onSelect(cg)
+                  setQuery('')
+                  setOpen(false)
+                }}
+              >
+                <span className="text-sm font-medium text-forest-900">{cg.name}</span>
+                <span className="text-xs text-forest-500">ID: {cg.id}</span>
+              </button>
+            ))}
         </div>
       )}
     </div>

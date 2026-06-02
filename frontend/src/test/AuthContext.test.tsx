@@ -18,19 +18,31 @@ describe('AuthContext', () => {
   beforeEach(() => localStorage.clear())
 
   it('starts with null user when localStorage is empty', () => {
-    render(<AuthProvider><AuthDisplay /></AuthProvider>)
+    render(
+      <AuthProvider>
+        <AuthDisplay />
+      </AuthProvider>
+    )
     expect(screen.getByTestId('user').textContent).toBe('null')
   })
 
   it('login stores user in context and localStorage', () => {
-    render(<AuthProvider><AuthDisplay /></AuthProvider>)
+    render(
+      <AuthProvider>
+        <AuthDisplay />
+      </AuthProvider>
+    )
     act(() => screen.getByText('login').click())
     expect(screen.getByTestId('user').textContent).toContain('a@b.com')
     expect(JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)!).email).toBe('a@b.com')
   })
 
   it('logout clears context and localStorage', () => {
-    render(<AuthProvider><AuthDisplay /></AuthProvider>)
+    render(
+      <AuthProvider>
+        <AuthDisplay />
+      </AuthProvider>
+    )
     act(() => screen.getByText('login').click())
     act(() => screen.getByText('logout').click())
     expect(screen.getByTestId('user').textContent).toBe('null')
@@ -39,7 +51,11 @@ describe('AuthContext', () => {
 
   it('seeds from localStorage on mount', () => {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ id: 2, email: 'seed@test.com' }))
-    render(<AuthProvider><AuthDisplay /></AuthProvider>)
+    render(
+      <AuthProvider>
+        <AuthDisplay />
+      </AuthProvider>
+    )
     expect(screen.getByTestId('user').textContent).toContain('seed@test.com')
   })
 })

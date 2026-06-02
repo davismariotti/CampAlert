@@ -13,7 +13,7 @@ export function Nav() {
     onSettled: () => {
       clearAuth()
       navigate('/login')
-    },
+    }
   })
 
   if (!user) return null

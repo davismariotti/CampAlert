@@ -23,8 +23,7 @@ export function RequestsPage() {
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['search-requests', filter],
-    queryFn: () =>
-      listSearchRequests({ query: { completed } }).then((r) => r.data ?? []),
+    queryFn: () => listSearchRequests({ query: { completed } }).then((r) => r.data ?? [])
   })
 
   const all = data ?? []
@@ -34,7 +33,7 @@ export function RequestsPage() {
   const tabs: { key: Filter; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'watching', label: 'Watching' },
-    { key: 'done', label: 'Done' },
+    { key: 'done', label: 'Done' }
   ]
 
   return (

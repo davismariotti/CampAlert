@@ -27,17 +27,11 @@ describe('RegisterPage', () => {
   })
 
   it('shows email-taken error on 409', async () => {
-    vi.spyOn(sdk, 'register').mockRejectedValueOnce(
-      Object.assign(new Error(), { response: { status: 409 } })
-    )
+    vi.spyOn(sdk, 'register').mockRejectedValueOnce(Object.assign(new Error(), { response: { status: 409 } }))
     render(<Wrapper />)
     await userEvent.type(screen.getByPlaceholderText('Email'), 'existing@b.com')
     await userEvent.type(screen.getByPlaceholderText('Password'), 'pass')
     await userEvent.click(screen.getByRole('button', { name: /create account/i }))
-    await waitFor(() =>
-      expect(
-        screen.getByText('An account with this email already exists')
-      ).toBeInTheDocument()
-    )
+    await waitFor(() => expect(screen.getByText('An account with this email already exists')).toBeInTheDocument())
   })
 })
