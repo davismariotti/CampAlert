@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { listSearchRequests } from '../../api/generated/sdk.gen'
+import { listSearchRequests, listPhoneNumbers } from '../../api/generated/sdk.gen'
 import { RequestCard } from './RequestCard'
 
 type Filter = 'all' | 'watching' | 'done'
@@ -25,6 +25,13 @@ export function RequestsPage() {
     queryKey: ['search-requests', filter],
     queryFn: () => listSearchRequests({ query: { completed } }).then((r) => r.data ?? [])
   })
+
+  const { data: phones } = useQuery({
+    queryKey: ['phone-numbers'],
+    queryFn: () => listPhoneNumbers().then((r) => r.data ?? [])
+  })
+
+  const hasVerifiedPhone = (phones ?? []).some((p) => p.status === 'VERIFIED')
 
   const all = data ?? []
   const watchingCount = all.filter((r) => !r.completed).length
@@ -53,6 +60,19 @@ export function RequestsPage() {
           + New Alert
         </Link>
       </div>
+
+      {phones !== undefined && !hasVerifiedPhone && (
+        <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <span className="mt-0.5 text-amber-500">⚠</span>
+          <p className="text-sm text-amber-800">
+            You don't have a verified phone number. Alerts won't fire and new alerts can't be created.{' '}
+            <Link to="/phone-numbers" className="font-medium underline hover:text-amber-900">
+              Add a phone number
+            </Link>
+            .
+          </p>
+        </div>
+      )}
 
       <div className="mb-6 flex gap-1 border-b border-forest-200">
         {tabs.map((tab) => (

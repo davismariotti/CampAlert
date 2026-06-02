@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { deleteSearchRequest } from '../../api/generated/sdk.gen'
 import { Badge } from '../../components/ui/Badge'
@@ -60,6 +61,15 @@ export function RequestCard({ request }: Props) {
                 </span>
               ))}
             </div>
+          )}
+          {request.pauseReason === 'NO_VERIFIED_PHONE' && (
+            <p className="text-xs text-amber-700">
+              Paused — no verified phone.{' '}
+              <Link to="/phone-numbers" className="font-medium underline hover:text-amber-900">
+                Add one
+              </Link>{' '}
+              to resume.
+            </p>
           )}
         </div>
       </div>

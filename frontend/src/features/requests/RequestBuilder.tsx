@@ -1,10 +1,11 @@
 import { useState, type KeyboardEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { createSearchRequest } from '../../api/generated/sdk.gen'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import type { CampgroundSearchResult } from '../../api/generated/types.gen'
+import type { AxiosError } from 'axios'
 
 interface Props {
   campground: CampgroundSearchResult
@@ -20,6 +21,7 @@ export function RequestBuilder({ campground, onClear }: Props) {
   const [loops, setLoops] = useState<string[]>([])
   const [loopInput, setLoopInput] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [submitError, setSubmitError] = useState<{ noPhone?: boolean; message?: string } | null>(null)
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -33,7 +35,15 @@ export function RequestBuilder({ campground, onClear }: Props) {
           loops: loops.length > 0 ? loops : null
         }
       }),
-    onSuccess: () => navigate('/requests')
+    onSuccess: () => navigate('/requests'),
+    onError: (err: AxiosError<{ code?: string; message?: string }>) => {
+      const code = err.response?.data?.code
+      if (err.response?.status === 422 && code === 'NO_VERIFIED_PHONE') {
+        setSubmitError({ noPhone: true })
+      } else {
+        setSubmitError({ message: err.response?.data?.message ?? 'Something went wrong. Please try again.' })
+      }
+    }
   })
 
   function validate() {
@@ -154,11 +164,23 @@ export function RequestBuilder({ campground, onClear }: Props) {
             </div>
           </div>
 
+          {submitError?.noPhone && (
+            <p className="text-sm text-amber-700">
+              You need a verified phone number to create alerts.{' '}
+              <Link to="/phone-numbers" className="font-medium underline hover:text-amber-900">
+                Add one now
+              </Link>
+              .
+            </p>
+          )}
+          {submitError?.message && <p className="text-sm text-red-600">{submitError.message}</p>}
+
           <Button
             type="button"
             loading={mutation.isPending}
             disabled={!canSubmit}
             onClick={() => {
+              setSubmitError(null)
               if (validate()) mutation.mutate()
             }}
           >
