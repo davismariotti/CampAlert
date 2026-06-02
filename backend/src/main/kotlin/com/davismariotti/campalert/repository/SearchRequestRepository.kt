@@ -11,4 +11,8 @@ interface SearchRequestRepository : CrudRepository<SearchRequest, Int> {
     fun findByUserId(userId: Long): List<SearchRequest>
 
     fun findByCompletedAndUserId(completed: Boolean, userId: Long): List<SearchRequest>
+
+    fun findByUserIdAndCompletedFalseAndPauseReasonIsNull(userId: Long): List<SearchRequest>
+
+    fun findByUserIdAndPauseReason(userId: Long, pauseReason: String): List<SearchRequest>
 }

@@ -19,4 +19,13 @@ data class User(
 
     @Column(name = "password_hash", nullable = false)
     val passwordHash: String,
+
+    @Column(name = "pushover_user_key")
+    val pushoverUserKey: String? = null,
+
+    @Column(name = "pushover_api_token")
+    val pushoverApiToken: String? = null,
+
+    @Column(name = "pushover_override_enabled", nullable = false)
+    val pushoverOverrideEnabled: Boolean = false,
 )

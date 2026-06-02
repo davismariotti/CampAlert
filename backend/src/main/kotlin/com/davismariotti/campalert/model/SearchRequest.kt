@@ -41,4 +41,7 @@ data class SearchRequest(
 
     @Column(name = "user_id")
     val userId: Long? = null,
+
+    @Column(name = "pause_reason")
+    val pauseReason: String? = null,
 )
