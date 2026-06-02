@@ -15,7 +15,7 @@ fi
 
 echo "Running migrations..."
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate run --rm migrate
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate down
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate rm --stop --force atlas-dev-db
 
 echo "Starting infra services..."
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d
@@ -25,7 +25,8 @@ docker rollout -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile app app
 
 echo "Deploying frontend..."
 TMPDIR=$(mktemp -d)
-gh release download --latest --pattern "frontend-dist.zip" --repo davismariotti/CampAlert --output "$TMPDIR/frontend-dist.zip"
+LATEST_TAG=$(gh release view --repo davismariotti/CampAlert --json tagName --jq .tagName)
+gh release download "$LATEST_TAG" --pattern "frontend-dist.zip" --repo davismariotti/CampAlert --output "$TMPDIR/frontend-dist.zip"
 unzip -o "$TMPDIR/frontend-dist.zip" -d "$TMPDIR/extracted"
 mkdir -p "$FRONTEND_WEB_ROOT"
 cp -r "$TMPDIR/extracted/frontend/dist/." "$FRONTEND_WEB_ROOT/"
