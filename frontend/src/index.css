@@ -1,0 +1,23 @@
+@import '@fontsource/inter';
+@import 'tailwindcss';
+
+@theme {
+  --color-forest-950: #0f2219;
+  --color-forest-900: #1a3d2e;
+  --color-forest-800: #1e4a38;
+  --color-forest-700: #2d6147;
+  --color-forest-600: #3d7a5a;
+  --color-forest-500: #4a8c6a;
+  --color-forest-400: #6aaa84;
+  --color-forest-300: #8fc4a0;
+  --color-forest-200: #b8d9c4;
+  --color-forest-100: #dff0e8;
+  --color-forest-50: #f0f8f4;
+
+  --font-sans: 'Inter', sans-serif;
+}
+
+body {
+  @apply bg-forest-50 font-sans text-forest-900;
+  margin: 0;
+}
