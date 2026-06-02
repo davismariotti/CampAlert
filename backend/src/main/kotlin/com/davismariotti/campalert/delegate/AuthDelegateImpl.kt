@@ -64,4 +64,11 @@ class AuthDelegateImpl(
         request.getSession(false)?.invalidate()
         return ResponseEntity.noContent().build()
     }
+
+    @PreAuthorize("isAuthenticated()")
+    override fun getMe(): ResponseEntity<AuthResponse> {
+        val auth = SecurityContextHolder.getContext().authentication
+        val user = userRepository.findByEmail(auth.name)!!
+        return ResponseEntity.ok(AuthResponse(id = user.id!!, email = user.email))
+    }
 }

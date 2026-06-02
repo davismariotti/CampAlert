@@ -2,11 +2,14 @@ package com.davismariotti.campalert.delegate
 
 import com.davismariotti.campalert.api.CampgroundsApiDelegate
 import com.davismariotti.campalert.api.model.CampgroundResponse
+import com.davismariotti.campalert.api.model.CampgroundSearchResult
 import com.davismariotti.campalert.api.model.CampsiteResponse
 import com.davismariotti.campalert.recreation.RecreationApi
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
+import org.springframework.web.server.ResponseStatusException
 import java.time.format.DateTimeFormatter
 
 @Service
@@ -37,5 +40,25 @@ class CampgroundsDelegateImpl(
             }
         )
         return ResponseEntity.ok(response)
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    override fun searchCampgrounds(q: String): ResponseEntity<List<CampgroundSearchResult>> {
+        if (q.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Query parameter 'q' must not be blank")
+        }
+        val response = try {
+            recreationApi.searchSuggest(q).execute()
+        } catch (ex: Exception) {
+            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Recreation.gov upstream error")
+        }
+        if (!response.isSuccessful) {
+            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Recreation.gov upstream error")
+        }
+        val results = response.body()?.inventorySuggestions
+            ?.filter { it.entityType == "campground" }
+            ?.map { CampgroundSearchResult(id = it.entityId.toIntOrNull() ?: 0, name = it.name) }
+            ?: emptyList()
+        return ResponseEntity.ok(results)
     }
 }
