@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'frontend/**'
       - '.releaserc.json'
   workflow_dispatch:
     inputs:
@@ -102,8 +103,33 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  build-frontend:
+    needs: release-check
+    if: needs.release-check.outputs.new-release-published == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+      - name: Zip dist
+        run: zip -r frontend-dist.zip frontend/dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend-dist.zip
+          retention-days: 1
+
   release:
-    needs: [release-check, build-and-push-docker]
+    needs: [release-check, build-and-push-docker, build-frontend]
     if: needs.release-check.outputs.new-release-published == 'true' && inputs.dry_run != true
     runs-on: ubuntu-latest
     permissions:
@@ -122,3 +148,11 @@ jobs:
             @semantic-release/git@10
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+      - name: Attach frontend to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "v${{ needs.release-check.outputs.new-release-version }}" frontend-dist.zip --clobber
