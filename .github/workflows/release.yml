@@ -6,6 +6,7 @@ on:
     paths:
       - 'backend/**'
       - 'frontend/**'
+      - 'api/**'
       - '.releaserc.json'
   workflow_dispatch:
     inputs:
@@ -117,6 +118,9 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
+      - name: Generate API types
+        working-directory: frontend
+        run: npm run generate
       - name: Build
         working-directory: frontend
         run: npm run build
