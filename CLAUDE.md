@@ -10,7 +10,7 @@ All backend code lives under `backend/`. Future `frontend/` and `infrastructure/
 
 - Kotlin 1.9.25 / Spring Boot 3.3.3 / Gradle (Groovy DSL) / Java 21
 - PostgreSQL — schema managed by Atlas (`backend/db/schema.sql` is the source of truth)
-- OpenAPI spec-first — `backend/src/main/resources/openapi/campalert-api.yaml` drives code generation via `openApiGenerate`
+- OpenAPI spec-first — `api/campalert-api.yaml` drives code generation via `openApiGenerate` (shared with frontend)
 - Retrofit2 — internal client for Recreation.gov API only (not used for the app's own API)
 
 ## Running locally
@@ -26,7 +26,7 @@ Requires `backend/src/main/resources/application-local.properties` (gitignored) 
 
 | Thing | Location |
 |---|---|
-| OpenAPI spec | `backend/src/main/resources/openapi/campalert-api.yaml` |
+| OpenAPI spec | `api/campalert-api.yaml` |
 | Generated interfaces + models | `backend/build/generated/openapi/` (never edit directly) |
 | Delegate implementations | `backend/src/main/kotlin/.../delegate/` |
 | Database schema | `backend/db/schema.sql` |
@@ -47,7 +47,7 @@ When making any schema change:
 
 When adding or changing an endpoint:
 
-1. Edit `backend/src/main/resources/openapi/campalert-api.yaml`
+1. Edit `api/campalert-api.yaml`
 2. `cd backend && ./gradlew openApiGenerate` — regenerates interfaces and models into `backend/build/generated/openapi/`
 3. Update or create the delegate in `backend/src/main/kotlin/.../delegate/`
 4. `./gradlew compileKotlin` — verify no type errors before running
