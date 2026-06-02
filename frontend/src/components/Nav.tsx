@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { logout } from '../api/generated/sdk.gen'
 import { useAuth } from '../features/auth/AuthContext'
-import { Button } from './ui/Button'
+import { Spinner } from './ui/Spinner'
 
 export function Nav() {
   const { user, logout: clearAuth } = useAuth()
@@ -31,14 +31,15 @@ export function Nav() {
 
       <div className="flex items-center gap-3">
         <span className="text-sm text-white/70">{user.email}</span>
-        <Button
-          variant="secondary"
-          className="bg-transparent border-white/30 text-white hover:bg-white/10"
-          loading={logoutMutation.isPending}
+        <button
+          type="button"
+          disabled={logoutMutation.isPending}
           onClick={() => logoutMutation.mutate()}
+          className="inline-flex items-center gap-2 rounded-xl border border-white/30 px-4 py-2 text-sm font-medium text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
         >
+          {logoutMutation.isPending && <Spinner size="sm" />}
           Sign out
-        </Button>
+        </button>
       </div>
     </nav>
   )
