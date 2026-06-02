@@ -33,7 +33,7 @@ export function Nav() {
         <span className="text-sm text-white/70">{user.email}</span>
         <Button
           variant="secondary"
-          className="border-white/30 text-white hover:bg-white/10"
+          className="bg-transparent border-white/30 text-white hover:bg-white/10"
           loading={logoutMutation.isPending}
           onClick={() => logoutMutation.mutate()}
         >
