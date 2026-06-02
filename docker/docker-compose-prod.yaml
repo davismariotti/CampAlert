@@ -11,7 +11,7 @@ services:
       - db
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.campalert.rule=Host(`api.campalert.davismariotti.com`)"
+      - "traefik.http.routers.campalert.rule=Host(`campalert-api.davismariotti.com`)"
       - "traefik.http.routers.campalert.entrypoints=web"
       - "traefik.http.services.campalert.loadbalancer.server.port=8080"
 
