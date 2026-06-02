@@ -78,6 +78,64 @@ paths:
         "204":
           description: Logged out
 
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: getMe
+      summary: Get the current authenticated user
+      responses:
+        "200":
+          description: Current user identity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /campgrounds/search:
+    get:
+      tags: [Campgrounds]
+      operationId: searchCampgrounds
+      summary: Search campgrounds by name
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of matching campgrounds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CampgroundSearchResult'
+        "400":
+          description: Missing or blank query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "502":
+          description: Recreation.gov upstream error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /campgrounds/{id}:
     get:
       tags: [Campgrounds]
@@ -441,6 +499,17 @@ components:
           type: string
         completed:
           type: boolean
+
+    CampgroundSearchResult:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
 
     ErrorResponse:
       type: object

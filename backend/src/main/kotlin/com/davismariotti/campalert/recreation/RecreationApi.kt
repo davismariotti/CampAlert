@@ -25,4 +25,9 @@ interface RecreationApi {
                 dateFormatter
             )
     ): Call<Campground>
+
+    @GET("search/suggest")
+    fun searchSuggest(
+        @Query("q") query: String
+    ): Call<SuggestResponse>
 }
