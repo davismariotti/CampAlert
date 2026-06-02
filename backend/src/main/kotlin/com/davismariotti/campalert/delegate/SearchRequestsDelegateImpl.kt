@@ -2,9 +2,12 @@ package com.davismariotti.campalert.delegate
 
 import com.davismariotti.campalert.api.SearchRequestsApiDelegate
 import com.davismariotti.campalert.api.model.CreateSearchRequestBody
+import com.davismariotti.campalert.api.model.ErrorResponse
 import com.davismariotti.campalert.api.model.SearchRequestResponse
 import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
+import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import org.springframework.http.ResponseEntity
@@ -16,6 +19,7 @@ import org.springframework.stereotype.Service
 class SearchRequestsDelegateImpl(
     private val searchRequestRepository: SearchRequestRepository,
     private val userRepository: UserRepository,
+    private val phoneNumberRepository: PhoneNumberRepository,
 ) : SearchRequestsApiDelegate {
     private fun currentUserId(): Long {
         val email = SecurityContextHolder.getContext().authentication.name
@@ -33,11 +37,20 @@ class SearchRequestsDelegateImpl(
         return ResponseEntity.ok(results.map { it.toResponse() })
     }
 
+    @Suppress("UNCHECKED_CAST")
     @PreAuthorize("isAuthenticated()")
     override fun createSearchRequest(
-        createSearchRequestBody: CreateSearchRequestBody
+        createSearchRequestBody: CreateSearchRequestBody,
     ): ResponseEntity<SearchRequestResponse> {
         val userId = currentUserId()
+        if (phoneNumberRepository.countByUserIdAndStatus(userId, PhoneNumberStatus.VERIFIED) == 0L) {
+            return ResponseEntity.status(422).body(
+                ErrorResponse(
+                    message = "A verified phone number is required to create a search request.",
+                    code = "NO_VERIFIED_PHONE",
+                ),
+            ) as ResponseEntity<SearchRequestResponse>
+        }
         val entity = SearchRequest(
             startDay = createSearchRequestBody.startDay,
             nights = createSearchRequestBody.nights,
@@ -101,5 +114,6 @@ class SearchRequestsDelegateImpl(
             loops = this.loops,
             name = this.name,
             completed = this.completed,
+            pauseReason = this.pauseReason,
         )
 }

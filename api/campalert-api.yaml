@@ -11,6 +11,7 @@ tags:
   - name: Auth
   - name: Campgrounds
   - name: SearchRequests
+  - name: PhoneNumbers
 
 paths:
   /auth/register:
@@ -228,6 +229,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        "422":
+          description: No verified phone number on account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /search-requests/{id}:
     get:
@@ -310,6 +317,140 @@ paths:
           required: true
           schema:
             type: integer
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /phone-numbers:
+    get:
+      tags: [PhoneNumbers]
+      operationId: listPhoneNumbers
+      summary: List the authenticated user's phone numbers
+      responses:
+        "200":
+          description: List of phone numbers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PhoneNumberResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [PhoneNumbers]
+      operationId: addPhoneNumber
+      summary: Add a phone number and send a verification OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddPhoneNumberBody'
+      responses:
+        "201":
+          description: Phone number created and OTP sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhoneNumberResponse'
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "409":
+          description: Phone number already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "502":
+          description: Twilio Verify error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /phone-numbers/{id}/verify:
+    post:
+      tags: [PhoneNumbers]
+      operationId: verifyPhoneNumber
+      summary: Confirm the OTP code for a pending phone number
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyPhoneNumberBody'
+      responses:
+        "200":
+          description: Phone number verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhoneNumberResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Phone number not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "422":
+          description: Invalid or expired OTP, or number not in pending state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /phone-numbers/{id}:
+    delete:
+      tags: [PhoneNumbers]
+      operationId: deletePhoneNumber
+      summary: Delete a phone number
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
       responses:
         "204":
           description: Deleted
@@ -440,6 +581,9 @@ components:
           type: string
         completed:
           type: boolean
+        pauseReason:
+          type: string
+          nullable: true
 
     CreateSearchRequestBody:
       type: object
@@ -519,4 +663,59 @@ components:
         message:
           type: string
         details:
+          type: string
+        code:
+          type: string
+
+    PhoneNumberResponse:
+      type: object
+      required:
+        - id
+        - phone
+        - status
+        - smsConsentAt
+        - createdAt
+      properties:
+        id:
+          type: integer
+          format: int64
+        phone:
+          type: string
+        status:
+          type: string
+          enum: [PENDING_VERIFICATION, VERIFIED, OPTED_OUT]
+        firstMessageSent:
+          type: boolean
+        smsConsentAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        verifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        requiresCarrierOptIn:
+          type: boolean
+
+    AddPhoneNumberBody:
+      type: object
+      required:
+        - phone
+        - smsConsent
+      properties:
+        phone:
+          type: string
+          description: E.164 format (e.g. +12125551234)
+        smsConsent:
+          type: boolean
+          description: Must be true; user has agreed to receive SMS
+
+    VerifyPhoneNumberBody:
+      type: object
+      required:
+        - code
+      properties:
+        code:
           type: string
