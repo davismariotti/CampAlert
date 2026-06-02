@@ -7,3 +7,9 @@ repos:
         entry: bash -c 'cd backend && ./gradlew ktlintFormat'
         files: \.kt$
         pass_filenames: false
+      - id: prettier
+        name: prettier
+        language: system
+        entry: frontend/node_modules/.bin/prettier --write
+        files: ^frontend/.*\.(ts|tsx|js|jsx|json|css|html)$
+        pass_filenames: true
