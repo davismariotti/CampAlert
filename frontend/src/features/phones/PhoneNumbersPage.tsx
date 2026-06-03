@@ -107,7 +107,7 @@ function PhoneCard({ phone }: PhoneCardProps) {
             </div>
             {phone.status === 'OPTED_OUT' && (
               <p className="text-xs text-neutral-500">
-                You opted out. Text UNSTOP to your carrier to re-enable, then add this number again.
+                You opted out. Reply UNSTOP from this number to re-enable alerts automatically.
               </p>
             )}
           </div>
