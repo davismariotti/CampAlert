@@ -6,11 +6,11 @@ import com.twilio.rest.verify.v2.service.VerificationCheck
 import org.springframework.stereotype.Service
 
 sealed class VerifyResult {
-    object Approved : VerifyResult()
+    data object Approved : VerifyResult()
 
-    object InvalidCode : VerifyResult()
+    data object InvalidCode : VerifyResult()
 
-    object Expired : VerifyResult()
+    data object Expired : VerifyResult()
 }
 
 @Service
@@ -21,7 +21,7 @@ class TwilioVerifyService(
         Verification.creator(twilioConfiguration.verifyServiceSid, phone, "sms").create()
     }
 
-    fun checkVerification(phone: String, code: String,): VerifyResult =
+    fun checkVerification(phone: String, code: String): VerifyResult =
         try {
             val check =
                 VerificationCheck

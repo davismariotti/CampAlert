@@ -9,7 +9,7 @@ class NotificationRouterTest {
     private val smsService = mock(SmsNotificationService::class.java)
     private val router = NotificationRouter(smsService)
 
-    private fun user(pushoverEnabled: Boolean, apiToken: String? = null, userKey: String? = null,) =
+    private fun user(pushoverEnabled: Boolean, apiToken: String? = null, userKey: String? = null) =
         User(
             id = 1L,
             email = "test@example.com",
