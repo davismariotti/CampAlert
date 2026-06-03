@@ -29,7 +29,7 @@ class SmsNotificationService(
             val body = buildMessage(searchRequest, campground, phoneNumber.firstMessageSent)
             Message.creator(
                 TwilioPhoneNumber(phoneNumber.phone),
-                TwilioPhoneNumber(twilioConfiguration.fromNumber),
+                twilioConfiguration.messagingServiceSid,
                 body,
             ).create()
             if (!phoneNumber.firstMessageSent) {

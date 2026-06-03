@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration
 class TwilioConfiguration(
     @Value("\${twilio.account_sid}") val accountSid: String,
     @Value("\${twilio.auth_token}") val authToken: String,
-    @Value("\${twilio.from_number}") val fromNumber: String,
+    @Value("\${twilio.messaging_service_sid}") val messagingServiceSid: String,
     @Value("\${twilio.verify_service_sid}") val verifyServiceSid: String,
 ) {
     @PostConstruct
