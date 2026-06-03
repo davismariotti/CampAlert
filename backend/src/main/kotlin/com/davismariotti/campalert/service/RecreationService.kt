@@ -4,5 +4,5 @@ import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.User
 
 interface RecreationService {
-    fun checkAvailability(searchRequest: SearchRequest, user: User,)
+    fun checkAvailability(searchRequest: SearchRequest, user: User)
 }

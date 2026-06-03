@@ -127,7 +127,7 @@ class PhoneNumbersDelegateImpl(
         return ResponseEntity.noContent().build()
     }
 
-    private fun error(status: Int, message: String, code: String? = null,) =
+    private fun error(status: Int, message: String, code: String? = null) =
         ResponseEntity.status(status).body(ErrorResponse(message = message, code = code))
 
     private fun PhoneNumber.toResponse() =

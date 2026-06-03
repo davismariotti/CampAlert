@@ -80,7 +80,7 @@ class SmsWebhookControllerTest {
         assertTrue(response.body?.contains("STOP") == true)
     }
 
-    private fun invokePrivate(methodName: String, vararg args: Any,) {
+    private fun invokePrivate(methodName: String, vararg args: Any) {
         val method = SmsWebhookController::class.java.getDeclaredMethod(methodName, String::class.java)
         method.isAccessible = true
         method.invoke(controller, *args)

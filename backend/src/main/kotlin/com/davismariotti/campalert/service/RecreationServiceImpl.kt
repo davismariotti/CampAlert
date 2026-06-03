@@ -17,7 +17,7 @@ class RecreationServiceImpl(
     val recreationApi: RecreationApi,
     val notificationRouter: NotificationRouter,
 ) : RecreationService {
-    override fun checkAvailability(searchRequest: SearchRequest, user: User,) {
+    override fun checkAvailability(searchRequest: SearchRequest, user: User) {
         // Find months
         val endNight = searchRequest.startDay.plusDays(searchRequest.nights.toLong())
         var monthStart = searchRequest.startDay.withDayOfMonth(1)

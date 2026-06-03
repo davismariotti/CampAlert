@@ -17,7 +17,7 @@ class SmsNotificationService(
 ) : NotificationService {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    override fun notify(searchRequest: SearchRequest, campground: Campground, user: User,) {
+    override fun notify(searchRequest: SearchRequest, campground: Campground, user: User) {
         val verifiedPhones = phoneNumberRepository.findByUserIdAndStatus(user.id!!, PhoneNumberStatus.VERIFIED)
         if (verifiedPhones.isEmpty()) {
             log.warn(
@@ -38,7 +38,7 @@ class SmsNotificationService(
         }
     }
 
-    private fun buildMessage(request: SearchRequest, campground: Campground, firstMessageSent: Boolean,): String {
+    private fun buildMessage(request: SearchRequest, campground: Campground, firstMessageSent: Boolean): String {
         val endDay = request.startDay.plusDays(request.nights.toLong())
         val sites = campground.campsites.values.joinToString("\n") { "${it.loop} ${it.site}" }
         val body =
