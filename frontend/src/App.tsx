@@ -10,6 +10,8 @@ import { RegisterPage } from './features/auth/RegisterPage'
 import { HomePage } from './pages/HomePage'
 import { RequestsPage } from './features/requests/RequestsPage'
 import { PhoneNumbersPage } from './features/phones/PhoneNumbersPage'
+import { TermsPage } from './pages/TermsPage'
+import { PrivacyPage } from './pages/PrivacyPage'
 import { getMe } from './api/generated/sdk.gen'
 import { setNavigate, AUTH_STORAGE_KEY } from './api/client'
 import { Spinner } from './components/ui/Spinner'
@@ -81,6 +83,8 @@ function AuthGate() {
             </ProtectedRoute>
           }
         />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

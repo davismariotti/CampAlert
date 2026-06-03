@@ -239,11 +239,11 @@ function AddPhoneForm() {
             />
             <span className="text-sm text-forest-600">
               I agree to receive SMS notifications from CampAlert. Message and data rates may apply.{' '}
-              <a href="/terms" className="underline hover:text-forest-900">
+              <a href="/terms#sms-program" className="underline hover:text-forest-900">
                 Terms
               </a>{' '}
               &amp;{' '}
-              <a href="/privacy" className="underline hover:text-forest-900">
+              <a href="/privacy#phone-data" className="underline hover:text-forest-900">
                 Privacy
               </a>
               .

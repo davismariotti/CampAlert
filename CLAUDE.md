@@ -1,6 +1,6 @@
 # CampAlert
 
-Kotlin/Spring Boot service that monitors Recreation.gov for campground availability and sends Pushover push notifications when sites open up. Search requests are stored in PostgreSQL; a scheduler polls every 12 seconds and calls the Recreation.gov API for each pending request.
+Kotlin/Spring Boot service that monitors Recreation.gov for campground availability and sends SMS notifications via Twilio when sites open up. Search requests are stored in PostgreSQL; a scheduler polls every 2 minutes and calls the Recreation.gov API for each pending request. Pushover remains available as a per-user admin override.
 
 ## Repo layout
 
@@ -20,7 +20,7 @@ cd backend
 ./gradlew bootRun --args='--spring.profiles.active=local'
 ```
 
-Requires `backend/src/main/resources/application-local.properties` (gitignored) with DB, Recreation.gov base URL, and Pushover credentials.
+Requires `backend/src/main/resources/application-local.properties` (gitignored) with DB, Recreation.gov base URL, and Twilio credentials.
 
 ## Where things live
 
@@ -92,6 +92,22 @@ When asked to commit or open a PR:
 If the work depends on a branch that hasn't been merged yet, check whether that branch is merged into `main` before branching off it. If it isn't merged, branch off the unmerged branch and open a stacked PR targeting that branch — update the target to `main` once the base branch merges.
 
 PR descriptions should only describe the change itself — what it does and why. Do not include notes about the git process (rebasing, stacking, how it relates to other PRs, etc.).
+
+## Local webhook testing with ngrok
+
+The SMS opt-out webhook (`POST /api/sms/webhook`) must be reachable by Twilio during local development. Use ngrok to tunnel:
+
+```bash
+ngrok http 8080
+```
+
+Then set the webhook URL in the Twilio Console:
+1. Go to **Phone Numbers → Manage → Active Numbers → your number**
+2. Under **Messaging Configuration → A message comes in**, set the webhook URL to:
+   `https://<your-ngrok-subdomain>.ngrok-free.app/api/sms/webhook`
+3. Set the HTTP method to **POST**
+
+The webhook validates `X-Twilio-Signature`. Twilio signs requests with your `twilio.auth_token`, so the local property must match the token configured in the Twilio Console for the signature check to pass.
 
 ## Tests
 
