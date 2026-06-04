@@ -51,4 +51,4 @@ services:
       --url "postgres://campalert:campalert@db:5432/campalert?sslmode=disable"
       --to "file:///db/schema.sql"
       --dev-url "postgres://dev:dev@atlas-dev-db:5432/dev?sslmode=disable"
-      --auto-approve
+      --config /db/atlas.hcl

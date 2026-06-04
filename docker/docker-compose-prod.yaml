@@ -54,7 +54,7 @@ services:
       --url "postgres://${DB_USERNAME}:${DB_PASSWORD}@localhost:5432/campalert?sslmode=disable"
       --to "file:///db/schema.sql"
       --dev-url "postgres://dev:dev@localhost:5433/dev?sslmode=disable"
-      --auto-approve
+      --config /db/atlas.hcl
 
 networks:
   proxy:
