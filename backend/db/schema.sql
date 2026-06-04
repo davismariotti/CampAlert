@@ -35,6 +35,7 @@ CREATE TABLE "public"."search_requests_v2" (
   "completed" boolean NOT NULL,
   "user_id" bigint NULL,
   "pause_reason" character varying(64) NULL,
+  "campground_name" character varying(255) NOT NULL DEFAULT '',
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_search_requests_v2_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id")
 );

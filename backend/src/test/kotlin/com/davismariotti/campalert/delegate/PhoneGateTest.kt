@@ -41,6 +41,7 @@ class PhoneGateTest {
                 nights = 2,
                 groupSize = 2,
                 campsiteId = 123,
+                campgroundName = "Test Campground",
                 name = "Test",
             )
         val response = delegate.createSearchRequest(body)

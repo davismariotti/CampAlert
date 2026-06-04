@@ -5,6 +5,7 @@ import { register } from '../../api/generated/sdk.gen'
 import { useAuth } from './useAuth'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import landscapeImg from '../../assets/landscape.jpg'
 import type { AxiosError } from 'axios'
 
 export function RegisterPage() {
@@ -38,51 +39,68 @@ export function RegisterPage() {
   const canSubmit = email.trim() !== '' && password !== ''
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-md">
-        <div className="mb-6 flex flex-col items-center gap-2">
-          <img src="/logo.png" alt="CampAlert" className="h-12 w-12 rounded" />
-          <h1 className="text-xl font-semibold text-forest-900">Create your account</h1>
+    <div className="min-h-screen bg-stone-50">
+      {/* Landscape banner */}
+      <div
+        className="relative flex h-48 items-center justify-center"
+        style={{
+          backgroundImage: `url(${landscapeImg})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center 55%'
+        }}
+      >
+        <div className="absolute inset-0 bg-forest-950/65" />
+        <Link to="/" className="relative z-10 flex flex-col items-center gap-2">
+          <img src="/logo.png" alt="CampAlert" className="h-12 w-12 rounded-2xl" />
+          <span className="text-lg font-bold text-white">CampAlert</span>
+        </Link>
+      </div>
+
+      {/* Form */}
+      <div className="px-5 py-10">
+        <div className="mx-auto max-w-sm rounded-2xl bg-white p-8 shadow-sm">
+          <h1 className="mb-1 text-xl font-semibold text-forest-900">Create your account</h1>
+          <p className="mb-6 text-sm text-forest-500">Free to use. No credit card needed.</p>
+
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault()
+              setError(null)
+              mutation.mutate()
+            }}
+          >
+            <Input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
+            <Input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+              required
+            />
+
+            {error && <p className="text-sm text-red-600">{error}</p>}
+
+            <Button type="submit" loading={mutation.isPending} disabled={!canSubmit}>
+              Create account
+            </Button>
+          </form>
+
+          <p className="mt-5 text-center text-sm text-forest-500">
+            Already have an account?{' '}
+            <Link to="/login" className="font-medium text-forest-800 hover:underline">
+              Sign in
+            </Link>
+          </p>
         </div>
-
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault()
-            setError(null)
-            mutation.mutate()
-          }}
-        >
-          <Input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            required
-          />
-          <Input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password"
-            required
-          />
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-
-          <Button type="submit" loading={mutation.isPending} disabled={!canSubmit}>
-            Create account
-          </Button>
-        </form>
-
-        <p className="mt-4 text-center text-sm text-forest-600">
-          Already have an account?{' '}
-          <Link to="/login" className="font-medium text-forest-800 hover:underline">
-            Sign in
-          </Link>
-        </p>
       </div>
     </div>
   )

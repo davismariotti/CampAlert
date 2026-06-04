@@ -1,24 +1,9 @@
-import { Link, useNavigate } from 'react-router-dom'
-import { useApiMutation } from '../hooks/useApiMutation'
-import { logout } from '../api/generated/sdk.gen'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../features/auth/useAuth'
-import { Spinner } from './ui/Spinner'
+import { ProfileDropdown } from './ProfileDropdown'
 
 export function Nav() {
-  const { user, logout: clearAuth } = useAuth()
-  const navigate = useNavigate()
-
-  const logoutMutation = useApiMutation({
-    mutationFn: async () => {
-      const result = await logout()
-      if (result.error) throw result
-    },
-    onError: () => {}, // always clear auth via onSettled regardless of backend error
-    onSettled: () => {
-      clearAuth()
-      navigate('/login')
-    }
-  })
+  const { user } = useAuth()
 
   if (!user) return null
 
@@ -29,27 +14,19 @@ export function Nav() {
         <span className="font-semibold">CampAlert</span>
       </Link>
 
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-4">
         <Link to="/requests" className="text-sm font-medium text-white/90 hover:text-white">
           My Alerts
         </Link>
-        <Link to="/phone-numbers" className="text-sm font-medium text-white/90 hover:text-white">
-          Phone Numbers
+        <Link
+          to="/"
+          className="rounded-lg border border-white/30 px-3 py-1.5 text-sm font-medium text-white/90 hover:bg-white/10 hover:text-white"
+        >
+          + New Alert
         </Link>
       </div>
 
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-white/70">{user.email}</span>
-        <button
-          type="button"
-          disabled={logoutMutation.isPending}
-          onClick={() => logoutMutation.mutate()}
-          className="inline-flex items-center gap-2 rounded-xl border border-white/30 px-4 py-2 text-sm font-medium text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {logoutMutation.isPending && <Spinner size="sm" />}
-          Sign out
-        </button>
-      </div>
+      <ProfileDropdown />
     </nav>
   )
 }

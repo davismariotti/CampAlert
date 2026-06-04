@@ -18,6 +18,6 @@
 }
 
 body {
-  @apply bg-forest-50 font-sans text-forest-900;
+  @apply bg-stone-50 font-sans text-forest-900;
   margin: 0;
 }
