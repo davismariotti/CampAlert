@@ -32,6 +32,7 @@ export function RequestBuilder({ campground, onClear }: Props) {
           nights,
           groupSize,
           campsiteId: campground.id,
+          campgroundName: campground.name,
           loops: loops.length > 0 ? loops : null
         }
       })

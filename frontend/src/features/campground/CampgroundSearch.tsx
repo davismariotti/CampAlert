@@ -21,7 +21,7 @@ export function CampgroundSearch({ onSelect }: Props) {
         <input
           ref={inputRef}
           type="text"
-          className="w-full rounded-xl border border-forest-200 bg-white py-3 pl-4 pr-10 text-forest-900 placeholder:text-forest-300 focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-500/30"
+          className="w-full rounded-xl border border-forest-200 bg-white py-3.5 pl-4 pr-10 text-forest-900 placeholder:text-forest-300 focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-500/30"
           placeholder="Search for a campground..."
           value={query}
           onChange={(e) => {

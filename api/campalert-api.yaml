@@ -558,6 +558,7 @@ components:
         - campsiteId
         - name
         - completed
+        - campgroundName
       properties:
         id:
           type: integer
@@ -572,6 +573,8 @@ components:
           minimum: 1
         campsiteId:
           type: integer
+        campgroundName:
+          type: string
         loops:
           type: array
           items:
@@ -593,6 +596,7 @@ components:
         - groupSize
         - campsiteId
         - name
+        - campgroundName
       properties:
         startDay:
           type: string
@@ -605,6 +609,8 @@ components:
           minimum: 1
         campsiteId:
           type: integer
+        campgroundName:
+          type: string
         loops:
           type: array
           items:

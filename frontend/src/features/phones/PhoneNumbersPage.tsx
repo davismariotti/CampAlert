@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { parsePhoneNumber } from 'libphonenumber-js'
 import { listPhoneNumbers, addPhoneNumber, verifyPhoneNumber, deletePhoneNumber } from '../../api/generated/sdk.gen'
 import type { PhoneNumberResponse } from '../../api/generated/types.gen'
 import { Button } from '../../components/ui/Button'
@@ -8,6 +9,15 @@ import { PhoneInput } from '../../components/ui/PhoneInput'
 import { useToast } from '../../components/ui/useToast'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import type { AxiosError } from 'axios'
+
+function formatPhone(e164: string): string {
+  try {
+    const parsed = parsePhoneNumber(e164)
+    return parsed.country === 'US' || parsed.country === 'CA' ? parsed.formatNational() : parsed.formatInternational()
+  } catch {
+    return e164
+  }
+}
 
 type StatusColor = { bg: string; text: string; label: string }
 
@@ -113,7 +123,7 @@ function PhoneCard({ phone }: PhoneCardProps) {
         <div className="flex items-start justify-between">
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-forest-900">{phone.phone}</span>
+              <span className="font-medium text-forest-900">{formatPhone(phone.phone)}</span>
               <PhoneStatusBadge status={phone.status} />
             </div>
             {phone.status === 'OPTED_OUT' && (

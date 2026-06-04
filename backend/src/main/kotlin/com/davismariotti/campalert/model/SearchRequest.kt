@@ -44,4 +44,7 @@ data class SearchRequest(
 
     @Column(name = "pause_reason")
     val pauseReason: String? = null,
+
+    @Column(name = "campground_name")
+    val campgroundName: String = "",
 )

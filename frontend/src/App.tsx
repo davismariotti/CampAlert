@@ -6,9 +6,9 @@ import { AuthProvider } from './features/auth/AuthContext'
 import { useAuth } from './features/auth/useAuth'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Nav } from './components/Nav'
-import { LoginPage } from './features/auth/LoginPage'
 import { RegisterPage } from './features/auth/RegisterPage'
-import { HomePage } from './pages/HomePage'
+import { AppHomePage } from './pages/HomePage'
+import { LandingPage } from './pages/LandingPage'
 import { RequestsPage } from './features/requests/RequestsPage'
 import { PhoneNumbersPage } from './features/phones/PhoneNumbersPage'
 import { TermsPage } from './pages/TermsPage'
@@ -50,7 +50,7 @@ function AuthGate() {
         if (data) login(data)
         else {
           logout()
-          navigate('/login')
+          navigate('/')
         }
       })
       .catch(() => {
@@ -72,16 +72,8 @@ function AuthGate() {
     <>
       <Nav />
       <Routes>
-        <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
         <Route path="/register" element={user ? <Navigate to="/" replace /> : <RegisterPage />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <HomePage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/" element={user ? <AppHomePage /> : <LandingPage />} />
         <Route
           path="/requests"
           element={
