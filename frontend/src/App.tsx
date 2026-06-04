@@ -14,7 +14,7 @@ import { PhoneNumbersPage } from './features/phones/PhoneNumbersPage'
 import { TermsPage } from './pages/TermsPage'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { getMe } from './api/generated/sdk.gen'
-import { setNavigate, AUTH_STORAGE_KEY } from './api/client'
+import { setNavigate, setLogout, AUTH_STORAGE_KEY } from './api/client'
 import { Spinner } from './components/ui/Spinner'
 import { ToastProvider } from './components/ui/Toast'
 
@@ -37,6 +37,10 @@ function AuthGate() {
   useEffect(() => {
     setNavigate((path) => navigate(path))
   }, [navigate])
+
+  useEffect(() => {
+    setLogout(logout)
+  }, [logout])
 
   useEffect(() => {
     const stored = localStorage.getItem(AUTH_STORAGE_KEY)

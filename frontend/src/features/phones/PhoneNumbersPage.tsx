@@ -190,13 +190,17 @@ function AddPhoneForm() {
   const { showToast } = useToast()
 
   const addMutation = useMutation({
-    mutationFn: () => addPhoneNumber({ body: { phone: e164, smsConsent: true } }),
-    onSuccess: ({ data }) => {
+    mutationFn: async () => {
+      const result = await addPhoneNumber({ body: { phone: e164, smsConsent: true } })
+      if (result.error) throw result.error
+      return result.data!
+    },
+    onSuccess: (data) => {
       setE164('')
       setConsent(false)
       setInputError(null)
       queryClient.invalidateQueries({ queryKey: ['phone-numbers'] })
-      if (data?.requiresCarrierOptIn) {
+      if (data.requiresCarrierOptIn) {
         setUnstopPhone(data.phone)
         setShowUnstop(true)
       }
