@@ -5,7 +5,7 @@ import type { PhoneNumberResponse } from '../../api/generated/types.gen'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { PhoneInput } from '../../components/ui/PhoneInput'
-import { useToast } from '../../components/ui/Toast'
+import { useToast } from '../../components/ui/useToast'
 import type { AxiosError } from 'axios'
 
 type StatusColor = { bg: string; text: string; label: string }

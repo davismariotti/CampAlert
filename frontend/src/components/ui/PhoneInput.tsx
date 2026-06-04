@@ -49,11 +49,12 @@ export function PhoneInput({ value, onChange, disabled }: Props) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const [prevValue, setPrevValue] = useState(value)
 
-  // Sync display when value is cleared externally (e.g. on form reset)
-  useEffect(() => {
-    if (!value) setDisplay('')
-  }, [value])
+  if (prevValue !== value) {
+    setPrevValue(value)
+    if (!value && display) setDisplay('')
+  }
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
