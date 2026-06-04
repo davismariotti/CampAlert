@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
+import { useApiMutation } from '../hooks/useApiMutation'
 import { logout } from '../api/generated/sdk.gen'
 import { useAuth } from '../features/auth/useAuth'
 import { Spinner } from './ui/Spinner'
@@ -8,8 +8,12 @@ export function Nav() {
   const { user, logout: clearAuth } = useAuth()
   const navigate = useNavigate()
 
-  const logoutMutation = useMutation({
-    mutationFn: () => logout(),
+  const logoutMutation = useApiMutation({
+    mutationFn: async () => {
+      const result = await logout()
+      if (result.error) throw result
+    },
+    onError: () => {}, // always clear auth via onSettled regardless of backend error
     onSettled: () => {
       clearAuth()
       navigate('/login')

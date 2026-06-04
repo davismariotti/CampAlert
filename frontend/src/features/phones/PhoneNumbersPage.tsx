@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { listPhoneNumbers, addPhoneNumber, verifyPhoneNumber, deletePhoneNumber } from '../../api/generated/sdk.gen'
 import type { PhoneNumberResponse } from '../../api/generated/types.gen'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { PhoneInput } from '../../components/ui/PhoneInput'
 import { useToast } from '../../components/ui/useToast'
+import { useApiMutation } from '../../hooks/useApiMutation'
 import type { AxiosError } from 'axios'
 
 type StatusColor = { bg: string; text: string; label: string }
@@ -35,18 +36,22 @@ function VerifyRow({ phone }: VerifyRowProps) {
   const [error, setError] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
-  const verifyMutation = useMutation({
-    mutationFn: () => verifyPhoneNumber({ path: { id: phone.id }, body: { code } }),
+  const verifyMutation = useApiMutation({
+    mutationFn: async () => {
+      const result = await verifyPhoneNumber({ path: { id: phone.id }, body: { code } })
+      if (result.error) throw result
+      return result.data!
+    },
     onSuccess: () => {
       setCode('')
       setError(null)
       queryClient.invalidateQueries({ queryKey: ['phone-numbers'] })
     },
     onError: (err: AxiosError<{ code?: string; message?: string }>) => {
-      const code = err.response?.data?.code
-      if (code === 'INVALID_OTP') {
+      const apiCode = err.response?.data?.code
+      if (apiCode === 'INVALID_OTP') {
         setError('Incorrect code. Please try again.')
-      } else if (code === 'OTP_EXPIRED') {
+      } else if (apiCode === 'OTP_EXPIRED') {
         setError('Code expired. Delete this number and re-add it to get a new code.')
       } else {
         setError('Verification failed. Please try again.')
@@ -89,13 +94,17 @@ function PhoneCard({ phone }: PhoneCardProps) {
   const [showConfirm, setShowConfirm] = useState(false)
   const queryClient = useQueryClient()
 
-  const deleteMutation = useMutation({
-    mutationFn: () => deletePhoneNumber({ path: { id: phone.id } }),
+  const deleteMutation = useApiMutation({
+    mutationFn: async () => {
+      const result = await deletePhoneNumber({ path: { id: phone.id } })
+      if (result.error) throw result
+    },
     onSuccess: () => {
       setShowConfirm(false)
       queryClient.invalidateQueries({ queryKey: ['phone-numbers'] })
       queryClient.invalidateQueries({ queryKey: ['search-requests'] })
-    }
+    },
+    errorMessage: 'Failed to remove phone number. Please try again.'
   })
 
   return (
@@ -189,10 +198,10 @@ function AddPhoneForm() {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
 
-  const addMutation = useMutation({
+  const addMutation = useApiMutation({
     mutationFn: async () => {
       const result = await addPhoneNumber({ body: { phone: e164, smsConsent: true } })
-      if (result.error) throw result.error
+      if (result.error) throw result
       return result.data!
     },
     onSuccess: (data) => {
@@ -206,8 +215,8 @@ function AddPhoneForm() {
       }
     },
     onError: (err: AxiosError<{ code?: string; message?: string }>) => {
-      const code = err.response?.data?.code
-      if (code === 'PHONE_ALREADY_REGISTERED') {
+      const apiCode = err.response?.data?.code
+      if (apiCode === 'PHONE_ALREADY_REGISTERED') {
         setInputError('This number is already registered on an account.')
       } else if (err.response?.status === 400) {
         setInputError('Enter a valid phone number.')

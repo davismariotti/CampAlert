@@ -1,6 +1,7 @@
 import { useState, type KeyboardEvent } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { updateSearchRequest } from '../../api/generated/sdk.gen'
+import { useApiMutation } from '../../hooks/useApiMutation'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import type { SearchRequestResponse } from '../../api/generated/types.gen'
@@ -21,12 +22,15 @@ export function RequestEditModal({ request, onClose }: Props) {
   const [completed, setCompleted] = useState(request.completed)
   const [error, setError] = useState<string | null>(null)
 
-  const mutation = useMutation({
-    mutationFn: () =>
-      updateSearchRequest({
+  const mutation = useApiMutation({
+    mutationFn: async () => {
+      const result = await updateSearchRequest({
         path: { id: request.id },
         body: { name, startDay, nights, groupSize, campsiteId: request.campsiteId, loops, completed }
-      }),
+      })
+      if (result.error) throw result
+      return result.data!
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['search-requests'] })
       onClose()

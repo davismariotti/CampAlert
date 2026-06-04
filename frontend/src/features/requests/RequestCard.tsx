@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { deleteSearchRequest } from '../../api/generated/sdk.gen'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { RequestEditModal } from './RequestEditModal'
+import { useApiMutation } from '../../hooks/useApiMutation'
 import type { SearchRequestResponse } from '../../api/generated/types.gen'
 
 interface Props {
@@ -16,9 +17,13 @@ export function RequestCard({ request }: Props) {
   const [showConfirm, setShowConfirm] = useState(false)
   const queryClient = useQueryClient()
 
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteSearchRequest({ path: { id: request.id } }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['search-requests'] })
+  const deleteMutation = useApiMutation({
+    mutationFn: async () => {
+      const result = await deleteSearchRequest({ path: { id: request.id } })
+      if (result.error) throw result
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['search-requests'] }),
+    errorMessage: 'Failed to delete alert. Please try again.'
   })
 
   const dateRange = `${request.startDay} · ${request.nights} night${request.nights !== 1 ? 's' : ''}`

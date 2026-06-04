@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
+import { useApiMutation } from '../../hooks/useApiMutation'
 import { register } from '../../api/generated/sdk.gen'
 import { useAuth } from './useAuth'
 import { Button } from '../../components/ui/Button'
@@ -14,13 +14,15 @@ export function RegisterPage() {
   const { login: storeAuth } = useAuth()
   const navigate = useNavigate()
 
-  const mutation = useMutation({
-    mutationFn: () => register({ body: { email, password } }),
-    onSuccess: ({ data }) => {
-      if (data) {
-        storeAuth(data)
-        navigate('/')
-      }
+  const mutation = useApiMutation({
+    mutationFn: async () => {
+      const result = await register({ body: { email, password } })
+      if (result.error) throw result
+      return result.data!
+    },
+    onSuccess: (data) => {
+      storeAuth(data)
+      navigate('/')
     },
     onError: (err: AxiosError<{ message: string }>) => {
       if (err.response?.status === 409) {
