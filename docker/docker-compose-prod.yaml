@@ -18,6 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    command: redis-server --requirepass ${SPRING_DATA_REDIS_PASSWORD}
     volumes:
       - ../data/redis:/data
     networks:
