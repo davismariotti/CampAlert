@@ -17,8 +17,11 @@ echo "Running migrations..."
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate run --rm migrate
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate down
 
+echo "Starting infra services..."
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d
+
 echo "Rolling out app..."
-docker rollout -f "$COMPOSE_FILE" --env-file "$ENV_FILE" app
+docker rollout -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile app app
 
 echo "Deploying frontend..."
 TMPDIR=$(mktemp -d)

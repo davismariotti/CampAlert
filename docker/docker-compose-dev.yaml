@@ -15,6 +15,13 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - ../data/redis:/data
+
   # Ephemeral dev-db used only by Atlas for diff/planning — no persistent volume needed.
   atlas-dev-db:
     image: postgres:16-alpine

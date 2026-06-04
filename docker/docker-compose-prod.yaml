@@ -4,6 +4,7 @@ services:
   app:
     image: davismariotti/campalert:latest
     restart: unless-stopped
+    profiles: [app]
     env_file: .env.prod
     networks:
       - proxy
@@ -13,6 +14,14 @@ services:
       - "traefik.http.routers.campalert.rule=Host(`api.campalert.davismariotti.com`)"
       - "traefik.http.routers.campalert.entrypoints=web"
       - "traefik.http.services.campalert.loadbalancer.server.port=8080"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - ../data/redis:/data
+    networks:
+      - db
 
   # Ephemeral dev-db used only by Atlas during migrations — no persistent volume.
   atlas-dev-db:

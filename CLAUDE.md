@@ -22,6 +22,18 @@ cd backend
 
 Requires `backend/src/main/resources/application-local.properties` (gitignored) with DB, Recreation.gov base URL, and Twilio credentials.
 
+Also requires Redis running locally. Start it via Docker Compose:
+
+```bash
+docker compose -f docker/docker-compose-dev.yaml up -d redis
+```
+
+Or bring up all dev services (Postgres + Redis) at once:
+
+```bash
+docker compose -f docker/docker-compose-dev.yaml up -d
+```
+
 ## Where things live
 
 | Thing | Location |
