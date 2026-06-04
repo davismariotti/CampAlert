@@ -10,7 +10,7 @@ function Wrapper({ initialEntry }: { initialEntry: string }) {
     <MemoryRouter initialEntries={[initialEntry]}>
       <AuthProvider>
         <Routes>
-          <Route path="/login" element={<div>login page</div>} />
+          <Route path="/" element={<div>home page</div>} />
           <Route
             path="/protected"
             element={
@@ -28,9 +28,9 @@ function Wrapper({ initialEntry }: { initialEntry: string }) {
 describe('ProtectedRoute', () => {
   beforeEach(() => localStorage.clear())
 
-  it('redirects to /login when unauthenticated', () => {
+  it('redirects to / when unauthenticated', () => {
     render(<Wrapper initialEntry="/protected" />)
-    expect(screen.getByText('login page')).toBeInTheDocument()
+    expect(screen.getByText('home page')).toBeInTheDocument()
     expect(screen.queryByText('protected content')).not.toBeInTheDocument()
   })
 

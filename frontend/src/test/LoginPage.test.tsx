@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { LoginPage } from '../features/auth/LoginPage'
+import { LoginModal } from '../components/LoginModal'
 import { AuthProvider } from '../features/auth/AuthContext'
 import * as sdk from '../api/generated/sdk.gen'
 
@@ -13,14 +13,14 @@ function Wrapper() {
     <MemoryRouter>
       <QueryClientProvider client={qc}>
         <AuthProvider>
-          <LoginPage />
+          <LoginModal onClose={() => {}} />
         </AuthProvider>
       </QueryClientProvider>
     </MemoryRouter>
   )
 }
 
-describe('LoginPage', () => {
+describe('LoginModal', () => {
   it('Sign in button disabled when fields are empty', () => {
     render(<Wrapper />)
     expect(screen.getByRole('button', { name: /sign in/i })).toBeDisabled()
