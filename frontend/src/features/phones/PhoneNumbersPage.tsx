@@ -4,6 +4,8 @@ import { listPhoneNumbers, addPhoneNumber, verifyPhoneNumber, deletePhoneNumber 
 import type { PhoneNumberResponse } from '../../api/generated/types.gen'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { PhoneInput } from '../../components/ui/PhoneInput'
+import { useToast } from '../../components/ui/Toast'
 import type { AxiosError } from 'axios'
 
 type StatusColor = { bg: string; text: string; label: string }
@@ -179,19 +181,20 @@ function UnstopModal({ phone, onClose }: UnstopModalProps) {
 }
 
 function AddPhoneForm() {
-  const [phone, setPhone] = useState('')
+  const [e164, setE164] = useState('')
   const [consent, setConsent] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [inputError, setInputError] = useState<string | null>(null)
   const [showUnstop, setShowUnstop] = useState(false)
   const [unstopPhone, setUnstopPhone] = useState('')
   const queryClient = useQueryClient()
+  const { showToast } = useToast()
 
   const addMutation = useMutation({
-    mutationFn: () => addPhoneNumber({ body: { phone, smsConsent: true } }),
+    mutationFn: () => addPhoneNumber({ body: { phone: e164, smsConsent: true } }),
     onSuccess: ({ data }) => {
-      setPhone('')
+      setE164('')
       setConsent(false)
-      setError(null)
+      setInputError(null)
       queryClient.invalidateQueries({ queryKey: ['phone-numbers'] })
       if (data?.requiresCarrierOptIn) {
         setUnstopPhone(data.phone)
@@ -201,16 +204,16 @@ function AddPhoneForm() {
     onError: (err: AxiosError<{ code?: string; message?: string }>) => {
       const code = err.response?.data?.code
       if (code === 'PHONE_ALREADY_REGISTERED') {
-        setError('This number is already registered on an account.')
+        setInputError('This number is already registered on an account.')
       } else if (err.response?.status === 400) {
-        setError('Enter a valid phone number in E.164 format (e.g. +12125551234).')
+        setInputError('Enter a valid phone number.')
       } else {
-        setError('Failed to add number. Please try again.')
+        showToast('Could not send verification code. Please try again.')
       }
     }
   })
 
-  const canSubmit = phone.trim() !== '' && consent
+  const canSubmit = e164 !== '' && consent
 
   return (
     <>
@@ -218,16 +221,15 @@ function AddPhoneForm() {
         <h2 className="mb-4 font-semibold text-forest-900">Add a phone number</h2>
         <div className="flex flex-col gap-4">
           <div>
-            <Input
-              placeholder="+12125551234"
-              value={phone}
-              onChange={(e) => {
-                setPhone(e.target.value)
-                setError(null)
+            <PhoneInput
+              value={e164}
+              onChange={(val) => {
+                setE164(val)
+                setInputError(null)
               }}
-              type="tel"
+              disabled={addMutation.isPending}
             />
-            {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+            {inputError && <p className="mt-1 text-xs text-red-600">{inputError}</p>}
           </div>
 
           <label className="flex cursor-pointer items-start gap-3">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { AxiosError } from 'axios'
 import { AuthProvider } from './features/auth/AuthContext'
 import { useAuth } from './features/auth/useAuth'
 import { ProtectedRoute } from './components/ProtectedRoute'
@@ -15,8 +16,18 @@ import { PrivacyPage } from './pages/PrivacyPage'
 import { getMe } from './api/generated/sdk.gen'
 import { setNavigate, AUTH_STORAGE_KEY } from './api/client'
 import { Spinner } from './components/ui/Spinner'
+import { ToastProvider } from './components/ui/Toast'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        if ((error as AxiosError)?.response?.status === 401) return false
+        return failureCount < 3
+      }
+    }
+  }
+})
 
 function AuthGate() {
   const { user, login, logout } = useAuth()
@@ -95,9 +106,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <AuthGate />
-        </AuthProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <AuthGate />
+          </AuthProvider>
+        </ToastProvider>
       </QueryClientProvider>
     </BrowserRouter>
   )
