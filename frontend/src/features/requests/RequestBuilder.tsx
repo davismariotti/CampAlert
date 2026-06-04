@@ -1,6 +1,6 @@
 import { useState, type KeyboardEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
+import { useApiMutation } from '../../hooks/useApiMutation'
 import { createSearchRequest } from '../../api/generated/sdk.gen'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -23,9 +23,9 @@ export function RequestBuilder({ campground, onClear }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<{ noPhone?: boolean; message?: string } | null>(null)
 
-  const mutation = useMutation({
-    mutationFn: () =>
-      createSearchRequest({
+  const mutation = useApiMutation({
+    mutationFn: async () => {
+      const result = await createSearchRequest({
         body: {
           name,
           startDay,
@@ -34,11 +34,13 @@ export function RequestBuilder({ campground, onClear }: Props) {
           campsiteId: campground.id,
           loops: loops.length > 0 ? loops : null
         }
-      }),
+      })
+      if (result.error) throw result
+      return result.data!
+    },
     onSuccess: () => navigate('/requests'),
     onError: (err: AxiosError<{ code?: string; message?: string }>) => {
-      const code = err.response?.data?.code
-      if (err.response?.status === 422 && code === 'NO_VERIFIED_PHONE') {
+      if (err.response?.status === 422 && err.response?.data?.code === 'NO_VERIFIED_PHONE') {
         setSubmitError({ noPhone: true })
       } else {
         setSubmitError({ message: err.response?.data?.message ?? 'Something went wrong. Please try again.' })
