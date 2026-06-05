@@ -1,4 +1,4 @@
-package com.davismariotti.campalert.service
+package com.davismariotti.campalert.service.sms
 
 import com.twilio.exception.ApiException
 import com.twilio.rest.verify.v2.service.Verification
@@ -31,7 +31,6 @@ class TwilioVerifyService(
                     .create()
             if (check.status == "approved") VerifyResult.Approved else VerifyResult.InvalidCode
         } catch (e: ApiException) {
-            // Twilio returns 404 when the verification is not found or has expired
             if (e.statusCode == 404) VerifyResult.Expired else throw e
         }
 }

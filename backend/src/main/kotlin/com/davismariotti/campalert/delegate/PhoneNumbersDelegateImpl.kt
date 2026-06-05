@@ -10,8 +10,8 @@ import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.PhoneNumberService
-import com.davismariotti.campalert.service.TwilioVerifyService
-import com.davismariotti.campalert.service.VerifyResult
+import com.davismariotti.campalert.service.sms.TwilioVerifyService
+import com.davismariotti.campalert.service.sms.VerifyResult
 import com.twilio.exception.TwilioException
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
