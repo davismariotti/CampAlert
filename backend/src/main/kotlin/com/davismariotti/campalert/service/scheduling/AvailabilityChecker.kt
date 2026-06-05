@@ -27,7 +27,7 @@ class AvailabilityChecker(
     private val availabilityStateService: AvailabilityStateService,
     private val notificationRouter: NotificationRouter,
     private val eventPublisher: ApplicationEventPublisher,
-    @Value("\${campfinder.checker.thread-pool-size:20}")
+    @param:Value("\${campfinder.checker.thread-pool-size:20}")
     private val threadPoolSize: Int,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
