@@ -8,6 +8,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.Table
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
+import java.time.Instant
 import java.time.LocalDate
 
 @Entity
@@ -47,4 +48,16 @@ data class SearchRequest(
 
     @Column(name = "campground_name")
     val campgroundName: String = "",
+
+    @Column(name = "last_availability_state")
+    val lastAvailabilityState: String? = null,
+
+    @Column(name = "user_paused", nullable = false)
+    val userPaused: Boolean = false,
+
+    @Column(name = "last_notified_at")
+    val lastNotifiedAt: Instant? = null,
+
+    @Column(name = "reminder_sent_at")
+    val reminderSentAt: Instant? = null,
 )

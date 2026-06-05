@@ -28,4 +28,7 @@ data class User(
 
     @Column(name = "pushover_override_enabled", nullable = false)
     val pushoverOverrideEnabled: Boolean = false,
+
+    @Column(name = "timezone", nullable = false)
+    val timezone: String = "UTC",
 )
