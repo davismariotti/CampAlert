@@ -23,7 +23,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.util.Optional
 
-class NotificationSenderTest {
+class NotificationProcessorTest {
     // Kotlin + Mockito: any() / capture() returns null but Kotlin adds a null check at the call
     // site when passing to a non-nullable param. Casting as T suppresses that check without
     // adding mockito-kotlin.
@@ -42,7 +42,7 @@ class NotificationSenderTest {
     private val smsSvc = mock(SmsNotificationService::class.java)
     private val conversationSvc = mock(SmsConversationService::class.java)
 
-    private val sender = NotificationSender(outboxRepo, searchRequestRepo, phoneRepo, smsSvc, conversationSvc)
+    private val processor = NotificationProcessor(outboxRepo, searchRequestRepo, phoneRepo, smsSvc, conversationSvc)
 
     private val phone = PhoneNumber(
         id = 1L,
@@ -73,7 +73,7 @@ class NotificationSenderTest {
         val rows = listOf(outboxRow(1L, 10, "AVAILABLE"))
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(0)
 
-        sender.processUser(42L, rows, Instant.now())
+        processor.processUser(42L, rows, Instant.now())
 
         verify(smsSvc, never()).notifyAggregated(anyK(), anyK())
     }
@@ -87,7 +87,7 @@ class NotificationSenderTest {
         `when`(searchRequestRepo.findById(10)).thenReturn(Optional.of(req))
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
-        sender.processUser(42L, listOf(row), Instant.now())
+        processor.processUser(42L, listOf(row), Instant.now())
 
         verify(smsSvc, never()).notifyAggregated(anyK(), anyK())
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
@@ -111,7 +111,7 @@ class NotificationSenderTest {
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
-        sender.processUser(42L, listOf(row1, row2), Instant.now())
+        processor.processUser(42L, listOf(row1, row2), Instant.now())
 
         @Suppress("UNCHECKED_CAST")
         val captor = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<PendingNotification>>
@@ -130,7 +130,7 @@ class NotificationSenderTest {
         `when`(outboxRepo.findById(1L)).thenReturn(Optional.of(row))
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
-        sender.processUser(42L, listOf(row), Instant.now())
+        processor.processUser(42L, listOf(row), Instant.now())
 
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
         verify(outboxRepo).save(captureK(captor))
