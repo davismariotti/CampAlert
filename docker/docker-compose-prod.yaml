@@ -6,6 +6,8 @@ services:
     restart: unless-stopped
     profiles: [app]
     env_file: .env.prod
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
     networks:
       - proxy
       - db
@@ -13,6 +15,8 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.campalert.rule=Host(`campalert-api.davismariotti.com`)"
       - "traefik.http.routers.campalert.entrypoints=web"
+      - "traefik.http.routers.campalert.middlewares=campalert-proto"
+      - "traefik.http.middlewares.campalert-proto.headers.customRequestHeaders.X-Forwarded-Proto=https"
       - "traefik.http.services.campalert.loadbalancer.server.port=8080"
 
   redis:
@@ -54,7 +58,8 @@ services:
       --url "postgres://${DB_USERNAME}:${DB_PASSWORD}@localhost:5432/campalert?sslmode=disable"
       --to "file:///db/schema.sql"
       --dev-url "postgres://dev:dev@localhost:5433/dev?sslmode=disable"
-      --config /db/atlas.hcl
+      --config file:///db/atlas.hcl
+      --auto-approve
 
 networks:
   proxy:
