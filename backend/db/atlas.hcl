@@ -2,7 +2,6 @@ lint {
   destructive {
     error = true
   }
-  review = ERROR
 }
 
 env "local" {

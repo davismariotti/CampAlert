@@ -1,6 +1,8 @@
 #!/bin/bash
-# Usage: ./docker/deploy.sh [--allow-unsafe]
-#   --allow-unsafe  Allow schema changes that drop tables or columns (data loss)
+# Usage: ./docker/deploy.sh [--allow-unsafe] [--migrate-only] [--frontend-only]
+#   --allow-unsafe    Allow schema changes that drop tables or columns (data loss)
+#   --migrate-only    Run migrations only; skip app and frontend deployment
+#   --frontend-only   Deploy frontend only; skip migrations and app deployment
 
 set -e
 
@@ -9,10 +11,14 @@ COMPOSE_FILE="$SCRIPT_DIR/docker-compose-prod.yaml"
 ENV_FILE="$SCRIPT_DIR/.env.prod"
 FRONTEND_WEB_ROOT="/var/www/campalert"
 ALLOW_UNSAFE=false
+MIGRATE_ONLY=false
+FRONTEND_ONLY=false
 
 for arg in "$@"; do
   case $arg in
-    --allow-unsafe) ALLOW_UNSAFE=true ;;
+    --allow-unsafe)   ALLOW_UNSAFE=true ;;
+    --migrate-only|--migrations-only) MIGRATE_ONLY=true ;;
+    --frontend-only)  FRONTEND_ONLY=true ;;
   esac
 done
 
@@ -27,26 +33,41 @@ set -a
 source "$ENV_FILE"
 set +a
 
-echo "Running migrations..."
-if [ "$ALLOW_UNSAFE" = "true" ]; then
-  echo "WARNING: --allow-unsafe passed; destructive schema changes will not be blocked."
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate run --rm migrate \
-    schema apply \
-    --url "postgres://${DB_USERNAME}:${DB_PASSWORD}@localhost:5432/campalert?sslmode=disable" \
-    --to "file:///db/schema.sql" \
-    --dev-url "postgres://dev:dev@localhost:5433/dev?sslmode=disable" \
-    --config /db/atlas.hcl \
-    --auto-approve
-else
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate run --rm migrate
+if [ "$FRONTEND_ONLY" = "false" ]; then
+  echo "Pulling latest migrate images..."
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate pull
+
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate rm --stop --force atlas-dev-db 2>/dev/null || true
+
+  echo "Running migrations..."
+  if [ "$ALLOW_UNSAFE" = "true" ]; then
+    echo "WARNING: --allow-unsafe passed; destructive schema changes will not be blocked."
+    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate run --rm migrate \
+      schema apply \
+      --url "postgres://${DB_USERNAME}:${DB_PASSWORD}@localhost:5432/campalert?sslmode=disable" \
+      --to "file:///db/schema.sql" \
+      --dev-url "postgres://dev:dev@localhost:5433/dev?sslmode=disable" \
+      --config file:///db/atlas.hcl \
+      --auto-approve
+  else
+    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate run --rm migrate
+  fi
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate rm --stop --force atlas-dev-db
+
+  if [ "$MIGRATE_ONLY" = "true" ]; then
+    echo "Migrations complete. Skipping app and frontend deployment."
+    exit 0
+  fi
+
+  echo "Pulling latest images..."
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile app pull
+
+  echo "Starting infra services..."
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d
+
+  echo "Rolling out app..."
+  docker rollout -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile app app
 fi
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate rm --stop --force atlas-dev-db
-
-echo "Starting infra services..."
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d
-
-echo "Rolling out app..."
-docker rollout -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile app app
 
 echo "Deploying frontend..."
 TMPDIR=$(mktemp -d)
