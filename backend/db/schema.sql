@@ -52,7 +52,7 @@ CREATE TABLE "public"."search_request_checks" (
   "available" boolean NOT NULL,
   "available_site_count" integer NOT NULL,
   PRIMARY KEY ("id"),
-  CONSTRAINT "fk_src_search_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests_v2" ("id")
+  CONSTRAINT "fk_src_search_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests_v2" ("id") ON DELETE CASCADE
 );
 -- Create "notification_outbox" table
 CREATE TABLE "public"."notification_outbox" (
@@ -67,7 +67,7 @@ CREATE TABLE "public"."notification_outbox" (
   "attempt_count" integer NOT NULL DEFAULT 0,
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_outbox_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
-  CONSTRAINT "fk_outbox_request" FOREIGN KEY ("request_id") REFERENCES "public"."search_requests_v2" ("id")
+  CONSTRAINT "fk_outbox_request" FOREIGN KEY ("request_id") REFERENCES "public"."search_requests_v2" ("id") ON DELETE CASCADE
 );
 CREATE INDEX ON "public"."notification_outbox" ("send_after") WHERE sent_at IS NULL AND missed_at IS NULL;
 -- Create "phone_numbers" table

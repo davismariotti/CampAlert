@@ -153,7 +153,13 @@ class SmsWebhookController(
         val url = buildUrl(request)
         val params = request.parameterMap.mapValues { it.value.firstOrNull() ?: "" }
         val signature = request.getHeader("X-Twilio-Signature") ?: return false
-        return validator.validate(url, params, signature)
+        val valid = validator.validate(url, params, signature)
+        log.info(
+            "Twilio signature check: url={} scheme={} serverName={} serverPort={} remoteAddr={} xForwardedProto={} xForwardedHost={} valid={}",
+            url, request.scheme, request.serverName, request.serverPort, request.remoteAddr,
+            request.getHeader("X-Forwarded-Proto"), request.getHeader("X-Forwarded-Host"), valid
+        )
+        return valid
     }
 
     private fun buildUrl(request: HttpServletRequest): String {
