@@ -20,6 +20,7 @@ CREATE TABLE "public"."users" (
   "pushover_user_key" character varying(255) NULL,
   "pushover_api_token" character varying(255) NULL,
   "pushover_override_enabled" boolean NOT NULL DEFAULT false,
+  "timezone" character varying(64) NOT NULL DEFAULT 'UTC',
   PRIMARY KEY ("id"),
   UNIQUE ("email")
 );
@@ -36,9 +37,39 @@ CREATE TABLE "public"."search_requests_v2" (
   "user_id" bigint NULL,
   "pause_reason" character varying(64) NULL,
   "campground_name" character varying(255) NOT NULL DEFAULT '',
+  "last_availability_state" character varying(16) NULL,
+  "user_paused" boolean NOT NULL DEFAULT false,
+  "last_notified_at" timestamptz NULL,
+  "reminder_sent_at" timestamptz NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_search_requests_v2_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id")
 );
+-- Create "search_request_checks" table
+CREATE TABLE "public"."search_request_checks" (
+  "id" bigserial NOT NULL,
+  "search_request_id" integer NOT NULL,
+  "checked_at" timestamptz NOT NULL,
+  "available" boolean NOT NULL,
+  "available_site_count" integer NOT NULL,
+  PRIMARY KEY ("id"),
+  CONSTRAINT "fk_src_search_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests_v2" ("id")
+);
+-- Create "notification_outbox" table
+CREATE TABLE "public"."notification_outbox" (
+  "id" bigserial NOT NULL,
+  "user_id" bigint NOT NULL,
+  "request_id" integer NOT NULL,
+  "type" character varying(16) NOT NULL,
+  "send_after" timestamptz NOT NULL,
+  "sent_at" timestamptz NULL,
+  "missed_at" timestamptz NULL,
+  "claimed_at" timestamptz NULL,
+  "attempt_count" integer NOT NULL DEFAULT 0,
+  PRIMARY KEY ("id"),
+  CONSTRAINT "fk_outbox_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
+  CONSTRAINT "fk_outbox_request" FOREIGN KEY ("request_id") REFERENCES "public"."search_requests_v2" ("id")
+);
+CREATE INDEX ON "public"."notification_outbox" ("send_after") WHERE sent_at IS NULL AND missed_at IS NULL;
 -- Create "phone_numbers" table
 CREATE TABLE "public"."phone_numbers" (
   "id" bigserial NOT NULL,
