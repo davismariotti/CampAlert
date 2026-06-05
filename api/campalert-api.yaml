@@ -97,6 +97,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags: [Auth]
+      operationId: updateMe
+      summary: Update current user settings (e.g. timezone)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMeBody'
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /campground-search:
     get:
@@ -480,6 +503,9 @@ components:
           format: int64
         email:
           type: string
+        timezone:
+          type: string
+          nullable: true
 
     RegisterBody:
       type: object
@@ -587,6 +613,35 @@ components:
         pauseReason:
           type: string
           nullable: true
+        stats:
+          $ref: '#/components/schemas/SearchRequestStats'
+          nullable: true
+
+    SearchRequestStats:
+      type: object
+      required:
+        - totalChecks
+        - availableChecks
+      properties:
+        totalChecks:
+          type: integer
+          format: int64
+        availableChecks:
+          type: integer
+          format: int64
+        availabilityRate:
+          type: number
+          format: double
+          nullable: true
+        avgAvailabilityWindowMinutes:
+          type: number
+          format: double
+
+    UpdateMeBody:
+      type: object
+      properties:
+        timezone:
+          type: string
 
     CreateSearchRequestBody:
       type: object
