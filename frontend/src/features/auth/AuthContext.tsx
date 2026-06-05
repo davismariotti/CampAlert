@@ -1,11 +1,19 @@
 import { useState, type ReactNode } from 'react'
 import { AUTH_STORAGE_KEY } from '../../api/client'
 import { AuthContext, type AuthUser } from './authState'
+import { DEFAULT_TIMEZONE } from '../../utils/timezones'
 
 function loadFromStorage(): AuthUser | null {
   try {
     const raw = localStorage.getItem(AUTH_STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as AuthUser) : null
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<AuthUser>
+    if (!parsed.id || !parsed.email) return null
+    return {
+      id: parsed.id,
+      email: parsed.email,
+      timezone: parsed.timezone ?? DEFAULT_TIMEZONE
+    }
   } catch {
     return null
   }

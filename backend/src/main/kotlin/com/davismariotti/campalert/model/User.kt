@@ -30,5 +30,5 @@ data class User(
     val pushoverOverrideEnabled: Boolean = false,
 
     @Column(name = "timezone", nullable = false)
-    val timezone: String = "UTC",
+    val timezone: String = "America/Los_Angeles",
 )

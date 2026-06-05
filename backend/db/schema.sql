@@ -20,7 +20,7 @@ CREATE TABLE "public"."users" (
   "pushover_user_key" character varying(255) NULL,
   "pushover_api_token" character varying(255) NULL,
   "pushover_override_enabled" boolean NOT NULL DEFAULT false,
-  "timezone" character varying(64) NOT NULL DEFAULT 'UTC',
+  "timezone" character varying(64) NOT NULL DEFAULT 'America/Los_Angeles',
   PRIMARY KEY ("id"),
   UNIQUE ("email")
 );

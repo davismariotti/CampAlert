@@ -9,7 +9,7 @@ function AuthDisplay() {
   return (
     <div>
       <span data-testid="user">{user ? JSON.stringify(user) : 'null'}</span>
-      <button onClick={() => login({ id: 1, email: 'a@b.com' })}>login</button>
+      <button onClick={() => login({ id: 1, email: 'a@b.com', timezone: 'America/Los_Angeles' })}>login</button>
       <button onClick={() => logout()}>logout</button>
     </div>
   )
@@ -51,7 +51,10 @@ describe('AuthContext', () => {
   })
 
   it('seeds from localStorage on mount', () => {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ id: 2, email: 'seed@test.com' }))
+    localStorage.setItem(
+      AUTH_STORAGE_KEY,
+      JSON.stringify({ id: 2, email: 'seed@test.com', timezone: 'America/Los_Angeles' })
+    )
     render(
       <AuthProvider>
         <AuthDisplay />

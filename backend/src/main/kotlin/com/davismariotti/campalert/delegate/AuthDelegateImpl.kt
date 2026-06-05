@@ -35,6 +35,7 @@ class AuthDelegateImpl(
             UserEntity(
                 email = registerBody.email,
                 passwordHash = passwordEncoder.encode(registerBody.password),
+                timezone = registerBody.timezone,
             )
         )
         val auth = authenticationManager.authenticate(

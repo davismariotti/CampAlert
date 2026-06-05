@@ -62,6 +62,13 @@ export function ProfileDropdown() {
           </div>
           <div className="border-t border-forest-700" />
           <Link
+            to="/account"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center px-4 py-2.5 text-sm text-white/80 hover:bg-forest-700 hover:text-white"
+          >
+            Account Settings
+          </Link>
+          <Link
             to="/phone-numbers"
             onClick={() => setOpen(false)}
             className="flex w-full items-center px-4 py-2.5 text-sm text-white/80 hover:bg-forest-700 hover:text-white"

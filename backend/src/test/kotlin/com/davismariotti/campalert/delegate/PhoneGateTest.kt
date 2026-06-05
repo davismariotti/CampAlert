@@ -4,6 +4,7 @@ import com.davismariotti.campalert.api.model.CreateSearchRequestBody
 import com.davismariotti.campalert.api.model.ErrorResponse
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestCheckRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
@@ -21,8 +22,15 @@ class PhoneGateTest {
     private val userRepository = mock(UserRepository::class.java)
     private val phoneNumberRepository = mock(PhoneNumberRepository::class.java)
     private val checkRepository = mock(SearchRequestCheckRepository::class.java)
+    private val notificationOutboxRepository = mock(NotificationOutboxRepository::class.java)
     private val delegate =
-        SearchRequestsDelegateImpl(searchRequestRepository, userRepository, phoneNumberRepository, checkRepository)
+        SearchRequestsDelegateImpl(
+            searchRequestRepository,
+            userRepository,
+            phoneNumberRepository,
+            checkRepository,
+            notificationOutboxRepository,
+        )
 
     private val testUser = User(id = 1L, email = "test@example.com", passwordHash = "hash")
 

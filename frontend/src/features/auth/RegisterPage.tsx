@@ -6,18 +6,21 @@ import { useAuth } from './useAuth'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import landscapeImg from '../../assets/landscape.jpg'
+import { getBrowserTimezone, getTimezoneOptions } from '../../utils/timezones'
 import type { AxiosError } from 'axios'
 
 export function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [timezone, setTimezone] = useState(getBrowserTimezone)
   const [error, setError] = useState<string | null>(null)
   const { login: storeAuth } = useAuth()
   const navigate = useNavigate()
+  const timezoneOptions = getTimezoneOptions()
 
   const mutation = useApiMutation({
     mutationFn: async () => {
-      const result = await register({ body: { email, password } })
+      const result = await register({ body: { email, password, timezone } })
       if (result.error) throw result
       return result.data!
     },
@@ -86,6 +89,21 @@ export function RegisterPage() {
               autoComplete="new-password"
               required
             />
+            <label className="flex flex-col gap-1 text-sm font-medium text-forest-700">
+              Timezone
+              <select
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                className="w-full rounded-xl border border-forest-200 bg-white px-3 py-2 text-sm text-forest-900 focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-500/30"
+                required
+              >
+                {timezoneOptions.map((zone) => (
+                  <option key={zone} value={zone}>
+                    {zone.replace('_', ' ')}
+                  </option>
+                ))}
+              </select>
+            </label>
 
             {error && <p className="text-sm text-red-600">{error}</p>}
 
