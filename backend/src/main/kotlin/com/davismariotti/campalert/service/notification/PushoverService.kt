@@ -1,4 +1,4 @@
-package com.davismariotti.campalert.service
+package com.davismariotti.campalert.service.notification
 
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.recreation.Campground
@@ -11,37 +11,24 @@ import org.springframework.stereotype.Service
 @Service
 class PushoverService(
     @Value("\${pushover.api_token}") private val apiToken: String,
-    @Value("\${pushover.user_token}") private val userToken: String
+    @Value("\${pushover.user_token}") private val userToken: String,
 ) {
     fun pushMessage(request: SearchRequest, campground: Campground) {
         val client: PushoverClient = PushoverRestClient()
-
         client.pushMessage(
             PushoverMessage
                 .Builder()
                 .setApiToken(apiToken)
                 .setUserId(userToken)
                 .setMessage(buildMessage(campground, request))
-                .setUrl(
-                    "https://www.recreation.gov/camping/campgrounds/%d".format(request.campsiteId)
-                ).build()
+                .setUrl("https://www.recreation.gov/camping/campgrounds/%d".format(request.campsiteId))
+                .build(),
         )
     }
 
     fun buildMessage(campground: Campground, request: SearchRequest): String {
-        val sb = StringBuilder()
-        sb
-            .append("${request.name} - ${request.startDay} (${request.startDay.plusDays(request.nights.toLong())})")
-            .append("\n")
-
-        // Construct the message parts for each campsite
-        val messageParts = campground.campsites.values.map {
-            "${it.loop} ${it.site} (${it.campsiteId})"
-        }
-
-        // Join the message parts with "\n" and append to the StringBuilder
-        sb.append(messageParts.joinToString(separator = "\n"))
-
-        return sb.toString()
+        val endDay = request.startDay.plusDays(request.nights.toLong())
+        val sites = campground.campsites.values.joinToString("\n") { "${it.loop} ${it.site} (${it.campsiteId})" }
+        return "${request.name} - ${request.startDay} ($endDay)\n$sites"
     }
 }

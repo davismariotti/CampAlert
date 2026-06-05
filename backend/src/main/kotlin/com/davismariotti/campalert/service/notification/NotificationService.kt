@@ -1,4 +1,4 @@
-package com.davismariotti.campalert.service
+package com.davismariotti.campalert.service.notification
 
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.User

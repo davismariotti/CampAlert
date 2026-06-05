@@ -1,4 +1,4 @@
-package com.davismariotti.campalert.service
+package com.davismariotti.campalert.service.sms
 
 import com.twilio.Twilio
 import jakarta.annotation.PostConstruct
