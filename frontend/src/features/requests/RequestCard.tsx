@@ -5,7 +5,7 @@ import { deleteSearchRequest } from '../../api/generated/sdk.gen'
 import { Button } from '../../components/ui/Button'
 import { RequestEditModal } from './RequestEditModal'
 import { useApiMutation } from '../../hooks/useApiMutation'
-import type { SearchRequestResponse } from '../../api/generated/types.gen'
+import type { SearchRequestResponse, SearchRequestStats } from '../../api/generated/types.gen'
 
 interface Props {
   request: SearchRequestResponse
@@ -77,9 +77,84 @@ function OverflowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () =
   )
 }
 
+function formatPercent(value: number | null | undefined) {
+  if (value === null || value === undefined) return 'Not checked yet'
+  return `${Math.round(value * 100)}%`
+}
+
+function formatMinutes(value: number) {
+  if (value < 1) return '< 1 min'
+  return `${Math.round(value)} min`
+}
+
+function StatsModal({
+  request,
+  stats,
+  onClose
+}: {
+  request: SearchRequestResponse
+  stats: SearchRequestStats
+  onClose: () => void
+}) {
+  const hasHistory = stats.totalChecks > 0
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-md">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="font-semibold text-forest-900">Alert stats</h2>
+            <p className="mt-0.5 text-sm text-forest-500">{request.name}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-forest-400 hover:bg-forest-100 hover:text-forest-700"
+            aria-label="Close stats"
+          >
+            x
+          </button>
+        </div>
+
+        {!hasHistory ? (
+          <p className="rounded-xl bg-forest-50 px-4 py-3 text-sm text-forest-700">
+            This alert has not been checked yet. Stats will appear after the next availability scan.
+          </p>
+        ) : (
+          <dl className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-forest-50 p-3">
+              <dt className="text-xs font-medium text-forest-500">Total checks</dt>
+              <dd className="mt-1 text-lg font-semibold text-forest-900">{stats.totalChecks}</dd>
+            </div>
+            <div className="rounded-xl bg-forest-50 p-3">
+              <dt className="text-xs font-medium text-forest-500">Available checks</dt>
+              <dd className="mt-1 text-lg font-semibold text-forest-900">{stats.availableChecks}</dd>
+            </div>
+            <div className="rounded-xl bg-forest-50 p-3">
+              <dt className="text-xs font-medium text-forest-500">Availability rate</dt>
+              <dd className="mt-1 text-lg font-semibold text-forest-900">{formatPercent(stats.availabilityRate)}</dd>
+            </div>
+            <div className="rounded-xl bg-forest-50 p-3">
+              <dt className="text-xs font-medium text-forest-500">Avg window</dt>
+              <dd className="mt-1 text-lg font-semibold text-forest-900">
+                {formatMinutes(stats.avgAvailabilityWindowMinutes)}
+              </dd>
+            </div>
+            <div className="col-span-2 rounded-xl bg-forest-50 p-3">
+              <dt className="text-xs font-medium text-forest-500">Missed quiet-hours windows</dt>
+              <dd className="mt-1 text-lg font-semibold text-forest-900">{stats.missedQuietHoursWindows}</dd>
+            </div>
+          </dl>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function RequestCard({ request }: Props) {
   const [showEdit, setShowEdit] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [showStats, setShowStats] = useState(false)
   const queryClient = useQueryClient()
 
   const deleteMutation = useApiMutation({
@@ -110,7 +185,16 @@ export function RequestCard({ request }: Props) {
               {watching ? 'Watching' : 'Done'}
             </span>
           </div>
-          <OverflowMenu onEdit={() => setShowEdit(true)} onDelete={() => setShowConfirm(true)} />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setShowStats(true)}
+              className="rounded-lg px-2 py-1 text-xs font-medium text-forest-600 hover:bg-forest-100 hover:text-forest-800"
+            >
+              Stats
+            </button>
+            <OverflowMenu onEdit={() => setShowEdit(true)} onDelete={() => setShowConfirm(true)} />
+          </div>
         </div>
 
         {/* Names */}
@@ -144,6 +228,8 @@ export function RequestCard({ request }: Props) {
       </div>
 
       {showEdit && <RequestEditModal request={request} onClose={() => setShowEdit(false)} />}
+
+      {showStats && <StatsModal request={request} stats={request.stats} onClose={() => setShowStats(false)} />}
 
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">

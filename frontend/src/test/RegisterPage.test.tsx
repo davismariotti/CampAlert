@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -21,6 +21,22 @@ function Wrapper() {
 }
 
 describe('RegisterPage', () => {
+  beforeEach(() => {
+    vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockReturnValue({
+      locale: 'en-US',
+      calendar: 'gregory',
+      numberingSystem: 'latn',
+      timeZone: 'America/Denver',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric'
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('Create account button disabled when fields are empty', () => {
     render(<Wrapper />)
     expect(screen.getByRole('button', { name: /create account/i })).toBeDisabled()
@@ -33,5 +49,25 @@ describe('RegisterPage', () => {
     await userEvent.type(screen.getByPlaceholderText('Password'), 'pass')
     await userEvent.click(screen.getByRole('button', { name: /create account/i }))
     await waitFor(() => expect(screen.getByText('An account with this email already exists')).toBeInTheDocument())
+  })
+
+  it('defaults timezone from browser and submits it on register', async () => {
+    const registerSpy = vi.spyOn(sdk, 'register').mockResolvedValueOnce({
+      data: { id: 1, email: 'new@b.com', timezone: 'America/Denver' },
+      error: undefined
+    } as Awaited<ReturnType<typeof sdk.register>>)
+
+    render(<Wrapper />)
+    expect(screen.getByLabelText('Timezone')).toHaveValue('America/Denver')
+
+    await userEvent.type(screen.getByPlaceholderText('Email'), 'new@b.com')
+    await userEvent.type(screen.getByPlaceholderText('Password'), 'pass')
+    await userEvent.click(screen.getByRole('button', { name: /create account/i }))
+
+    await waitFor(() =>
+      expect(registerSpy).toHaveBeenCalledWith({
+        body: { email: 'new@b.com', password: 'pass', timezone: 'America/Denver' }
+      })
+    )
   })
 })

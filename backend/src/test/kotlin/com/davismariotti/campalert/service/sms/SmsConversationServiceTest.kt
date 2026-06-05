@@ -10,13 +10,13 @@ import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
 import java.util.concurrent.TimeUnit
 
 class SmsConversationServiceTest {
     @Suppress("UNCHECKED_CAST")
-    private val redisTemplate = mock(RedisTemplate::class.java) as RedisTemplate<String, String>
+    private val redisTemplate = mock(StringRedisTemplate::class.java)
 
     @Suppress("UNCHECKED_CAST")
     private val valueOps = mock(ValueOperations::class.java) as ValueOperations<String, String>

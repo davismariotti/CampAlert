@@ -11,6 +11,7 @@ import { AppHomePage } from './pages/HomePage'
 import { LandingPage } from './pages/LandingPage'
 import { RequestsPage } from './features/requests/RequestsPage'
 import { PhoneNumbersPage } from './features/phones/PhoneNumbersPage'
+import { AccountSettingsPage } from './features/account/AccountSettingsPage'
 import { TermsPage } from './pages/TermsPage'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { getMe } from './api/generated/sdk.gen'
@@ -87,6 +88,14 @@ function AuthGate() {
           element={
             <ProtectedRoute>
               <PhoneNumbersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <ProtectedRoute>
+              <AccountSettingsPage />
             </ProtectedRoute>
           }
         />

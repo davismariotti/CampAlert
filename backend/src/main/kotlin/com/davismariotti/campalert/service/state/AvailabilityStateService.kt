@@ -89,7 +89,7 @@ class AvailabilityStateService(
         val zone = try {
             ZoneId.of(timezone)
         } catch (_: Exception) {
-            ZoneId.of("UTC")
+            ZoneId.of("America/Los_Angeles")
         }
         val local = now.atZone(zone)
         val hour = local.hour

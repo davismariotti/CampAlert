@@ -3,6 +3,7 @@ import { createContext } from 'react'
 export interface AuthUser {
   id: number
   email: string
+  timezone: string
 }
 
 export interface AuthContextValue {

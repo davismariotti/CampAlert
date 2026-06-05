@@ -8,6 +8,7 @@ import com.davismariotti.campalert.api.model.SearchRequestStats
 import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestCheckRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
@@ -23,6 +24,7 @@ class SearchRequestsDelegateImpl(
     private val userRepository: UserRepository,
     private val phoneNumberRepository: PhoneNumberRepository,
     private val searchRequestCheckRepository: SearchRequestCheckRepository,
+    private val notificationOutboxRepository: NotificationOutboxRepository,
 ) : SearchRequestsApiDelegate {
     private fun currentUserId(): Long {
         val email = SecurityContextHolder.getContext().authentication.name
@@ -109,20 +111,22 @@ class SearchRequestsDelegateImpl(
     }
 
     private fun SearchRequest.toResponse(): SearchRequestResponse {
-        val total = searchRequestCheckRepository.countBySearchRequestId(this.id!!)
-        val available = searchRequestCheckRepository.countAvailableBySearchRequestId(this.id!!)
+        val requestId = this.id ?: error("Cannot map unsaved search request")
+        val total = searchRequestCheckRepository.countBySearchRequestId(requestId)
+        val available = searchRequestCheckRepository.countAvailableBySearchRequestId(requestId)
         val stats = SearchRequestStats(
             totalChecks = total,
             availableChecks = available,
-            availabilityRate = if (total > 0) available.toDouble() / total.toDouble() else null,
             avgAvailabilityWindowMinutes = if (total > 0) {
-                searchRequestCheckRepository.computeAvgWindowMinutes(this.id!!)
+                searchRequestCheckRepository.computeAvgWindowMinutes(requestId)
             } else {
                 0.0
             },
+            missedQuietHoursWindows = notificationOutboxRepository.countMissedWindowsByRequestId(requestId),
+            availabilityRate = if (total > 0) available.toDouble() / total.toDouble() else null,
         )
         return SearchRequestResponse(
-            id = this.id!!,
+            id = requestId,
             startDay = this.startDay,
             nights = this.nights,
             groupSize = this.groupSize,
