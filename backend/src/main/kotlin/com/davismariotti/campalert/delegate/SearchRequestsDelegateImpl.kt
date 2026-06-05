@@ -4,10 +4,12 @@ import com.davismariotti.campalert.api.SearchRequestsApiDelegate
 import com.davismariotti.campalert.api.model.CreateSearchRequestBody
 import com.davismariotti.campalert.api.model.ErrorResponse
 import com.davismariotti.campalert.api.model.SearchRequestResponse
+import com.davismariotti.campalert.api.model.SearchRequestStats
 import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.repository.PhoneNumberRepository
+import com.davismariotti.campalert.repository.SearchRequestCheckRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import org.springframework.http.ResponseEntity
@@ -20,6 +22,7 @@ class SearchRequestsDelegateImpl(
     private val searchRequestRepository: SearchRequestRepository,
     private val userRepository: UserRepository,
     private val phoneNumberRepository: PhoneNumberRepository,
+    private val searchRequestCheckRepository: SearchRequestCheckRepository,
 ) : SearchRequestsApiDelegate {
     private fun currentUserId(): Long {
         val email = SecurityContextHolder.getContext().authentication.name
@@ -105,8 +108,20 @@ class SearchRequestsDelegateImpl(
         return ResponseEntity.noContent().build()
     }
 
-    private fun SearchRequest.toResponse() =
-        SearchRequestResponse(
+    private fun SearchRequest.toResponse(): SearchRequestResponse {
+        val total = searchRequestCheckRepository.countBySearchRequestId(this.id!!)
+        val available = searchRequestCheckRepository.countAvailableBySearchRequestId(this.id!!)
+        val stats = SearchRequestStats(
+            totalChecks = total,
+            availableChecks = available,
+            availabilityRate = if (total > 0) available.toDouble() / total.toDouble() else null,
+            avgAvailabilityWindowMinutes = if (total > 0) {
+                searchRequestCheckRepository.computeAvgWindowMinutes(this.id!!)
+            } else {
+                0.0
+            },
+        )
+        return SearchRequestResponse(
             id = this.id!!,
             startDay = this.startDay,
             nights = this.nights,
@@ -117,5 +132,7 @@ class SearchRequestsDelegateImpl(
             name = this.name,
             completed = this.completed,
             pauseReason = this.pauseReason,
+            stats = stats,
         )
+    }
 }

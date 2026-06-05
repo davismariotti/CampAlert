@@ -4,6 +4,7 @@ import com.davismariotti.campalert.api.AuthApiDelegate
 import com.davismariotti.campalert.api.model.AuthResponse
 import com.davismariotti.campalert.api.model.LoginBody
 import com.davismariotti.campalert.api.model.RegisterBody
+import com.davismariotti.campalert.api.model.UpdateMeBody
 import com.davismariotti.campalert.repository.UserRepository
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
@@ -44,7 +45,9 @@ class AuthDelegateImpl(
         SecurityContextHolder.setContext(context)
         val session = request.getSession(true)
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context)
-        return ResponseEntity.status(HttpStatus.CREATED).body(AuthResponse(id = user.id!!, email = user.email))
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+            AuthResponse(id = user.id!!, email = user.email, timezone = user.timezone),
+        )
     }
 
     override fun login(loginBody: LoginBody): ResponseEntity<AuthResponse> {
@@ -63,7 +66,7 @@ class AuthDelegateImpl(
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context)
 
         val user = userRepository.findByEmail(loginBody.email)!!
-        return ResponseEntity.ok(AuthResponse(id = user.id!!, email = user.email))
+        return ResponseEntity.ok(AuthResponse(id = user.id!!, email = user.email, timezone = user.timezone))
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -77,6 +80,16 @@ class AuthDelegateImpl(
     override fun getMe(): ResponseEntity<AuthResponse> {
         val auth = SecurityContextHolder.getContext().authentication
         val user = userRepository.findByEmail(auth.name)!!
-        return ResponseEntity.ok(AuthResponse(id = user.id!!, email = user.email))
+        return ResponseEntity.ok(AuthResponse(id = user.id!!, email = user.email, timezone = user.timezone))
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    override fun updateMe(updateMeBody: UpdateMeBody): ResponseEntity<AuthResponse> {
+        val auth = SecurityContextHolder.getContext().authentication
+        val user = userRepository.findByEmail(auth.name)!!
+        val updated = updateMeBody.timezone?.let { userRepository.save(user.copy(timezone = it)) } ?: user
+        return ResponseEntity.ok(
+            AuthResponse(id = updated.id!!, email = updated.email, timezone = updated.timezone),
+        )
     }
 }
