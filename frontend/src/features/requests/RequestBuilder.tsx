@@ -1,9 +1,10 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { createSearchRequest } from '../../api/generated/sdk.gen'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { LoopPicker } from './LoopPicker'
 import type { CampgroundSearchResult } from '../../api/generated/types.gen'
 import type { AxiosError } from 'axios'
 
@@ -13,14 +14,23 @@ interface Props {
   onSuccess?: () => void
 }
 
+function defaultAlertName(campgroundName: string): string {
+  const year = new Date().getFullYear()
+  const base = campgroundName
+    .replace(/\bcampgrounds?\b\s*/gi, '') // remove "Campground(s)" anywhere
+    .replace(/\s*\([A-Z]{2}\)\s*$/, '') // strip trailing state abbrevs like (UT)
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+  return `${base} ${year}`
+}
+
 export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
   const navigate = useNavigate()
-  const [name, setName] = useState('')
+  const [name, setName] = useState(() => defaultAlertName(campground.name))
   const [startDay, setStartDay] = useState('')
   const [nights, setNights] = useState(1)
   const [groupSize, setGroupSize] = useState(1)
-  const [loops, setLoops] = useState<string[]>([])
-  const [loopInput, setLoopInput] = useState('')
+  const [loops, setLoops] = useState<string[] | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<{ noPhone?: boolean; message?: string } | null>(null)
 
@@ -34,7 +44,7 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
           groupSize,
           campsiteId: campground.id,
           campgroundName: campground.name,
-          loops: loops.length > 0 ? loops : null
+          loops
         }
       })
       if (result.error) throw result
@@ -58,14 +68,6 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
     if (groupSize < 1) e.groupSize = 'Group size must be at least 1'
     setErrors(e)
     return Object.keys(e).length === 0
-  }
-
-  function addLoop(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' && loopInput.trim()) {
-      e.preventDefault()
-      setLoops((prev) => [...prev, loopInput.trim()])
-      setLoopInput('')
-    }
   }
 
   const canSubmit = name.trim() !== '' && startDay !== '' && nights >= 1 && groupSize >= 1
@@ -143,30 +145,7 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
             </div>
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-forest-600">
-              Loops <span className="font-normal text-forest-400">(optional — press Enter to add)</span>
-            </label>
-            <div className="flex flex-wrap gap-1 rounded-xl border border-forest-200 bg-white px-3 py-2">
-              {loops.map((loop) => (
-                <button
-                  key={loop}
-                  type="button"
-                  onClick={() => setLoops((prev) => prev.filter((l) => l !== loop))}
-                  className="flex items-center gap-1 rounded-full bg-forest-100 px-2 py-0.5 text-xs font-medium text-forest-700 hover:bg-forest-200"
-                >
-                  {loop} ×
-                </button>
-              ))}
-              <input
-                className="min-w-24 flex-1 bg-transparent text-sm text-forest-900 placeholder:text-forest-300 focus:outline-none"
-                placeholder={loops.length === 0 ? 'e.g. Loop A' : ''}
-                value={loopInput}
-                onChange={(e) => setLoopInput(e.target.value)}
-                onKeyDown={addLoop}
-              />
-            </div>
-          </div>
+          <LoopPicker campgroundId={campground.id} selectedLoops={loops} onChange={setLoops} />
 
           {submitError?.noPhone && (
             <p className="text-sm text-amber-700">
