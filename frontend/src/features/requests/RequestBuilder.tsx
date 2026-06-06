@@ -10,9 +10,10 @@ import type { AxiosError } from 'axios'
 interface Props {
   campground: CampgroundSearchResult
   onClear: () => void
+  onSuccess?: () => void
 }
 
-export function RequestBuilder({ campground, onClear }: Props) {
+export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [startDay, setStartDay] = useState('')
@@ -39,7 +40,7 @@ export function RequestBuilder({ campground, onClear }: Props) {
       if (result.error) throw result
       return result.data!
     },
-    onSuccess: () => navigate('/requests'),
+    onSuccess: () => (onSuccess ? onSuccess() : navigate('/requests')),
     onError: (err: AxiosError<{ code?: string; message?: string }>) => {
       if (err.response?.status === 422 && err.response?.data?.code === 'NO_VERIFIED_PHONE') {
         setSubmitError({ noPhone: true })

@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { parsePhoneNumber } from 'libphonenumber-js'
+import confetti from 'canvas-confetti'
 import { listPhoneNumbers, addPhoneNumber, verifyPhoneNumber, deletePhoneNumber } from '../../api/generated/sdk.gen'
+import { CONFETTI_ENABLED } from '../../config/featureFlags'
 import type { PhoneNumberResponse } from '../../api/generated/types.gen'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -56,6 +58,7 @@ function VerifyRow({ phone }: VerifyRowProps) {
       setCode('')
       setError(null)
       queryClient.invalidateQueries({ queryKey: ['phone-numbers'] })
+      if (CONFETTI_ENABLED) confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } })
     },
     onError: (err: AxiosError<{ code?: string; message?: string }>) => {
       const apiCode = err.response?.data?.code

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listSearchRequests, listPhoneNumbers } from '../../api/generated/sdk.gen'
 import { RequestCard } from './RequestCard'
+import { AddAlertModal } from './AddAlertModal'
 
 type Filter = 'all' | 'watching' | 'done'
 
@@ -18,6 +19,7 @@ function SkeletonCard() {
 
 export function RequestsPage() {
   const [filter, setFilter] = useState<Filter>('all')
+  const [showAddModal, setShowAddModal] = useState(false)
 
   const completed = filter === 'all' ? undefined : filter === 'done'
 
@@ -53,12 +55,13 @@ export function RequestsPage() {
         <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-sm font-medium text-neutral-500">
           {doneCount} done
         </span>
-        <Link
-          to="/"
+        <button
+          type="button"
+          onClick={() => setShowAddModal(true)}
           className="ml-auto rounded-xl border border-forest-600 px-4 py-1.5 text-sm font-medium text-forest-600 hover:bg-forest-100"
         >
           + New Alert
-        </Link>
+        </button>
       </div>
 
       {phones !== undefined && !hasVerifiedPhone && (
@@ -115,9 +118,13 @@ export function RequestsPage() {
       {!isLoading && !isError && all.length === 0 && (
         <div className="text-center">
           <p className="text-forest-600">No alerts here yet.</p>
-          <Link to="/" className="mt-2 block text-sm font-medium text-forest-800 hover:underline">
+          <button
+            type="button"
+            onClick={() => setShowAddModal(true)}
+            className="mt-2 text-sm font-medium text-forest-800 hover:underline"
+          >
             Create your first alert
-          </Link>
+          </button>
         </div>
       )}
 
@@ -128,6 +135,8 @@ export function RequestsPage() {
           ))}
         </div>
       )}
+
+      {showAddModal && <AddAlertModal onClose={() => setShowAddModal(false)} />}
     </div>
   )
 }

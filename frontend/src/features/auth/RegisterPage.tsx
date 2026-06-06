@@ -26,7 +26,7 @@ export function RegisterPage() {
     },
     onSuccess: (data) => {
       storeAuth(data)
-      navigate('/')
+      navigate('/requests')
     },
     onError: (err: AxiosError<{ message: string }>) => {
       if (err.response?.status === 409) {

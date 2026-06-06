@@ -7,7 +7,6 @@ import { useAuth } from './features/auth/useAuth'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Nav } from './components/Nav'
 import { RegisterPage } from './features/auth/RegisterPage'
-import { AppHomePage } from './pages/HomePage'
 import { LandingPage } from './pages/LandingPage'
 import { RequestsPage } from './features/requests/RequestsPage'
 import { PhoneNumbersPage } from './features/phones/PhoneNumbersPage'
@@ -73,8 +72,8 @@ function AuthGate() {
     <>
       <Nav />
       <Routes>
-        <Route path="/register" element={user ? <Navigate to="/" replace /> : <RegisterPage />} />
-        <Route path="/" element={user ? <AppHomePage /> : <LandingPage />} />
+        <Route path="/register" element={user ? <Navigate to="/requests" replace /> : <RegisterPage />} />
+        <Route path="/" element={user ? <Navigate to="/requests" replace /> : <LandingPage />} />
         <Route
           path="/requests"
           element={
