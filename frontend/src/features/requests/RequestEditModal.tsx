@@ -1,9 +1,10 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { updateSearchRequest } from '../../api/generated/sdk.gen'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { LoopPicker } from './LoopPicker'
 import type { SearchRequestResponse } from '../../api/generated/types.gen'
 
 interface Props {
@@ -17,8 +18,7 @@ export function RequestEditModal({ request, onClose }: Props) {
   const [startDay, setStartDay] = useState(request.startDay)
   const [nights, setNights] = useState(request.nights)
   const [groupSize, setGroupSize] = useState(request.groupSize)
-  const [loops, setLoops] = useState<string[]>(request.loops ?? [])
-  const [loopInput, setLoopInput] = useState('')
+  const [loops, setLoops] = useState<string[] | null>(request.loops ?? null)
   const [completed, setCompleted] = useState(request.completed)
   const [error, setError] = useState<string | null>(null)
 
@@ -26,7 +26,15 @@ export function RequestEditModal({ request, onClose }: Props) {
     mutationFn: async () => {
       const result = await updateSearchRequest({
         path: { id: request.id },
-        body: { name, startDay, nights, groupSize, campsiteId: request.campsiteId, loops, completed }
+        body: {
+          name,
+          startDay,
+          nights,
+          groupSize,
+          campsiteId: request.campsiteId,
+          loops: loops ?? undefined,
+          completed
+        }
       })
       if (result.error) throw result
       return result.data!
@@ -37,14 +45,6 @@ export function RequestEditModal({ request, onClose }: Props) {
     },
     onError: () => setError('Failed to update. Please try again.')
   })
-
-  function addLoop(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' && loopInput.trim()) {
-      e.preventDefault()
-      setLoops((prev) => [...prev, loopInput.trim()])
-      setLoopInput('')
-    }
-  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -98,28 +98,7 @@ export function RequestEditModal({ request, onClose }: Props) {
             </div>
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-forest-600">Loops (press Enter to add)</label>
-            <div className="flex flex-wrap gap-1 rounded-xl border border-forest-200 bg-white px-3 py-2">
-              {loops.map((loop) => (
-                <button
-                  key={loop}
-                  type="button"
-                  onClick={() => setLoops((prev) => prev.filter((l) => l !== loop))}
-                  className="flex items-center gap-1 rounded-full bg-forest-100 px-2 py-0.5 text-xs font-medium text-forest-700 hover:bg-forest-200"
-                >
-                  {loop} ×
-                </button>
-              ))}
-              <input
-                className="min-w-24 flex-1 bg-transparent text-sm text-forest-900 placeholder:text-forest-300 focus:outline-none"
-                placeholder={loops.length === 0 ? 'e.g. Loop A' : ''}
-                value={loopInput}
-                onChange={(e) => setLoopInput(e.target.value)}
-                onKeyDown={addLoop}
-              />
-            </div>
-          </div>
+          <LoopPicker campgroundId={request.campsiteId} selectedLoops={loops} onChange={setLoops} />
 
           <label className="flex items-center gap-2 text-sm text-forest-700">
             <input

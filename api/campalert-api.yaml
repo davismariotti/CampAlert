@@ -197,6 +197,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /campgrounds/{id}/loops:
+    get:
+      tags: [Campgrounds]
+      operationId: getCampgroundLoops
+      summary: Get distinct loop names for a campground
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sorted list of loops with access type metadata
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoopInfo'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "502":
+          description: RIDB upstream error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /search-requests:
     get:
       tags: [SearchRequests]
@@ -681,6 +714,17 @@ components:
           nullable: true
         name:
           type: string
+
+    LoopInfo:
+      type: object
+      required:
+        - name
+        - boatInOnly
+      properties:
+        name:
+          type: string
+        boatInOnly:
+          type: boolean
 
     UpdateSearchRequestBody:
       type: object
