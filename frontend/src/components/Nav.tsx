@@ -18,12 +18,6 @@ export function Nav() {
         <Link to="/requests" className="text-sm font-medium text-white/90 hover:text-white">
           My Alerts
         </Link>
-        <Link
-          to="/"
-          className="rounded-lg border border-white/30 px-3 py-1.5 text-sm font-medium text-white/90 hover:bg-white/10 hover:text-white"
-        >
-          + New Alert
-        </Link>
       </div>
 
       <ProfileDropdown />
