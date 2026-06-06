@@ -13,8 +13,10 @@ const FALLBACK_TIMEZONES = [
 export function getTimezoneOptions() {
   const intlWithValues = Intl as typeof Intl & { supportedValuesOf?: (key: 'timeZone') => string[] }
   const zones = intlWithValues.supportedValuesOf?.('timeZone') ?? FALLBACK_TIMEZONES
-  const withDefault = zones.includes(DEFAULT_TIMEZONE) ? zones : [DEFAULT_TIMEZONE, ...zones]
-  return Array.from(new Set(withDefault))
+  const all = Array.from(new Set(zones.includes(DEFAULT_TIMEZONE) ? zones : [DEFAULT_TIMEZONE, ...zones]))
+  const american = all.filter((z) => z.startsWith('America/')).sort()
+  const rest = all.filter((z) => !z.startsWith('America/')).sort()
+  return [...american, ...rest]
 }
 
 export function getBrowserTimezone() {

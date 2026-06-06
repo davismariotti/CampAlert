@@ -23,6 +23,12 @@ class PhoneNumberService(
         paused.forEach { searchRequestRepository.save(it.copy(pauseReason = null)) }
     }
 
+    fun supersedePreviousVerifiedPhone(userId: Long, keepId: Long) {
+        val previous = phoneNumberRepository.findByUserIdAndStatus(userId, PhoneNumberStatus.VERIFIED)
+            .filter { it.id != keepId }
+        phoneNumberRepository.deleteAll(previous)
+    }
+
     companion object {
         const val NO_PHONE = "NO_VERIFIED_PHONE"
     }

@@ -105,6 +105,7 @@ class PhoneNumbersDelegateImpl(
                             verifiedAt = Instant.now(),
                         ),
                     )
+                phoneNumberService.supersedePreviousVerifiedPhone(userId, verified.id!!)
                 phoneNumberService.resumeRequestsIfVerifiedPhone(userId)
                 ResponseEntity.ok(verified.toResponse())
             }
