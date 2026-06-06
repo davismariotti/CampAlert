@@ -130,3 +130,25 @@ Run the suite:
 cd backend
 ./gradlew test
 ```
+
+## Frontend npm install on Mac arm64
+
+`npm install` on Mac arm64 prunes `@emnapi/core` and `@emnapi/runtime` from `package-lock.json` because they are dependencies of `@rolldown/binding-wasm32-wasi`, an optional Vite/Rolldown binding that is skipped on arm64. CI (Linux x64) then fails `npm ci` because those entries are missing.
+
+After any `npm install` that touches `package-lock.json`, restore the missing entries:
+
+```bash
+node -e "
+const fs = require('fs'), cp = require('child_process');
+const lock = JSON.parse(fs.readFileSync('frontend/package-lock.json', 'utf8'));
+const main = JSON.parse(cp.execSync('git show main:frontend/package-lock.json').toString());
+for (const k of Object.keys(main.packages)) {
+  if (k.startsWith('node_modules/@emnapi/') && !lock.packages[k]) lock.packages[k] = main.packages[k];
+}
+const sorted = Object.fromEntries(Object.keys(lock.packages).sort().map(k => [k, lock.packages[k]]));
+lock.packages = sorted;
+fs.writeFileSync('frontend/package-lock.json', JSON.stringify(lock, null, 2) + '\n');
+"
+```
+
+Then verify with `cd frontend && npm ci`.
