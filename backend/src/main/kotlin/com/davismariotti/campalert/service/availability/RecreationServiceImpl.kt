@@ -4,6 +4,7 @@ import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.recreation.AvailabilityType
 import com.davismariotti.campalert.recreation.Campground
+import com.davismariotti.campalert.recreation.Campsite
 import com.davismariotti.campalert.recreation.Campsite.Companion.mergeWith
 import com.davismariotti.campalert.recreation.RecreationApi
 import org.springframework.stereotype.Service
@@ -46,17 +47,31 @@ class RecreationServiceImpl(
             monthStart = monthStart.plusMonths(1)
         }
 
-        campground = campground ?: Campground(emptyMap())
-        campground.filterByLoops(searchRequest.loops)
-        campground.filterByGroupSize(searchRequest.groupSize)
-        campground.removeExtraDates(searchRequest.startDay, endNight)
-        campground.filterByAvailability()
+        val loops = searchRequest.loops?.map { it.lowercase() }
+        val availableSites = (campground ?: Campground(emptyMap())).campsites
+            .filterValues {
+                    site ->
+                matchesRequest(site, loops, searchRequest.groupSize, searchRequest.startDay, endNight)
+            }
 
         return AvailabilityResult(
             searchRequest = searchRequest,
-            campground = campground,
-            hasAvailableSites = campground.campsites.isNotEmpty(),
+            campground = Campground(availableSites),
+            hasAvailableSites = availableSites.isNotEmpty(),
         )
+    }
+
+    private fun matchesRequest(
+        site: Campsite,
+        loops: List<String>?,
+        groupSize: Int,
+        startDay: LocalDate,
+        endNight: LocalDate,
+    ): Boolean {
+        if (loops != null && site.loop.lowercase() !in loops) return false
+        if (site.minimumNumberOfPeople > groupSize || site.maximumNumberOfPeople < groupSize) return false
+        val relevant = site.availabilities.filterKeys { it.isBetween(startDay, endNight) }
+        return relevant.isNotEmpty() && relevant.values.all { it == AvailabilityType.AVAILABLE }
     }
 
     private fun fetchMonth(campsiteId: Int, monthStart: LocalDate): Campground =
@@ -66,32 +81,6 @@ class RecreationServiceImpl(
                 monthStart.atStartOfDay().atZone(ZoneOffset.UTC).format(dateFormatter),
             ).execute()
             .body()!!
-
-    private fun Campground.filterByLoops(loops: List<String>?) {
-        loops?.let { validLoops ->
-            val lower = validLoops.map { it.lowercase() }
-            campsites = campsites.filterValues { it.loop.lowercase() in lower }
-        }
-    }
-
-    private fun Campground.filterByGroupSize(groupSize: Int) {
-        campsites = campsites.filterValues {
-            it.minimumNumberOfPeople <= groupSize && it.maximumNumberOfPeople >= groupSize
-        }
-    }
-
-    private fun Campground.removeExtraDates(startDay: LocalDate, endDay: LocalDate) {
-        campsites.forEach { (_, site) ->
-            site.availabilities = site.availabilities.filterKeys { it.isBetween(startDay, endDay) }
-            site.quantities = site.quantities.filterKeys { it.isBetween(startDay, endDay) }
-        }
-    }
-
-    private fun Campground.filterByAvailability() {
-        campsites = campsites.filterValues {
-            it.availabilities.values.all { type -> type == AvailabilityType.AVAILABLE }
-        }
-    }
 
     companion object {
         val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
