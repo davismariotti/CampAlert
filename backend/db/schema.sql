@@ -41,6 +41,7 @@ CREATE TABLE "public"."search_requests_v2" (
   "user_paused" boolean NOT NULL DEFAULT false,
   "last_notified_at" timestamptz NULL,
   "reminder_sent_at" timestamptz NULL,
+  "campground_timezone" character varying(64) NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_search_requests_v2_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id")
 );

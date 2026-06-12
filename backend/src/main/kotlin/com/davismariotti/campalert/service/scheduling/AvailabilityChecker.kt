@@ -14,6 +14,8 @@ import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -35,13 +37,13 @@ class AvailabilityChecker(
     fun processSearchRequests() {
         val allRequests = searchRequestRepository.findByCompletedFalse()
 
-        // Auto-complete past-date requests first
-        allRequests.filter { it.startDay < LocalDate.now() }.forEach { req ->
+        // Auto-complete past-date requests first, using campground local midnight
+        allRequests.filter { it.startDay < today(it.campgroundTimezone) }.forEach { req ->
             searchRequestRepository.save(req.copy(completed = true))
         }
 
         val active = allRequests.filter { req ->
-            req.startDay >= LocalDate.now() && req.pauseReason == null && req.userId != null
+            req.startDay >= today(req.campgroundTimezone) && req.pauseReason == null && req.userId != null
         }
         if (active.isEmpty()) return
 
@@ -101,4 +103,7 @@ class AvailabilityChecker(
 
     private fun isPushoverUser(user: User) =
         user.pushoverOverrideEnabled && user.pushoverApiToken != null && user.pushoverUserKey != null
+
+    private fun today(campgroundTimezone: String?): LocalDate =
+        LocalDate.now(campgroundTimezone?.let { ZoneId.of(it) } ?: ZoneOffset.UTC)
 }

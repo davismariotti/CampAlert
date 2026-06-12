@@ -60,4 +60,7 @@ data class SearchRequest(
 
     @Column(name = "reminder_sent_at")
     val reminderSentAt: Instant? = null,
+
+    @Column(name = "campground_timezone")
+    val campgroundTimezone: String? = null,
 )

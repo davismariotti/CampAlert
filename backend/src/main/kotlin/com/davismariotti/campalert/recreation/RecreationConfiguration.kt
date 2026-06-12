@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import net.iakovlev.timeshape.TimeZoneEngine
 import okhttp3.OkHttpClient
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
@@ -18,6 +19,9 @@ class RecreationConfiguration(
     @Value("\${ridb.baseUrl}") val ridbBaseUrl: String,
     @Value("\${ridb.apiKey}") val ridbApiKey: String
 ) {
+    @Bean
+    fun timeZoneEngine(): TimeZoneEngine = TimeZoneEngine.initialize()
+
     @Bean
     fun getRecreationClient(): RecreationApi {
         val objectMapper = jacksonObjectMapper()

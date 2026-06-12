@@ -4,11 +4,13 @@ import com.davismariotti.campalert.api.model.CreateSearchRequestBody
 import com.davismariotti.campalert.api.model.ErrorResponse
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.recreation.RidbApi
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestCheckRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
+import net.iakovlev.timeshape.TimeZoneEngine
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -23,6 +25,8 @@ class PhoneGateTest {
     private val phoneNumberRepository = mock(PhoneNumberRepository::class.java)
     private val checkRepository = mock(SearchRequestCheckRepository::class.java)
     private val notificationOutboxRepository = mock(NotificationOutboxRepository::class.java)
+    private val ridbApi = mock(RidbApi::class.java)
+    private val timeZoneEngine = mock(TimeZoneEngine::class.java)
     private val delegate =
         SearchRequestsDelegateImpl(
             searchRequestRepository,
@@ -30,6 +34,8 @@ class PhoneGateTest {
             phoneNumberRepository,
             checkRepository,
             notificationOutboxRepository,
+            ridbApi,
+            timeZoneEngine,
         )
 
     private val testUser = User(id = 1L, email = "test@example.com", passwordHash = "hash")
