@@ -7,13 +7,14 @@ import org.springframework.stereotype.Component
 @Component
 class NotificationRouter(
     private val smsNotificationService: SmsNotificationService,
+    private val pushoverNotificationService: PushoverNotificationService,
 ) {
     fun resolve(user: User): NotificationService {
         if (user.pushoverOverrideEnabled &&
             user.pushoverApiToken != null &&
             user.pushoverUserKey != null
         ) {
-            return PushoverNotificationService(user.pushoverApiToken, user.pushoverUserKey)
+            return pushoverNotificationService
         }
         return smsNotificationService
     }

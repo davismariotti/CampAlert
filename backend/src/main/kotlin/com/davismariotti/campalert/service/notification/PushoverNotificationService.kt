@@ -5,13 +5,15 @@ import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.recreation.Campground
 import net.pushover.client.PushoverMessage
 import net.pushover.client.PushoverRestClient
+import org.springframework.stereotype.Service
 
-class PushoverNotificationService(
-    private val apiToken: String,
-    private val userKey: String,
-) : NotificationService {
+@Service
+class PushoverNotificationService : NotificationService {
+    private val client = PushoverRestClient()
+
     override fun notify(searchRequest: SearchRequest, campground: Campground, user: User) {
-        val client = PushoverRestClient()
+        val apiToken = requireNotNull(user.pushoverApiToken) { "User ${user.id} has no Pushover API token" }
+        val userKey = requireNotNull(user.pushoverUserKey) { "User ${user.id} has no Pushover user key" }
         client.pushMessage(
             PushoverMessage
                 .Builder()
