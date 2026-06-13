@@ -13,10 +13,11 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 import org.springframework.security.web.authentication.rememberme.JdbcTokenRepositoryImpl
-import org.springframework.security.web.authentication.rememberme.PersistentTokenBasedRememberMeServices
 import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler
 import javax.sql.DataSource
 
 @Configuration
@@ -50,9 +51,8 @@ class SecurityConfig(
     }
 
     @Bean
-    fun rememberMeServices(): PersistentTokenBasedRememberMeServices {
-        val services =
-            PersistentTokenBasedRememberMeServices(rememberMeKey, userDetailsService, persistentTokenRepository())
+    fun rememberMeServices(): RememberMeServices {
+        val services = RememberMeServices(rememberMeKey, userDetailsService, persistentTokenRepository())
         services.setTokenValiditySeconds(30 * 24 * 60 * 60)
         services.setAlwaysRemember(false)
         return services
@@ -64,6 +64,7 @@ class SecurityConfig(
             .csrf { csrf ->
                 csrf
                     .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                    .csrfTokenRequestHandler(CsrfTokenRequestAttributeHandler())
                     .ignoringRequestMatchers("/api/sms/webhook")
             }
             .authorizeHttpRequests { auth ->
@@ -73,9 +74,11 @@ class SecurityConfig(
                     .requestMatchers(HttpMethod.POST, "/api/sms/webhook").permitAll()
                     .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                     .requestMatchers(HttpMethod.GET, "/actuator/info").permitAll()
+                    .requestMatchers("/error").permitAll()
                     .anyRequest().authenticated()
             }
             .rememberMe { rm -> rm.rememberMeServices(rememberMeServices()) }
+            .addFilterAfter(CsrfCookieFilter(), UsernamePasswordAuthenticationFilter::class.java)
             .exceptionHandling { ex ->
                 ex.authenticationEntryPoint { _, response, _ ->
                     response.contentType = "application/json"

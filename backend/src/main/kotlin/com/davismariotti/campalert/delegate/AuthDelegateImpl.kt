@@ -6,6 +6,7 @@ import com.davismariotti.campalert.api.model.LoginBody
 import com.davismariotti.campalert.api.model.RegisterBody
 import com.davismariotti.campalert.api.model.UpdateMeBody
 import com.davismariotti.campalert.repository.UserRepository
+import com.davismariotti.campalert.security.RememberMeServices
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.HttpStatus
@@ -16,7 +17,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.AuthenticationException
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
-import org.springframework.security.web.authentication.rememberme.PersistentTokenBasedRememberMeServices
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
@@ -29,7 +29,7 @@ class AuthDelegateImpl(
     private val authenticationManager: AuthenticationManager,
     private val request: HttpServletRequest,
     private val response: HttpServletResponse,
-    private val rememberMeServices: PersistentTokenBasedRememberMeServices,
+    private val rememberMeServices: RememberMeServices,
 ) : AuthApiDelegate {
     override fun register(registerBody: RegisterBody): ResponseEntity<AuthResponse> {
         if (userRepository.findByEmail(registerBody.email) != null) {
@@ -71,7 +71,7 @@ class AuthDelegateImpl(
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context)
 
         if (loginBody.rememberMe == true) {
-            rememberMeServices.loginSuccess(request, response, auth)
+            rememberMeServices.loginSuccessForced(request, response, auth)
         }
 
         val user = userRepository.findByEmail(loginBody.email)!!

@@ -46,7 +46,7 @@ describe('RegisterPage', () => {
     vi.spyOn(sdk, 'register').mockRejectedValueOnce(Object.assign(new Error(), { response: { status: 409 } }))
     render(<Wrapper />)
     await userEvent.type(screen.getByPlaceholderText('Email'), 'existing@b.com')
-    await userEvent.type(screen.getByPlaceholderText('Password'), 'pass')
+    await userEvent.type(screen.getByPlaceholderText('Password'), 'password1')
     await userEvent.click(screen.getByRole('button', { name: /create account/i }))
     await waitFor(() => expect(screen.getByText('An account with this email already exists')).toBeInTheDocument())
   })
@@ -61,12 +61,12 @@ describe('RegisterPage', () => {
     expect(screen.getByLabelText('Timezone')).toHaveValue('America/Denver')
 
     await userEvent.type(screen.getByPlaceholderText('Email'), 'new@b.com')
-    await userEvent.type(screen.getByPlaceholderText('Password'), 'pass')
+    await userEvent.type(screen.getByPlaceholderText('Password'), 'password1')
     await userEvent.click(screen.getByRole('button', { name: /create account/i }))
 
     await waitFor(() =>
       expect(registerSpy).toHaveBeenCalledWith({
-        body: { email: 'new@b.com', password: 'pass', timezone: 'America/Denver' }
+        body: { email: 'new@b.com', password: 'password1', timezone: 'America/Denver' }
       })
     )
   })
