@@ -75,7 +75,7 @@ class SmsNotificationServiceTest {
     }
 
     @Test
-    fun `buildAggregatedMessage multiple campgrounds lists all`() {
+    fun `buildAggregatedMessage multiple campgrounds lists all with count header`() {
         val req2 = request.copy(id = 2, campsiteId = 100, campgroundName = "Yosemite Valley")
         val notifications = listOf(
             PendingNotification(request = request, type = "AVAILABLE", outboxId = 1L),
@@ -86,6 +86,7 @@ class SmsNotificationServiceTest {
         assertTrue(body.contains("Yosemite Valley"))
         assertTrue(body.contains("recreation.gov/camping/campgrounds/99"))
         assertTrue(body.contains("recreation.gov/camping/campgrounds/100"))
+        assertTrue(body.contains("2 campgrounds available"), "Expected count header for 2 notifications")
     }
 
     @Test
