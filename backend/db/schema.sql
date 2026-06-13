@@ -2,16 +2,6 @@
 CREATE SCHEMA IF NOT EXISTS "public";
 -- Set comment to schema: "public"
 COMMENT ON SCHEMA "public" IS 'standard public schema';
--- Create "search_requests" table
-CREATE TABLE "public"."search_requests" (
-  "id" serial NOT NULL,
-  "campgrounds" jsonb NULL,
-  "start_night" character varying(12) NOT NULL,
-  "end_night" character varying(12) NOT NULL,
-  "nights" integer NOT NULL,
-  "persons" integer NOT NULL,
-  PRIMARY KEY ("id")
-);
 -- Create "users" table
 CREATE TABLE "public"."users" (
   "id" bigserial NOT NULL,
