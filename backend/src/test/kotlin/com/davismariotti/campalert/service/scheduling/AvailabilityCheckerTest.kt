@@ -7,8 +7,6 @@ import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.availability.AvailabilityResult
 import com.davismariotti.campalert.service.availability.RecreationService
-import com.davismariotti.campalert.service.notification.NotificationRouter
-import com.davismariotti.campalert.service.notification.NotificationService
 import com.davismariotti.campalert.service.state.AvailabilityStateService
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
@@ -28,16 +26,13 @@ class AvailabilityCheckerTest {
     private val userRepository = mock(UserRepository::class.java)
     private val recreationService = mock(RecreationService::class.java)
     private val availabilityStateService = mock(AvailabilityStateService::class.java)
-    private val notificationRouter = mock(NotificationRouter::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
-    private val notificationService = mock(NotificationService::class.java)
 
     private val checker = AvailabilityChecker(
         searchRequestRepository,
         userRepository,
         recreationService,
         availabilityStateService,
-        notificationRouter,
         eventPublisher,
         threadPoolSize = 1,
     )
@@ -179,35 +174,22 @@ class AvailabilityCheckerTest {
         assertEquals(2, captor.value.size)
     }
 
-    // ---- Pushover path ----
+    // ---- Pushover path (now routes through outbox like SMS) ----
 
     @Test
-    fun `pushover user with available sites triggers notify`() {
+    fun `pushover user result is passed to processUserResults`() {
         val req = request(userId = 2L)
         `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(pushoverUser))
         `when`(recreationService.checkAvailability(any(), any(), any()))
             .thenReturn(result(req, hasAvailableSites = true))
-        `when`(notificationRouter.resolve(pushoverUser)).thenReturn(notificationService)
 
         checker.processSearchRequests()
 
-        verify(notificationService).notify(any(), any(), any())
-        verify(availabilityStateService, never()).processUserResults(any(), any())
-    }
-
-    @Test
-    fun `pushover user without available sites does not notify`() {
-        val req = request(userId = 2L)
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
-        `when`(userRepository.findAllById(any())).thenReturn(listOf(pushoverUser))
-        `when`(recreationService.checkAvailability(any(), any(), any()))
-            .thenReturn(result(req, hasAvailableSites = false))
-        `when`(notificationRouter.resolve(pushoverUser)).thenReturn(notificationService)
-
-        checker.processSearchRequests()
-
-        verify(notificationService, never()).notify(any(), any(), any())
+        @Suppress("UNCHECKED_CAST")
+        val captor = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<AvailabilityResult>>
+        verify(availabilityStateService).processUserResults(capture(captor), any())
+        assertEquals(1, captor.value.size)
     }
 
     @Test
@@ -217,7 +199,6 @@ class AvailabilityCheckerTest {
         `when`(userRepository.findAllById(any())).thenReturn(listOf(pushoverUser))
         `when`(recreationService.checkAvailability(any(), any(), any()))
             .thenReturn(result(req, hasAvailableSites = true))
-        `when`(notificationRouter.resolve(pushoverUser)).thenReturn(notificationService)
 
         checker.processSearchRequests()
 
