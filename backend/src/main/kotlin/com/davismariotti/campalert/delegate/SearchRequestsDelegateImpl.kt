@@ -8,16 +8,12 @@ import com.davismariotti.campalert.api.model.SearchRequestStats
 import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
-import com.davismariotti.campalert.recreation.RidbApi
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestCheckRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
-import io.github.resilience4j.circuitbreaker.CallNotPermittedException
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
-import net.iakovlev.timeshape.TimeZoneEngine
-import org.slf4j.LoggerFactory
+import com.davismariotti.campalert.service.TimezoneResolutionService
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.context.SecurityContextHolder
@@ -30,13 +26,8 @@ class SearchRequestsDelegateImpl(
     private val phoneNumberRepository: PhoneNumberRepository,
     private val searchRequestCheckRepository: SearchRequestCheckRepository,
     private val notificationOutboxRepository: NotificationOutboxRepository,
-    private val ridbApi: RidbApi,
-    private val timeZoneEngine: TimeZoneEngine,
-    private val circuitBreakerRegistry: CircuitBreakerRegistry,
+    private val timezoneResolutionService: TimezoneResolutionService,
 ) : SearchRequestsApiDelegate {
-    private val log = LoggerFactory.getLogger(javaClass)
-    private val ridbCb by lazy { circuitBreakerRegistry.circuitBreaker("ridb") }
-
     private fun currentUserId(): Long {
         val email = SecurityContextHolder.getContext().authentication.name
         return userRepository.findByEmail(email)!!.id!!
@@ -67,7 +58,6 @@ class SearchRequestsDelegateImpl(
                 ),
             ) as ResponseEntity<SearchRequestResponse>
         }
-        val campgroundTimezone = resolveCampgroundTimezone(createSearchRequestBody.campsiteId)
         val entity = SearchRequest(
             startDay = createSearchRequestBody.startDay,
             nights = createSearchRequestBody.nights,
@@ -78,9 +68,10 @@ class SearchRequestsDelegateImpl(
             name = createSearchRequestBody.name,
             completed = false,
             userId = userId,
-            campgroundTimezone = campgroundTimezone,
         )
-        return ResponseEntity.status(201).body(searchRequestRepository.save(entity).toResponse())
+        val savedRequest = searchRequestRepository.save(entity)
+        timezoneResolutionService.resolveAndPersistAsync(savedRequest.id!!, createSearchRequestBody.campsiteId)
+        return ResponseEntity.status(201).body(savedRequest.toResponse())
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -121,26 +112,6 @@ class SearchRequestsDelegateImpl(
             ?: return ResponseEntity.notFound().build()
         searchRequestRepository.deleteById(entity.id!!)
         return ResponseEntity.noContent().build()
-    }
-
-    private fun resolveCampgroundTimezone(campsiteId: Int): String? {
-        return try {
-            val facilityResponse = ridbCb.executeSupplier { ridbApi.getFacility(campsiteId).execute() }
-            val facility = facilityResponse.body()?.recdata
-            val lat = facility?.facilityLatitude?.takeIf { it != 0.0 }
-            val lon = facility?.facilityLongitude?.takeIf { it != 0.0 }
-            if (lat != null && lon != null) {
-                timeZoneEngine.query(lat, lon).map { it.id }.orElse(null)
-            } else {
-                null
-            }
-        } catch (e: CallNotPermittedException) {
-            log.warn("RIDB circuit open for resolveCampgroundTimezone campsiteId=$campsiteId")
-            null
-        } catch (e: Exception) {
-            log.warn("Failed to resolve timezone for campsiteId=$campsiteId: ${e.message}")
-            null
-        }
     }
 
     private fun SearchRequest.toResponse(): SearchRequestResponse {
