@@ -1,0 +1,29 @@
+package com.davismariotti.campalert.health
+
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.actuate.health.Health
+import org.springframework.boot.actuate.health.HealthIndicator
+import org.springframework.stereotype.Component
+import java.util.concurrent.TimeUnit
+
+@Component("recreationGov")
+class RecreationGovHealthIndicator(
+    @Value("\${recreation.baseUrl}") private val baseUrl: String,
+) : HealthIndicator {
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(3, TimeUnit.SECONDS)
+        .readTimeout(3, TimeUnit.SECONDS)
+        .build()
+
+    override fun health(): Health {
+        return try {
+            val response = client.newCall(Request.Builder().url(baseUrl).build()).execute()
+            response.close()
+            Health.up().build()
+        } catch (e: Exception) {
+            Health.down().withDetail("reason", e.message ?: "unknown error").build()
+        }
+    }
+}
