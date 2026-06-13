@@ -549,8 +549,11 @@ components:
       properties:
         email:
           type: string
+          pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
         password:
           type: string
+          minLength: 8
+          maxLength: 72
         timezone:
           type: string
 
