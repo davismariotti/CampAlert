@@ -17,7 +17,9 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 @Service
@@ -29,6 +31,8 @@ class AvailabilityChecker(
     private val eventPublisher: ApplicationEventPublisher,
     @param:Value("\${campfinder.checker.thread-pool-size:20}")
     private val threadPoolSize: Int,
+    @param:Value("\${campfinder.checker.thread-pool-queue-capacity:100}")
+    private val threadPoolQueueCapacity: Int,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -60,7 +64,14 @@ class AvailabilityChecker(
         // Tick-scoped dedup cache: (campsiteId, yearMonth) → Future<Campground>
         val cache = ConcurrentHashMap<Pair<Int, YearMonth>, CompletableFuture<Campground>>()
 
-        val executor = Executors.newFixedThreadPool(threadPoolSize)
+        val executor = ThreadPoolExecutor(
+            threadPoolSize,
+            threadPoolSize,
+            0L,
+            TimeUnit.MILLISECONDS,
+            LinkedBlockingQueue(threadPoolQueueCapacity),
+            ThreadPoolExecutor.CallerRunsPolicy(),
+        )
         val futures = valid.map { request ->
             CompletableFuture.runAsync(
                 {
