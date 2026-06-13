@@ -7,6 +7,7 @@ import com.davismariotti.campalert.recreation.Campground
 import com.davismariotti.campalert.recreation.Campsite
 import com.davismariotti.campalert.recreation.Campsite.Companion.mergeWith
 import com.davismariotti.campalert.recreation.RecreationApi
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.YearMonth
@@ -20,6 +21,8 @@ import java.util.concurrent.ConcurrentHashMap
 class RecreationServiceImpl(
     val recreationApi: RecreationApi,
 ) : RecreationService {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     override fun checkAvailability(
         searchRequest: SearchRequest,
         user: User,
@@ -74,13 +77,19 @@ class RecreationServiceImpl(
         return relevant.isNotEmpty() && relevant.values.all { it == AvailabilityType.AVAILABLE }
     }
 
-    private fun fetchMonth(campsiteId: Int, monthStart: LocalDate): Campground =
-        recreationApi
+    private fun fetchMonth(campsiteId: Int, monthStart: LocalDate): Campground {
+        val body = recreationApi
             .getCampgroundAvailability(
                 campsiteId,
                 monthStart.atStartOfDay().atZone(ZoneOffset.UTC).format(dateFormatter),
             ).execute()
-            .body()!!
+            .body()
+        if (body == null) {
+            log.warn("Null body from Recreation.gov for campsiteId=$campsiteId month=$monthStart")
+            return Campground(emptyMap())
+        }
+        return body
+    }
 
     companion object {
         val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
