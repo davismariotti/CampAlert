@@ -11,6 +11,7 @@ export { AUTH_STORAGE_KEY }
 
 let navigateFn: ((path: string) => void) | null = null
 let logoutFn: (() => void) | null = null
+let suppress401 = false
 
 export function setNavigate(fn: (path: string) => void) {
   navigateFn = fn
@@ -20,10 +21,33 @@ export function setLogout(fn: () => void) {
   logoutFn = fn
 }
 
+export function withoutRedirectOn401<T>(fn: () => Promise<T>): Promise<T> {
+  suppress401 = true
+  return fn().finally(() => {
+    suppress401 = false
+  })
+}
+
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+client.instance.interceptors.request.use((config) => {
+  const method = config.method?.toUpperCase()
+  if (method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const token = getCsrfToken()
+    if (token) {
+      config.headers['X-XSRF-TOKEN'] = token
+    }
+  }
+  return config
+})
+
 client.instance.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !suppress401) {
       logoutFn?.()
       navigateFn?.('/login')
     }

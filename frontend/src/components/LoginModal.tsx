@@ -14,6 +14,7 @@ interface Props {
 export function LoginModal({ onClose }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { login: storeAuth } = useAuth()
   const navigate = useNavigate()
@@ -30,7 +31,7 @@ export function LoginModal({ onClose }: Props) {
 
   const mutation = useApiMutation({
     mutationFn: async () => {
-      const result = await login({ body: { email, password } })
+      const result = await login({ body: { email, password, rememberMe } })
       if (result.error) throw result
       return result.data!
     },
@@ -102,6 +103,16 @@ export function LoginModal({ onClose }: Props) {
             autoComplete="current-password"
             required
           />
+
+          <label className="flex items-center gap-2 text-sm text-forest-700 select-none cursor-pointer">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-forest-300 accent-forest-700"
+            />
+            Remember me
+          </label>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
