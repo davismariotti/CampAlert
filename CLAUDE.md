@@ -45,6 +45,10 @@ docker compose -f docker/docker-compose-dev.yaml up -d
 | Atlas config | `backend/db/atlas.hcl` |
 | Atlas + build scripts | `backend/scripts/` |
 
+## Environment variable workflow
+
+`docker/.env.prod.example` is the canonical list of every env var the production container needs. Whenever you add a new property to `application.properties` that must be set (or overridden) in production — especially secrets, credentials, or values with an unsafe default like `change-me-in-production` — add the corresponding env var to `.env.prod.example` in the same commit. Spring Boot maps `UPPER_SNAKE_CASE` env vars to `lower.dotted.properties` via relaxed binding (e.g. `CAMPFINDER_SECURITY_REMEMBER_ME_KEY` → `campfinder.security.remember-me-key`). Leave the value blank and include a comment describing what it is and where to find it.
+
 ## Schema change workflow
 
 When making any schema change:

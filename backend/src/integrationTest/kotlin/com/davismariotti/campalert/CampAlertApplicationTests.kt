@@ -1,10 +1,9 @@
 package com.davismariotti.campalert
 
+import com.davismariotti.campalert.support.IntegrationTestBase
 import org.junit.jupiter.api.Test
-import org.springframework.boot.test.context.SpringBootTest
 
-@SpringBootTest
-class CampFinderApplicationTests {
+class CampAlertApplicationTests : IntegrationTestBase() {
     @Test
     fun contextLoads() {
     }
