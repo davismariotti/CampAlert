@@ -14,6 +14,8 @@ import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestCheckRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import net.iakovlev.timeshape.TimeZoneEngine
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
@@ -30,8 +32,10 @@ class SearchRequestsDelegateImpl(
     private val notificationOutboxRepository: NotificationOutboxRepository,
     private val ridbApi: RidbApi,
     private val timeZoneEngine: TimeZoneEngine,
+    private val circuitBreakerRegistry: CircuitBreakerRegistry,
 ) : SearchRequestsApiDelegate {
     private val log = LoggerFactory.getLogger(javaClass)
+    private val ridbCb by lazy { circuitBreakerRegistry.circuitBreaker("ridb") }
 
     private fun currentUserId(): Long {
         val email = SecurityContextHolder.getContext().authentication.name
@@ -121,7 +125,8 @@ class SearchRequestsDelegateImpl(
 
     private fun resolveCampgroundTimezone(campsiteId: Int): String? {
         return try {
-            val facility = ridbApi.getFacility(campsiteId).execute().body()?.recdata
+            val facilityResponse = ridbCb.executeSupplier { ridbApi.getFacility(campsiteId).execute() }
+            val facility = facilityResponse.body()?.recdata
             val lat = facility?.facilityLatitude?.takeIf { it != 0.0 }
             val lon = facility?.facilityLongitude?.takeIf { it != 0.0 }
             if (lat != null && lon != null) {
@@ -129,6 +134,9 @@ class SearchRequestsDelegateImpl(
             } else {
                 null
             }
+        } catch (e: CallNotPermittedException) {
+            log.warn("RIDB circuit open for resolveCampgroundTimezone campsiteId=$campsiteId")
+            null
         } catch (e: Exception) {
             log.warn("Failed to resolve timezone for campsiteId=$campsiteId: ${e.message}")
             null

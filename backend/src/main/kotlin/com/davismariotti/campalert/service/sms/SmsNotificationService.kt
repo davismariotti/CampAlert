@@ -8,6 +8,7 @@ import com.davismariotti.campalert.recreation.Campground
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.service.notification.NotificationService
 import com.twilio.rest.api.v2010.account.Message
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import com.twilio.type.PhoneNumber as TwilioPhoneNumber
@@ -22,8 +23,10 @@ data class PendingNotification(
 class SmsNotificationService(
     private val twilioConfiguration: TwilioConfiguration,
     private val phoneNumberRepository: PhoneNumberRepository,
+    private val circuitBreakerRegistry: CircuitBreakerRegistry,
 ) : NotificationService {
     private val log = LoggerFactory.getLogger(javaClass)
+    private val twilioCb by lazy { circuitBreakerRegistry.circuitBreaker("twilio") }
 
     /** Legacy single-request path used by Pushover-bypass callers and tests. */
     override fun notify(searchRequest: SearchRequest, campground: Campground, user: User) {
@@ -97,10 +100,12 @@ class SmsNotificationService(
     }
 
     private fun sendSms(toPhone: String, body: String) {
-        Message.creator(
-            TwilioPhoneNumber(toPhone),
-            twilioConfiguration.messagingServiceSid,
-            body,
-        ).create()
+        twilioCb.executeRunnable {
+            Message.creator(
+                TwilioPhoneNumber(toPhone),
+                twilioConfiguration.messagingServiceSid,
+                body,
+            ).create()
+        }
     }
 }
