@@ -6,6 +6,7 @@ import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.availability.AvailabilityResult
 import com.davismariotti.campalert.service.availability.RecreationService
 import com.davismariotti.campalert.service.state.AvailabilityStateService
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.ApplicationEventPublisher
@@ -31,6 +32,7 @@ class AvailabilityChecker(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
+    @SchedulerLock(name = "availabilityChecker", lockAtMostFor = "PT90S", lockAtLeastFor = "PT30S")
     fun processSearchRequests() {
         val allRequests = searchRequestRepository.findByCompletedFalse()
 
