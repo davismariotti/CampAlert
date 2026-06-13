@@ -10,6 +10,7 @@ import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestCheckRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import net.iakovlev.timeshape.TimeZoneEngine
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -36,6 +37,7 @@ class PhoneGateTest {
             notificationOutboxRepository,
             ridbApi,
             timeZoneEngine,
+            mock(CircuitBreakerRegistry::class.java),
         )
 
     private val testUser = User(id = 1L, email = "test@example.com", passwordHash = "hash")

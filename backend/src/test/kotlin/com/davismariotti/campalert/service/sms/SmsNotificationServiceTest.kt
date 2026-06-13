@@ -4,6 +4,7 @@ import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.recreation.Campground
 import com.davismariotti.campalert.recreation.Campsite
 import com.davismariotti.campalert.repository.PhoneNumberRepository
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -13,7 +14,11 @@ import java.time.LocalDate
 class SmsNotificationServiceTest {
     private val twilioConfig = mock(TwilioConfiguration::class.java)
     private val phoneNumberRepository = mock(PhoneNumberRepository::class.java)
-    private val service = SmsNotificationService(twilioConfig, phoneNumberRepository)
+    private val service = SmsNotificationService(
+        twilioConfig,
+        phoneNumberRepository,
+        mock(CircuitBreakerRegistry::class.java),
+    )
 
     private val request = SearchRequest(
         id = 1,

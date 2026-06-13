@@ -5,7 +5,6 @@ import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.availability.RecreationService
-import com.davismariotti.campalert.service.notification.NotificationRouter
 import com.davismariotti.campalert.service.state.AvailabilityStateService
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
@@ -28,7 +27,6 @@ class AvailabilityCheckerTimezoneTest {
         userRepository,
         mock(RecreationService::class.java),
         mock(AvailabilityStateService::class.java),
-        mock(NotificationRouter::class.java),
         mock(ApplicationEventPublisher::class.java),
         threadPoolSize = 1,
     )

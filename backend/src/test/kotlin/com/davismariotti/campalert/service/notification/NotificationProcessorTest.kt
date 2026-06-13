@@ -4,13 +4,16 @@ import com.davismariotti.campalert.model.NotificationOutbox
 import com.davismariotti.campalert.model.PhoneNumber
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
+import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.sms.PendingNotification
 import com.davismariotti.campalert.service.sms.SmsConversationService
 import com.davismariotti.campalert.service.sms.SmsNotificationService
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
@@ -39,10 +42,27 @@ class NotificationProcessorTest {
     private val outboxRepo = mock(NotificationOutboxRepository::class.java)
     private val searchRequestRepo = mock(SearchRequestRepository::class.java)
     private val phoneRepo = mock(PhoneNumberRepository::class.java)
+    private val userRepo = mock(UserRepository::class.java)
     private val smsSvc = mock(SmsNotificationService::class.java)
     private val conversationSvc = mock(SmsConversationService::class.java)
+    private val pushoverSvc = mock(PushoverNotificationService::class.java)
 
-    private val processor = NotificationProcessor(outboxRepo, searchRequestRepo, phoneRepo, smsSvc, conversationSvc)
+    private val processor = NotificationProcessor(
+        outboxRepo,
+        searchRequestRepo,
+        phoneRepo,
+        userRepo,
+        smsSvc,
+        conversationSvc,
+        pushoverSvc,
+    )
+
+    @BeforeEach
+    fun setUp() {
+        // Default: non-pushover user — routes to SMS path
+        val smsUser = User(id = 42L, email = "user@example.com", passwordHash = "hash")
+        `when`(userRepo.findById(42L)).thenReturn(Optional.of(smsUser))
+    }
 
     private val phone = PhoneNumber(
         id = 1L,
