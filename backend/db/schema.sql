@@ -35,6 +35,7 @@ CREATE TABLE "public"."search_requests_v2" (
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_search_requests_v2_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id")
 );
+CREATE INDEX ON "public"."search_requests_v2" ("user_id");
 -- Create "search_request_checks" table
 CREATE TABLE "public"."search_request_checks" (
   "id" bigserial NOT NULL,
@@ -45,6 +46,7 @@ CREATE TABLE "public"."search_request_checks" (
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_src_search_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests_v2" ("id") ON DELETE CASCADE
 );
+CREATE INDEX ON "public"."search_request_checks" ("search_request_id");
 -- Create "notification_outbox" table
 CREATE TABLE "public"."notification_outbox" (
   "id" bigserial NOT NULL,
@@ -61,6 +63,8 @@ CREATE TABLE "public"."notification_outbox" (
   CONSTRAINT "fk_outbox_request" FOREIGN KEY ("request_id") REFERENCES "public"."search_requests_v2" ("id") ON DELETE CASCADE
 );
 CREATE INDEX ON "public"."notification_outbox" ("send_after") WHERE sent_at IS NULL AND missed_at IS NULL;
+CREATE INDEX ON "public"."notification_outbox" ("request_id");
+CREATE INDEX ON "public"."notification_outbox" ("user_id");
 -- Create "shedlock" table
 CREATE TABLE "public"."shedlock" (
   "name" character varying(64) NOT NULL,
@@ -91,3 +95,4 @@ CREATE TABLE "public"."phone_numbers" (
   UNIQUE ("phone"),
   CONSTRAINT "fk_phone_numbers_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id")
 );
+CREATE INDEX ON "public"."phone_numbers" ("user_id");
