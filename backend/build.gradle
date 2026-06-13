@@ -104,6 +104,7 @@ tasks.register('integrationTest', Test) {
     classpath = sourceSets.integrationTest.runtimeClasspath
     useJUnitPlatform()
     shouldRunAfter test
+    jvmArgs '-Xmx1g'
 }
 
 openApiGenerate {

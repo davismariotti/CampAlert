@@ -1,16 +1,31 @@
 package com.davismariotti.campalert.support
 
+import com.davismariotti.campalert.api.model.LoginBody
+import com.davismariotti.campalert.api.model.RegisterBody
+import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.recreation.RidbApi
+import com.davismariotti.campalert.service.sms.TwilioVerifyService
+import com.fasterxml.jackson.databind.ObjectMapper
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
+import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.BeforeEach
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.data.redis.connection.RedisConnectionFactory
+import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.MvcResult
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.PostgreSQLContainer
 
@@ -44,6 +59,16 @@ open class IntegrationTestBase {
         }
     }
 
+    // Declared here so all subclasses share a single Spring context (same @MockBean set = same cache key).
+    @MockBean
+    protected lateinit var twilioVerifyService: TwilioVerifyService
+
+    @MockBean
+    protected lateinit var ridbApi: RidbApi
+
+    @MockBean
+    protected lateinit var recreationApi: RecreationApi
+
     @Autowired
     protected lateinit var mockMvc: MockMvc
 
@@ -53,6 +78,12 @@ open class IntegrationTestBase {
     @Autowired
     private lateinit var redisConnectionFactory: RedisConnectionFactory
 
+    @Autowired
+    protected lateinit var circuitBreakerRegistry: CircuitBreakerRegistry
+
+    @Autowired
+    protected lateinit var mapper: ObjectMapper
+
     @BeforeEach
     fun resetState() {
         jdbcTemplate.execute(
@@ -60,11 +91,67 @@ open class IntegrationTestBase {
                 "persistent_logins, phone_numbers, users, search_requests, shedlock CASCADE"
         )
         redisConnectionFactory.connection.use { it.serverCommands().flushAll() }
+        listOf("ridb", "recreation-gov", "twilio").forEach { name ->
+            circuitBreakerRegistry.circuitBreaker(name).reset()
+        }
     }
 
     protected fun getCsrfToken(): String {
         val result = mockMvc.perform(get("/api/auth/me")).andReturn()
         return result.response.getCookie("XSRF-TOKEN")?.value
             ?: error("XSRF-TOKEN cookie not found in GET /api/auth/me response")
+    }
+
+    protected fun doPost(path: String, session: Cookie? = null, body: Any? = null): MvcResult {
+        val csrf = getCsrfToken()
+        var req = post(path)
+            .cookie(Cookie("XSRF-TOKEN", csrf))
+            .header("X-XSRF-TOKEN", csrf)
+        if (session != null) req = req.cookie(session)
+        if (body != null) req = req.contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body))
+        return mockMvc.perform(req).andReturn()
+    }
+
+    protected fun doPut(path: String, session: Cookie? = null, body: Any): MvcResult {
+        val csrf = getCsrfToken()
+        var req = put(path)
+            .cookie(Cookie("XSRF-TOKEN", csrf))
+            .header("X-XSRF-TOKEN", csrf)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(body))
+        if (session != null) req = req.cookie(session)
+        return mockMvc.perform(req).andReturn()
+    }
+
+    protected fun doPatch(path: String, session: Cookie? = null, body: Any): MvcResult {
+        val csrf = getCsrfToken()
+        var req = patch(path)
+            .cookie(Cookie("XSRF-TOKEN", csrf))
+            .header("X-XSRF-TOKEN", csrf)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(body))
+        if (session != null) req = req.cookie(session)
+        return mockMvc.perform(req).andReturn()
+    }
+
+    protected fun doDelete(path: String, session: Cookie? = null): MvcResult {
+        val csrf = getCsrfToken()
+        var req = delete(path)
+            .cookie(Cookie("XSRF-TOKEN", csrf))
+            .header("X-XSRF-TOKEN", csrf)
+        if (session != null) req = req.cookie(session)
+        return mockMvc.perform(req).andReturn()
+    }
+
+    protected fun extractId(result: MvcResult): Long =
+        mapper.readTree(result.response.contentAsString).get("id").asLong()
+
+    protected fun registerAndLogin(email: String = "user@test.com", password: String = "password1"): Cookie {
+        doPost(
+            "/api/auth/register",
+            body = RegisterBody(email = email, password = password, timezone = "America/Los_Angeles")
+        )
+        val result = doPost("/api/auth/login", body = LoginBody(email = email, password = password))
+        return result.response.getCookie("SESSION") ?: error("SESSION cookie not found after login for $email")
     }
 }
