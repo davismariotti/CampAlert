@@ -79,7 +79,7 @@ sourceSets {
             runtimeClasspath += main.output + test.output
             srcDir 'src/integrationTest/kotlin'
         }
-        resources.srcDir 'src/integrationTest/resources'
+        resources.srcDirs = ['src/integrationTest/resources', 'db']
     }
     main {
         kotlin {
@@ -91,6 +91,10 @@ sourceSets {
 configurations {
     integrationTestImplementation.extendsFrom testImplementation
     integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+dependencies {
+    integrationTestImplementation 'org.springframework.security:spring-security-test'
 }
 
 tasks.register('integrationTest', Test) {
