@@ -91,7 +91,7 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
             )
         )
 
-    private fun seedRequest(userId: Long, completed: Boolean = false, pauseReason: String? = null,): SearchRequest =
+    private fun seedRequest(userId: Long, completed: Boolean = false, pauseReason: String? = null): SearchRequest =
         searchRequestRepository.save(
             SearchRequest(
                 userId = userId,
