@@ -59,7 +59,6 @@ class SmsNotificationService(
 
     fun buildAggregatedMessage(notifications: List<PendingNotification>): String {
         val sb = StringBuilder()
-        val totalSites = notifications.sumOf { it.request.campgroundName.length.coerceAtMost(1) } // count of requests
         val count = notifications.size
         if (count > 1) sb.appendLine("$count campgrounds available").appendLine()
         notifications.forEach { n ->
