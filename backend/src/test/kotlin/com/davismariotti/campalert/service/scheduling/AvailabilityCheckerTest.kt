@@ -35,6 +35,7 @@ class AvailabilityCheckerTest {
         availabilityStateService,
         eventPublisher,
         threadPoolSize = 1,
+        threadPoolQueueCapacity = 10,
     )
 
     private val futureDay = LocalDate.now(ZoneOffset.UTC).plusDays(1)

@@ -29,6 +29,7 @@ class AvailabilityCheckerTimezoneTest {
         mock(AvailabilityStateService::class.java),
         mock(ApplicationEventPublisher::class.java),
         threadPoolSize = 1,
+        threadPoolQueueCapacity = 10,
     )
 
     private fun request(startDay: LocalDate, timezone: String?) =
