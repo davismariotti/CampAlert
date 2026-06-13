@@ -39,7 +39,7 @@ export function RegisterPage() {
     }
   })
 
-  const canSubmit = email.trim() !== '' && password !== ''
+  const canSubmit = email.trim() !== '' && password.length >= 8 && password.length <= 72
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -87,6 +87,8 @@ export function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"
+              minLength={8}
+              maxLength={72}
               required
             />
             <label className="flex flex-col gap-1 text-sm font-medium text-forest-700">
