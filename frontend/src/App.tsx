@@ -14,7 +14,7 @@ import { AccountSettingsPage } from './features/account/AccountSettingsPage'
 import { TermsPage } from './pages/TermsPage'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { getMe } from './api/generated/sdk.gen'
-import { setNavigate, setLogout, AUTH_STORAGE_KEY } from './api/client'
+import { setNavigate, setLogout, withoutRedirectOn401, AUTH_STORAGE_KEY } from './api/client'
 import { Spinner } from './components/ui/Spinner'
 import { ToastProvider } from './components/ui/Toast'
 
@@ -32,7 +32,7 @@ const queryClient = new QueryClient({
 function AuthGate() {
   const { user, login, logout } = useAuth()
   const navigate = useNavigate()
-  const [checking, setChecking] = useState(() => localStorage.getItem(AUTH_STORAGE_KEY) !== null)
+  const [checking, setChecking] = useState(true)
 
   useEffect(() => {
     setNavigate((path) => navigate(path))
@@ -44,18 +44,16 @@ function AuthGate() {
 
   useEffect(() => {
     const stored = localStorage.getItem(AUTH_STORAGE_KEY)
-    if (!stored) return
-    getMe()
+    withoutRedirectOn401(() => getMe())
       .then(({ data }) => {
         if (data) login(data)
-        else {
-          logout()
-          navigate('/')
-        }
+        else if (stored) navigate('/')
       })
       .catch(() => {
-        logout()
-        navigate('/login')
+        if (stored) {
+          logout()
+          navigate('/login')
+        }
       })
       .finally(() => setChecking(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
