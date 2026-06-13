@@ -71,6 +71,22 @@ CREATE TABLE "public"."notification_outbox" (
   CONSTRAINT "fk_outbox_request" FOREIGN KEY ("request_id") REFERENCES "public"."search_requests_v2" ("id") ON DELETE CASCADE
 );
 CREATE INDEX ON "public"."notification_outbox" ("send_after") WHERE sent_at IS NULL AND missed_at IS NULL;
+-- Create "shedlock" table
+CREATE TABLE "public"."shedlock" (
+  "name" character varying(64) NOT NULL,
+  "lock_until" timestamp NOT NULL,
+  "locked_at" timestamp NOT NULL,
+  "locked_by" character varying(255) NOT NULL,
+  PRIMARY KEY ("name")
+);
+-- Create "persistent_logins" table
+CREATE TABLE "public"."persistent_logins" (
+  "username" character varying(64) NOT NULL,
+  "series" character varying(64) NOT NULL,
+  "token" character varying(64) NOT NULL,
+  "last_used" timestamp NOT NULL,
+  PRIMARY KEY ("series")
+);
 -- Create "phone_numbers" table
 CREATE TABLE "public"."phone_numbers" (
   "id" bigserial NOT NULL,
