@@ -1,12 +1,10 @@
 package com.davismariotti.campalert.service.scheduling
 
-import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.recreation.Campground
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.availability.AvailabilityResult
 import com.davismariotti.campalert.service.availability.RecreationService
-import com.davismariotti.campalert.service.notification.NotificationRouter
 import com.davismariotti.campalert.service.state.AvailabilityStateService
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -27,7 +25,6 @@ class AvailabilityChecker(
     private val userRepository: UserRepository,
     private val recreationService: RecreationService,
     private val availabilityStateService: AvailabilityStateService,
-    private val notificationRouter: NotificationRouter,
     private val eventPublisher: ApplicationEventPublisher,
     @param:Value("\${campfinder.checker.thread-pool-size:20}")
     private val threadPoolSize: Int,
@@ -63,46 +60,38 @@ class AvailabilityChecker(
 
         val executor = Executors.newFixedThreadPool(threadPoolSize)
         val futures = valid.map { request ->
-            CompletableFuture.runAsync({
-                val uid = request.userId!!
-                try {
-                    val user = userMap[uid]!!
-                    val result = recreationService.checkAvailability(request, user, cache)
-
-                    if (isPushoverUser(user)) {
-                        // Pushover path: fire per-request notification directly, bypass outbox
-                        if (result.hasAvailableSites) {
-                            notificationRouter.resolve(user).notify(request, result.campground, user)
-                        }
-                    } else {
+            CompletableFuture.runAsync(
+                {
+                    val uid = request.userId!!
+                    try {
+                        val user = userMap[uid]!!
+                        val result = recreationService.checkAvailability(request, user, cache)
                         userResults[uid]!!.add(result)
-                    }
-                } catch (e: Exception) {
-                    log.error("Error processing request=${request.id}", e)
-                } finally {
-                    val remaining = userCountdowns[uid]!!.decrementAndGet()
-                    if (remaining == 0) {
-                        val user = userMap[uid]
-                        if (user != null && !isPushoverUser(user)) {
-                            val results = userResults[uid] ?: emptyList()
-                            try {
-                                availabilityStateService.processUserResults(results, user)
-                            } catch (e: Exception) {
-                                log.error("Error persisting state for user=$uid", e)
+                    } catch (e: Exception) {
+                        log.error("Error processing request=${request.id}", e)
+                    } finally {
+                        val remaining = userCountdowns[uid]!!.decrementAndGet()
+                        if (remaining == 0) {
+                            val user = userMap[uid]
+                            if (user != null) {
+                                val results = userResults[uid] ?: emptyList()
+                                try {
+                                    availabilityStateService.processUserResults(results, user)
+                                } catch (e: Exception) {
+                                    log.error("Error persisting state for user=$uid", e)
+                                }
                             }
+                            eventPublisher.publishEvent(UserAvailabilityProcessedEvent(uid))
                         }
-                        eventPublisher.publishEvent(UserAvailabilityProcessedEvent(uid))
                     }
-                }
-            }, executor)
+                },
+                executor,
+            )
         }
 
         CompletableFuture.allOf(*futures.toTypedArray()).join()
         executor.shutdown()
     }
-
-    private fun isPushoverUser(user: User) =
-        user.pushoverOverrideEnabled && user.pushoverApiToken != null && user.pushoverUserKey != null
 
     private fun today(campgroundTimezone: String?): LocalDate =
         LocalDate.now(campgroundTimezone?.let { ZoneId.of(it) } ?: ZoneOffset.UTC)
