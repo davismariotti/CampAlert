@@ -5,6 +5,7 @@ import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.security.RememberMeServices
 import com.davismariotti.campalert.service.email.EmailVerificationService
+import com.davismariotti.campalert.service.email.PasswordResetService
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import jakarta.servlet.http.HttpSession
@@ -32,6 +33,7 @@ class AuthLoginGatingTest {
     private val response = mock(HttpServletResponse::class.java)
     private val rememberMeServices = mock(RememberMeServices::class.java)
     private val emailVerificationService = mock(EmailVerificationService::class.java)
+    private val passwordResetService = mock(PasswordResetService::class.java)
     private val session = mock(HttpSession::class.java)
 
     private val delegate = AuthDelegateImpl(
@@ -42,6 +44,7 @@ class AuthLoginGatingTest {
         response = response,
         rememberMeServices = rememberMeServices,
         emailVerificationService = emailVerificationService,
+        passwordResetService = passwordResetService,
     )
 
     @AfterEach

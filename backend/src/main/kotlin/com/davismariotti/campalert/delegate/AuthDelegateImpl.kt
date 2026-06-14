@@ -3,16 +3,20 @@ package com.davismariotti.campalert.delegate
 import com.davismariotti.campalert.api.AuthApiDelegate
 import com.davismariotti.campalert.api.model.AuthResponse
 import com.davismariotti.campalert.api.model.ErrorResponse
+import com.davismariotti.campalert.api.model.ForgotPasswordBody
 import com.davismariotti.campalert.api.model.LoginBody
 import com.davismariotti.campalert.api.model.RegisterBody
 import com.davismariotti.campalert.api.model.RegisterResponse
 import com.davismariotti.campalert.api.model.ResendVerificationBody
+import com.davismariotti.campalert.api.model.ResetPasswordBody
 import com.davismariotti.campalert.api.model.UpdateMeBody
 import com.davismariotti.campalert.api.model.VerifyEmailBody
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.security.RememberMeServices
 import com.davismariotti.campalert.service.email.EmailVerificationService
 import com.davismariotti.campalert.service.email.EmailVerificationService.VerifyResult
+import com.davismariotti.campalert.service.email.PasswordResetService
+import com.davismariotti.campalert.service.email.PasswordResetService.ResetResult
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.HttpStatus
@@ -37,6 +41,7 @@ class AuthDelegateImpl(
     private val response: HttpServletResponse,
     private val rememberMeServices: RememberMeServices,
     private val emailVerificationService: EmailVerificationService,
+    private val passwordResetService: PasswordResetService,
 ) : AuthApiDelegate {
     override fun register(registerBody: RegisterBody): ResponseEntity<RegisterResponse> {
         if (userRepository.findByEmail(registerBody.email) != null) {
@@ -133,6 +138,32 @@ class AuthDelegateImpl(
                 ResponseEntity
                     .status(HttpStatus.UNPROCESSABLE_ENTITY)
                     .body(ErrorResponse(message = "Verification link is invalid or expired", code = "VERIFICATION_INVALID_OR_EXPIRED"))
+                    as ResponseEntity<Unit>
+        }
+
+    override fun forgotPassword(forgotPasswordBody: ForgotPasswordBody): ResponseEntity<Unit> {
+        passwordResetService.forgotPassword(forgotPasswordBody.email)
+        return ResponseEntity.accepted().build()
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    override fun resetPassword(resetPasswordBody: ResetPasswordBody): ResponseEntity<Unit> =
+        when (passwordResetService.consumeReset(resetPasswordBody.resetId, resetPasswordBody.token, resetPasswordBody.newPassword)) {
+            ResetResult.SUCCESS -> ResponseEntity.noContent().build()
+            ResetResult.INVALID_OR_EXPIRED ->
+                ResponseEntity
+                    .status(HttpStatus.UNPROCESSABLE_ENTITY)
+                    .body(ErrorResponse(message = "Reset link is invalid or expired", code = "RESET_INVALID_OR_EXPIRED"))
+                    as ResponseEntity<Unit>
+            ResetResult.PASSWORD_TOO_WEAK ->
+                ResponseEntity
+                    .status(HttpStatus.UNPROCESSABLE_ENTITY)
+                    .body(ErrorResponse(message = "Password does not meet requirements", code = "RESET_PASSWORD_TOO_WEAK"))
+                    as ResponseEntity<Unit>
+            ResetResult.PASSWORD_SAME_AS_CURRENT ->
+                ResponseEntity
+                    .status(HttpStatus.UNPROCESSABLE_ENTITY)
+                    .body(ErrorResponse(message = "New password must differ from current password", code = "RESET_PASSWORD_SAME_AS_CURRENT"))
                     as ResponseEntity<Unit>
         }
 }
