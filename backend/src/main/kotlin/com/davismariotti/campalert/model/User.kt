@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import java.time.Instant
 
 @Entity
 @Table(name = "users")
@@ -31,4 +32,7 @@ data class User(
 
     @Column(name = "timezone", nullable = false)
     val timezone: String = "America/Los_Angeles",
+
+    @Column(name = "email_verified_at")
+    val emailVerifiedAt: Instant? = null,
 )
