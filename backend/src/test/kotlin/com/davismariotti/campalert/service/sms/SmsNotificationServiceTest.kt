@@ -34,10 +34,14 @@ class SmsNotificationServiceTest {
     private val campground = Campground(
         campsites = mapOf(
             1 to Campsite(
-                campsiteId = 1, site = "001", loop = "Loop A",
+                campsiteId = 1,
+                site = "001",
+                loop = "Loop A",
                 campsiteReserveType = "SITE_SPECIFIC",
-                minimumNumberOfPeople = 1, maximumNumberOfPeople = 6,
-                availabilities = emptyMap(), quantities = emptyMap(),
+                minimumNumberOfPeople = 1,
+                maximumNumberOfPeople = 6,
+                availabilities = emptyMap(),
+                quantities = emptyMap(),
             ),
         ),
     )

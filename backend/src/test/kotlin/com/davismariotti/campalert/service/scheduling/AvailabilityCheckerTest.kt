@@ -237,7 +237,8 @@ class AvailabilityCheckerTest {
         `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser))
         `when`(recreationService.checkAvailability(any(), any(), any())).thenReturn(result(req))
-        doThrow(RuntimeException("DB failure")).`when`(availabilityStateService)
+        doThrow(RuntimeException("DB failure"))
+            .`when`(availabilityStateService)
             .processUserResults(any(), any())
 
         checker.processSearchRequests()

@@ -34,9 +34,11 @@ class CampgroundsIntegrationTest : IntegrationTestBase() {
     @Suppress("UNCHECKED_CAST")
     private fun <T> errorCall(code: Int): Call<T> {
         val call = Mockito.mock(Call::class.java) as Call<T>
-        Mockito.doReturn(
-            Response.error<T>(code, "error".toResponseBody(null))
-        ).`when`(call).execute()
+        Mockito
+            .doReturn(
+                Response.error<T>(code, "error".toResponseBody(null))
+            ).`when`(call)
+            .execute()
         return call
     }
 
@@ -150,7 +152,8 @@ class CampgroundsIntegrationTest : IntegrationTestBase() {
         val session = loginSession()
         val call = successCall<Campground?>(null)
         @Suppress("UNCHECKED_CAST")
-        Mockito.`when`(recreationApi.getCampgroundAvailability(anyInt(), anyString()))
+        Mockito
+            .`when`(recreationApi.getCampgroundAvailability(anyInt(), anyString()))
             .thenReturn(call as Call<Campground>)
         val result = mockMvc.perform(get("/api/campgrounds/123").cookie(session)).andReturn()
         assertThat(result.response.status).isEqualTo(404)
@@ -229,7 +232,13 @@ class CampgroundsIntegrationTest : IntegrationTestBase() {
 
         val result = mockMvc.perform(get("/api/campgrounds/123/loops").cookie(session)).andReturn()
         val tree = mapper.readTree(result.response.contentAsString)
-        assertThat(tree.map { it.get("name").asText() }).containsExactly("Alpine", "Meadow", "Zephyr")
+        assertThat(
+            tree
+                .iterator()
+                .asSequence()
+                .map { it.get("name").asText() }
+                .toList()
+        ).containsExactly("Alpine", "Meadow", "Zephyr")
     }
 
     // --- 4.14 boat-in detection ---

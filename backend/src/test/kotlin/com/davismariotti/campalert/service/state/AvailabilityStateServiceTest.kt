@@ -35,10 +35,17 @@ class AvailabilityStateServiceTest {
         lastNotified: Instant? = null,
         reminderSent: Instant? = null
     ) = SearchRequest(
-        id = 10, startDay = LocalDate.now().plusDays(5), nights = 2,
-        groupSize = 2, campsiteId = 99, name = "Test", completed = false,
-        lastAvailabilityState = state, userPaused = paused,
-        lastNotifiedAt = lastNotified, reminderSentAt = reminderSent,
+        id = 10,
+        startDay = LocalDate.now().plusDays(5),
+        nights = 2,
+        groupSize = 2,
+        campsiteId = 99,
+        name = "Test",
+        completed = false,
+        lastAvailabilityState = state,
+        userPaused = paused,
+        lastNotifiedAt = lastNotified,
+        reminderSentAt = reminderSent,
     )
 
     private fun result(request: SearchRequest, available: Boolean) =
@@ -131,10 +138,11 @@ class AvailabilityStateServiceTest {
 
         service.processUserResults(listOf(result(req, true)), user)
 
-        org.mockito.Mockito.verify(
-            outboxRepository,
-            org.mockito.Mockito.never()
-        ).save(any(NotificationOutbox::class.java))
+        org.mockito.Mockito
+            .verify(
+                outboxRepository,
+                org.mockito.Mockito.never()
+            ).save(any(NotificationOutbox::class.java))
     }
 
     @Test
@@ -145,10 +153,11 @@ class AvailabilityStateServiceTest {
 
         service.processUserResults(listOf(result(req, false)), user)
 
-        org.mockito.Mockito.verify(
-            outboxRepository,
-            org.mockito.Mockito.never()
-        ).save(any(NotificationOutbox::class.java))
+        org.mockito.Mockito
+            .verify(
+                outboxRepository,
+                org.mockito.Mockito.never()
+            ).save(any(NotificationOutbox::class.java))
     }
 
     @Test

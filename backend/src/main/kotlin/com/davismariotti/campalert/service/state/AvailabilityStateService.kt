@@ -94,7 +94,11 @@ class AvailabilityStateService(
         val local = now.atZone(zone)
         val hour = local.hour
         return if (hour in 1 until 6) {
-            local.toLocalDate().atTime(6, 0).atZone(zone).toInstant()
+            local
+                .toLocalDate()
+                .atTime(6, 0)
+                .atZone(zone)
+                .toInstant()
         } else {
             now
         }

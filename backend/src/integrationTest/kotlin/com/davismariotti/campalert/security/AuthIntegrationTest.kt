@@ -111,7 +111,8 @@ class AuthIntegrationTest : IntegrationTestBase() {
 
     @Test
     fun `unauthenticated GET me returns 401 with JSON content type`() {
-        mockMvc.perform(get("/api/auth/me"))
+        mockMvc
+            .perform(get("/api/auth/me"))
             .andExpect(status().isUnauthorized)
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
     }
@@ -133,7 +134,10 @@ class AuthIntegrationTest : IntegrationTestBase() {
     fun `after logout session cookie no longer grants access`() {
         val session = registerAndLogin()
         doPost("/api/auth/logout", session)
-        val status = mockMvc.perform(get("/api/auth/me").cookie(session)).andReturn().response.status
+        val status = mockMvc
+            .perform(get("/api/auth/me").cookie(session))
+            .andReturn()
+            .response.status
         assertThat(status).isIn(401, 403)
     }
 

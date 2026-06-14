@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.mockStatic
 import org.mockito.Mockito.`when`
-import org.springframework.boot.actuate.health.Status
+import org.springframework.boot.health.contributor.Status
 import kotlin.test.assertEquals
 
 class TwilioHealthIndicatorTest {
@@ -20,9 +20,10 @@ class TwilioHealthIndicatorTest {
         val mockAccount = mock(Account::class.java)
         mockStatic(Account::class.java).use { staticAccount ->
             val fetcher = mock(com.twilio.rest.api.v2010.AccountFetcher::class.java)
-            staticAccount.`when`<com.twilio.rest.api.v2010.AccountFetcher> {
-                Account.fetcher("ACtest")
-            }.thenReturn(fetcher)
+            staticAccount
+                .`when`<com.twilio.rest.api.v2010.AccountFetcher> {
+                    Account.fetcher("ACtest")
+                }.thenReturn(fetcher)
             `when`(fetcher.fetch()).thenReturn(mockAccount)
 
             val health = indicator.health()

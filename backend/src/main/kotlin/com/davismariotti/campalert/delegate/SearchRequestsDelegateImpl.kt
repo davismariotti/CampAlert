@@ -29,7 +29,7 @@ class SearchRequestsDelegateImpl(
     private val timezoneResolutionService: TimezoneResolutionService,
 ) : SearchRequestsApiDelegate {
     private fun currentUserId(): Long {
-        val email = SecurityContextHolder.getContext().authentication.name
+        val email = SecurityContextHolder.getContext().authentication!!.name
         return userRepository.findByEmail(email)!!.id!!
     }
 
@@ -77,7 +77,9 @@ class SearchRequestsDelegateImpl(
     @PreAuthorize("isAuthenticated()")
     override fun getSearchRequest(id: Int): ResponseEntity<SearchRequestResponse> {
         val userId = currentUserId()
-        val entity = searchRequestRepository.findById(id).orElse(null)
+        val entity = searchRequestRepository
+            .findById(id)
+            .orElse(null)
             ?.takeIf { it.userId == userId }
             ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(entity.toResponse())
@@ -89,7 +91,9 @@ class SearchRequestsDelegateImpl(
         updateSearchRequestBody: UpdateSearchRequestBody
     ): ResponseEntity<SearchRequestResponse> {
         val userId = currentUserId()
-        val existing = searchRequestRepository.findById(id).orElse(null)
+        val existing = searchRequestRepository
+            .findById(id)
+            .orElse(null)
             ?.takeIf { it.userId == userId }
             ?: return ResponseEntity.notFound().build()
         val updated = existing.copy(
@@ -107,7 +111,9 @@ class SearchRequestsDelegateImpl(
     @PreAuthorize("isAuthenticated()")
     override fun deleteSearchRequest(id: Int): ResponseEntity<Unit> {
         val userId = currentUserId()
-        val entity = searchRequestRepository.findById(id).orElse(null)
+        val entity = searchRequestRepository
+            .findById(id)
+            .orElse(null)
             ?.takeIf { it.userId == userId }
             ?: return ResponseEntity.notFound().build()
         searchRequestRepository.deleteById(entity.id!!)

@@ -74,8 +74,14 @@ class NotificationProcessorTest {
 
     private fun request(id: Int, state: String = "AVAILABLE") =
         SearchRequest(
-            id = id, startDay = LocalDate.now().plusDays(5), nights = 2, groupSize = 2,
-            campsiteId = 99, name = "Camp", completed = false, campgroundName = "Camp Ground",
+            id = id,
+            startDay = LocalDate.now().plusDays(5),
+            nights = 2,
+            groupSize = 2,
+            campsiteId = 99,
+            name = "Camp",
+            completed = false,
+            campgroundName = "Camp Ground",
             lastAvailabilityState = state,
         )
 

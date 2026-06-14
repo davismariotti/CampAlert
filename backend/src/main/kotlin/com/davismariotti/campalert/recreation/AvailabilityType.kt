@@ -22,7 +22,6 @@ enum class AvailabilityType(
     companion object {
         @JvmStatic
         @JsonCreator
-        fun fromValue(value: String): AvailabilityType =
-            values().find { it.value.equals(value, ignoreCase = true) } ?: UNKNOWN
+        fun fromValue(value: String): AvailabilityType = values().find { it.value.equals(value, ignoreCase = true) } ?: UNKNOWN
     }
 }

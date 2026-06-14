@@ -5,20 +5,19 @@ import com.davismariotti.campalert.api.model.RegisterBody
 import com.davismariotti.campalert.recreation.RecreationApi
 import com.davismariotti.campalert.recreation.RidbApi
 import com.davismariotti.campalert.service.sms.TwilioVerifyService
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.BeforeEach
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.MvcResult
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
@@ -27,7 +26,8 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.testcontainers.containers.GenericContainer
-import org.testcontainers.containers.PostgreSQLContainer
+import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.databind.ObjectMapper
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
@@ -36,8 +36,8 @@ open class IntegrationTestBase {
     companion object {
         // Singleton containers: started once per JVM, never restarted between test classes.
         // This keeps the ports stable so the cached Spring context remains valid across classes.
-        val postgres: PostgreSQLContainer<Nothing> by lazy {
-            PostgreSQLContainer<Nothing>("postgres:16-alpine")
+        val postgres: PostgreSQLContainer by lazy {
+            PostgreSQLContainer("postgres:16-alpine")
                 .also { it.withInitScript("schema.sql") }
                 .also { it.start() }
         }
@@ -59,14 +59,14 @@ open class IntegrationTestBase {
         }
     }
 
-    // Declared here so all subclasses share a single Spring context (same @MockBean set = same cache key).
-    @MockBean
+    // Declared here so all subclasses share a single Spring context (same @MockitoBean set = same cache key).
+    @MockitoBean
     protected lateinit var twilioVerifyService: TwilioVerifyService
 
-    @MockBean
+    @MockitoBean
     protected lateinit var ridbApi: RidbApi
 
-    @MockBean
+    @MockitoBean
     protected lateinit var recreationApi: RecreationApi
 
     @Autowired
@@ -143,8 +143,7 @@ open class IntegrationTestBase {
         return mockMvc.perform(req).andReturn()
     }
 
-    protected fun extractId(result: MvcResult): Long =
-        mapper.readTree(result.response.contentAsString).get("id").asLong()
+    protected fun extractId(result: MvcResult): Long = mapper.readTree(result.response.contentAsString).get("id").asLong()
 
     protected fun registerAndLogin(email: String = "user@test.com", password: String = "password1"): Cookie {
         doPost(

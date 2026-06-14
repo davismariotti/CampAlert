@@ -37,7 +37,8 @@ class OnboardingFlowIntegrationTest : IntegrationTestBase() {
     @BeforeEach
     fun stubExternalDependencies() {
         Mockito.doNothing().`when`(twilioVerifyService).startVerification(anyString())
-        Mockito.`when`(twilioVerifyService.checkVerification(anyString(), anyString()))
+        Mockito
+            .`when`(twilioVerifyService.checkVerification(anyString(), anyString()))
             .thenReturn(VerifyResult.Approved)
 
         val noCoordFacility = RidbFacilityResponse(
@@ -63,11 +64,9 @@ class OnboardingFlowIntegrationTest : IntegrationTestBase() {
         return call
     }
 
-    private fun addPhone(session: Cookie, phone: String = "+12125551234"): MvcResult =
-        doPost("/api/phone-numbers", session, AddPhoneNumberBody(phone = phone, smsConsent = true))
+    private fun addPhone(session: Cookie, phone: String = "+12125551234"): MvcResult = doPost("/api/phone-numbers", session, AddPhoneNumberBody(phone = phone, smsConsent = true))
 
-    private fun verifyPhone(session: Cookie, id: Long): MvcResult =
-        doPost("/api/phone-numbers/$id/verify", session, VerifyPhoneNumberBody(code = "123456"))
+    private fun verifyPhone(session: Cookie, id: Long): MvcResult = doPost("/api/phone-numbers/$id/verify", session, VerifyPhoneNumberBody(code = "123456"))
 
     private fun deletePhone(session: Cookie, id: Long): MvcResult = doDelete("/api/phone-numbers/$id", session)
 

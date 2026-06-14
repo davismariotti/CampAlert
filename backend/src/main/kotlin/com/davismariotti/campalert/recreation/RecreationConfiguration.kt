@@ -42,15 +42,18 @@ class RecreationConfiguration(
         val objectMapper = jacksonObjectMapper()
             .registerModule(KotlinModule.Builder().build())
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        val okHttpClient = OkHttpClient.Builder()
+        val okHttpClient = OkHttpClient
+            .Builder()
             .addInterceptor { chain ->
-                val request = chain.request().newBuilder()
+                val request = chain
+                    .request()
+                    .newBuilder()
                     .addHeader("apikey", ridbApiKey)
                     .build()
                 chain.proceed(request)
-            }
-            .build()
-        val retrofit = Retrofit.Builder()
+            }.build()
+        val retrofit = Retrofit
+            .Builder()
             .baseUrl(ridbBaseUrl)
             .client(okHttpClient)
             .addConverterFactory(JacksonConverterFactory.create(objectMapper))

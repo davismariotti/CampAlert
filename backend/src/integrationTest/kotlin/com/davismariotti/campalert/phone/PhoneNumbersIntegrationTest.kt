@@ -36,17 +36,16 @@ class PhoneNumbersIntegrationTest : IntegrationTestBase() {
     @BeforeEach
     fun stubTwilio() {
         Mockito.doNothing().`when`(twilioVerifyService).startVerification(anyString())
-        Mockito.`when`(twilioVerifyService.checkVerification(anyString(), anyString()))
+        Mockito
+            .`when`(twilioVerifyService.checkVerification(anyString(), anyString()))
             .thenReturn(VerifyResult.Approved)
     }
 
     // --- helpers ---
 
-    private fun addPhone(session: Cookie, phone: String = "+12125551234", consent: Boolean = true): MvcResult =
-        doPost("/api/phone-numbers", session, AddPhoneNumberBody(phone = phone, smsConsent = consent))
+    private fun addPhone(session: Cookie, phone: String = "+12125551234", consent: Boolean = true): MvcResult = doPost("/api/phone-numbers", session, AddPhoneNumberBody(phone = phone, smsConsent = consent))
 
-    private fun verifyPhone(session: Cookie, id: Long, code: String = "123456"): MvcResult =
-        doPost("/api/phone-numbers/$id/verify", session, VerifyPhoneNumberBody(code = code))
+    private fun verifyPhone(session: Cookie, id: Long, code: String = "123456"): MvcResult = doPost("/api/phone-numbers/$id/verify", session, VerifyPhoneNumberBody(code = code))
 
     private fun deletePhone(session: Cookie, id: Long): MvcResult = doDelete("/api/phone-numbers/$id", session)
 
@@ -79,7 +78,12 @@ class PhoneNumbersIntegrationTest : IntegrationTestBase() {
 
     @Test
     fun `unauthenticated GET phone numbers returns 401`() {
-        assertThat(mockMvc.perform(get("/api/phone-numbers")).andReturn().response.status).isEqualTo(401)
+        assertThat(
+            mockMvc
+                .perform(get("/api/phone-numbers"))
+                .andReturn()
+                .response.status
+        ).isEqualTo(401)
     }
 
     @Test
@@ -137,9 +141,11 @@ class PhoneNumbersIntegrationTest : IntegrationTestBase() {
     @Test
     fun `Twilio exception on startVerification returns 502`() {
         val session = registerAndLogin()
-        Mockito.doThrow(
-            ApiConnectionException("twilio down")
-        ).`when`(twilioVerifyService).startVerification(anyString())
+        Mockito
+            .doThrow(
+                ApiConnectionException("twilio down")
+            ).`when`(twilioVerifyService)
+            .startVerification(anyString())
         assertThat(addPhone(session).response.status).isEqualTo(502)
     }
 
@@ -201,7 +207,8 @@ class PhoneNumbersIntegrationTest : IntegrationTestBase() {
     fun `wrong OTP code returns 422 with INVALID_OTP`() {
         val session = registerAndLogin()
         val id = extractId(addPhone(session))
-        Mockito.`when`(twilioVerifyService.checkVerification(anyString(), anyString()))
+        Mockito
+            .`when`(twilioVerifyService.checkVerification(anyString(), anyString()))
             .thenReturn(VerifyResult.InvalidCode)
         val result = verifyPhone(session, id, "000000")
         assertThat(result.response.status).isEqualTo(422)
@@ -212,7 +219,8 @@ class PhoneNumbersIntegrationTest : IntegrationTestBase() {
     fun `expired OTP returns 422 with OTP_EXPIRED`() {
         val session = registerAndLogin()
         val id = extractId(addPhone(session))
-        Mockito.`when`(twilioVerifyService.checkVerification(anyString(), anyString()))
+        Mockito
+            .`when`(twilioVerifyService.checkVerification(anyString(), anyString()))
             .thenReturn(VerifyResult.Expired)
         val result = verifyPhone(session, id, "000000")
         assertThat(result.response.status).isEqualTo(422)

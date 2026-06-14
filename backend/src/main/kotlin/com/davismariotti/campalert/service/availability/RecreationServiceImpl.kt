@@ -43,11 +43,12 @@ class RecreationServiceImpl(
             val capturedMonthStart = monthStart
 
             val monthly = if (campgroundCache != null) {
-                campgroundCache.computeIfAbsent(Pair(searchRequest.campsiteId, month)) {
-                    CompletableFuture.supplyAsync {
-                        fetchMonth(searchRequest.campsiteId, capturedMonthStart)
-                    }
-                }.get()
+                campgroundCache
+                    .computeIfAbsent(Pair(searchRequest.campsiteId, month)) {
+                        CompletableFuture.supplyAsync {
+                            fetchMonth(searchRequest.campsiteId, capturedMonthStart)
+                        }
+                    }.get()
             } else {
                 fetchMonth(searchRequest.campsiteId, capturedMonthStart)
             }
@@ -57,7 +58,8 @@ class RecreationServiceImpl(
         }
 
         val loops = searchRequest.loops?.map { it.lowercase() }
-        val availableSites = (campground ?: Campground(emptyMap())).campsites
+        val availableSites = (campground ?: Campground(emptyMap()))
+            .campsites
             .filterValues { site ->
                 matchesRequest(site, loops, searchRequest.groupSize, searchRequest.startDay, endNight)
             }
@@ -82,8 +84,8 @@ class RecreationServiceImpl(
         return relevant.isNotEmpty() && relevant.values.all { it == AvailabilityType.AVAILABLE }
     }
 
-    private fun fetchMonth(campsiteId: Int, monthStart: LocalDate): Campground {
-        return try {
+    private fun fetchMonth(campsiteId: Int, monthStart: LocalDate): Campground =
+        try {
             retry.executeSupplier {
                 cb.executeSupplier {
                     fetchMonthDirect(campsiteId, monthStart)
@@ -93,7 +95,6 @@ class RecreationServiceImpl(
             log.warn("Recreation.gov call failed for campsiteId=$campsiteId month=$monthStart: ${e.message}")
             Campground(emptyMap())
         }
-    }
 
     private fun fetchMonthDirect(campsiteId: Int, monthStart: LocalDate): Campground {
         val body = recreationApi
@@ -113,8 +114,7 @@ class RecreationServiceImpl(
         val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
     }
 
-    private fun LocalDate.isBeforeMonth(other: LocalDate): Boolean =
-        this.year < other.year || (this.year == other.year && this.monthValue < other.monthValue)
+    private fun LocalDate.isBeforeMonth(other: LocalDate): Boolean = this.year < other.year || (this.year == other.year && this.monthValue < other.monthValue)
 
     private fun ZonedDateTime.isBetween(startDate: LocalDate, endDate: LocalDate): Boolean {
         val startOfDay = startDate.atStartOfDay(this.zone)
