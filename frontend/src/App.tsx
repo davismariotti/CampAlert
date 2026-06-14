@@ -7,6 +7,9 @@ import { useAuth } from './features/auth/useAuth'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Nav } from './components/Nav'
 import { RegisterPage } from './features/auth/RegisterPage'
+import { VerifyEmailPage } from './features/auth/VerifyEmailPage'
+import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage'
+import { ResetPasswordPage } from './features/auth/ResetPasswordPage'
 import { LandingPage } from './pages/LandingPage'
 import { RequestsPage } from './features/requests/RequestsPage'
 import { PhoneNumbersPage } from './features/phones/PhoneNumbersPage'
@@ -71,6 +74,10 @@ function AuthGate() {
       <Nav />
       <Routes>
         <Route path="/register" element={user ? <Navigate to="/requests" replace /> : <RegisterPage />} />
+        <Route path="/login" element={<Navigate to="/?login=1" replace />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/" element={user ? <Navigate to="/requests" replace /> : <LandingPage />} />
         <Route
           path="/requests"

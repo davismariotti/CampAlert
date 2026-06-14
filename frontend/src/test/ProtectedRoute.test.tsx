@@ -35,7 +35,15 @@ describe('ProtectedRoute', () => {
   })
 
   it('renders children when authenticated', () => {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ id: 1, email: 'a@b.com' }))
+    localStorage.setItem(
+      AUTH_STORAGE_KEY,
+      JSON.stringify({
+        id: 1,
+        email: 'a@b.com',
+        timezone: 'America/Los_Angeles',
+        verificationStatus: 'VERIFIED'
+      })
+    )
     render(<Wrapper initialEntry="/protected" />)
     expect(screen.getByText('protected content')).toBeInTheDocument()
   })

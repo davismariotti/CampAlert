@@ -930,6 +930,9 @@ components:
           type: string
         code:
           type: string
+        verificationId:
+          type: string
+          format: uuid
 
     PhoneNumberResponse:
       type: object

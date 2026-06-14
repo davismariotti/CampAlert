@@ -25,6 +25,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import java.time.Instant
+import java.util.UUID
 
 class AuthLoginGatingTest {
     private val userRepository = mock(UserRepository::class.java)
@@ -63,6 +64,8 @@ class AuthLoginGatingTest {
         `when`(userRepository.findByEmail("user@example.com")).thenReturn(
             unverifiedUser(),
         )
+        `when`(emailVerificationService.ensureVerificationForLogin(1L, "user@example.com"))
+            .thenReturn(UUID.randomUUID())
 
         val responseEntity = delegate.login(LoginBody(email = "user@example.com", password = "password"))
 
@@ -81,10 +84,13 @@ class AuthLoginGatingTest {
         )
         `when`(authenticationManager.authenticate(any())).thenReturn(auth)
         `when`(userRepository.findByEmail("user@example.com")).thenReturn(unverifiedUser())
+        `when`(emailVerificationService.ensureVerificationForLogin(1L, "user@example.com"))
+            .thenReturn(UUID.randomUUID())
 
         delegate.login(LoginBody(email = "user@example.com", password = "password"))
 
         verify(request, never()).getSession(anyBoolean())
+        verify(emailVerificationService).ensureVerificationForLogin(1L, "user@example.com")
         // SecurityContextHolder should not have been set
         assertEquals(null, SecurityContextHolder.getContext().authentication)
     }

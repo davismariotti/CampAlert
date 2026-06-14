@@ -23,7 +23,9 @@ export function RegisterPage() {
       return result.data!
     },
     onSuccess: (data) => {
-      navigate(`/verify-email?verificationId=${data.verificationId}`)
+      navigate(`/verify-email?verificationId=${data.verificationId}`, {
+        state: { verificationId: data.verificationId, email }
+      })
     },
     onError: (err: AxiosError<{ message: string }>) => {
       if (err.response?.status === 409) {

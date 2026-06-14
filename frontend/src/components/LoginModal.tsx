@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { login } from '../api/generated/sdk.gen'
+import { login, resendVerification } from '../api/generated/sdk.gen'
+import type { ErrorResponse } from '../api/generated/types.gen'
+import { withoutRedirectOn401 } from '../api/client'
 import { useAuth } from '../features/auth/useAuth'
 import { useApiMutation } from '../hooks/useApiMutation'
 import { Button } from './ui/Button'
@@ -16,6 +18,8 @@ export function LoginModal({ onClose }: Props) {
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [unverified, setUnverified] = useState(false)
+  const [resendConfirmation, setResendConfirmation] = useState<string | null>(null)
   const { login: storeAuth } = useAuth()
   const navigate = useNavigate()
   const firstInputRef = useRef<HTMLInputElement>(null)
@@ -31,23 +35,48 @@ export function LoginModal({ onClose }: Props) {
 
   const mutation = useApiMutation({
     mutationFn: async () => {
-      const result = await login({ body: { email, password, rememberMe } })
-      if (result.error) throw result
-      return result.data!
+      const result = await withoutRedirectOn401(() =>
+        login({ body: { email, password, rememberMe }, throwOnError: true })
+      )
+      return result.data
     },
     onSuccess: (data) => {
       storeAuth(data)
       navigate('/')
     },
-    onError: (err: AxiosError<{ message: string }>) => {
+    onError: (err: AxiosError<ErrorResponse>) => {
       if (err.response?.status === 401) {
-        setError('Invalid email or password')
+        if (err.response.data?.code === 'EMAIL_NOT_VERIFIED') {
+          const verificationId = err.response.data.verificationId
+          if (verificationId) {
+            navigate(`/verify-email?verificationId=${verificationId}`, {
+              state: { verificationId, email }
+            })
+            return
+          }
+          setUnverified(true)
+          setError('Verify your email before signing in.')
+        } else {
+          setUnverified(false)
+          setError('Invalid email or password')
+        }
       } else if (err.response?.status === 400) {
         setError(err.response.data?.message ?? 'Validation error')
       } else {
         setError('Something went wrong. Please try again.')
       }
     }
+  })
+
+  const resendMutation = useApiMutation({
+    mutationFn: async () => {
+      await resendVerification({ body: { email }, throwOnError: true })
+    },
+    onSuccess: () => {
+      setResendConfirmation('If that account can be verified, a new code has been sent.')
+      setError(null)
+    },
+    onError: () => setError('Unable to request a new code. Please try again.')
   })
 
   const canSubmit = email.trim() !== '' && password !== ''
@@ -83,6 +112,8 @@ export function LoginModal({ onClose }: Props) {
           onSubmit={(e) => {
             e.preventDefault()
             setError(null)
+            setUnverified(false)
+            setResendConfirmation(null)
             mutation.mutate()
           }}
         >
@@ -115,11 +146,29 @@ export function LoginModal({ onClose }: Props) {
           </label>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
+          {resendConfirmation && <p className="text-sm text-green-700">{resendConfirmation}</p>}
+
+          {unverified && (
+            <Button
+              type="button"
+              variant="secondary"
+              loading={resendMutation.isPending}
+              onClick={() => resendMutation.mutate()}
+            >
+              Resend verification email
+            </Button>
+          )}
 
           <Button type="submit" loading={mutation.isPending} disabled={!canSubmit}>
             Sign in
           </Button>
         </form>
+
+        <p className="mt-4 text-center text-sm">
+          <Link to="/forgot-password" className="font-medium text-forest-800 hover:underline">
+            Forgot password?
+          </Link>
+        </p>
 
         <p className="mt-5 text-center text-sm text-forest-500">
           No account?{' '}

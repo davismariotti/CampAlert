@@ -76,9 +76,16 @@ class AuthDelegateImpl(
 
         val user = userRepository.findByEmail(loginBody.email)!!
         if (user.emailVerifiedAt == null) {
+            val verificationId = emailVerificationService.ensureVerificationForLogin(user.id!!, user.email)
             return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(ErrorResponse(message = "Email not verified", code = "EMAIL_NOT_VERIFIED"))
+                .body(
+                    ErrorResponse(
+                        message = "Email not verified",
+                        code = "EMAIL_NOT_VERIFIED",
+                        verificationId = verificationId,
+                    ),
+                )
                 as ResponseEntity<AuthResponse>
         }
 

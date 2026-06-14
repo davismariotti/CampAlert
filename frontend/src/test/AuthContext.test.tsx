@@ -9,7 +9,18 @@ function AuthDisplay() {
   return (
     <div>
       <span data-testid="user">{user ? JSON.stringify(user) : 'null'}</span>
-      <button onClick={() => login({ id: 1, email: 'a@b.com', timezone: 'America/Los_Angeles' })}>login</button>
+      <button
+        onClick={() =>
+          login({
+            id: 1,
+            email: 'a@b.com',
+            timezone: 'America/Los_Angeles',
+            verificationStatus: 'VERIFIED'
+          })
+        }
+      >
+        login
+      </button>
       <button onClick={() => logout()}>logout</button>
     </div>
   )
@@ -53,7 +64,12 @@ describe('AuthContext', () => {
   it('seeds from localStorage on mount', () => {
     localStorage.setItem(
       AUTH_STORAGE_KEY,
-      JSON.stringify({ id: 2, email: 'seed@test.com', timezone: 'America/Los_Angeles' })
+      JSON.stringify({
+        id: 2,
+        email: 'seed@test.com',
+        timezone: 'America/Los_Angeles',
+        verificationStatus: 'VERIFIED'
+      })
     )
     render(
       <AuthProvider>
@@ -61,5 +77,23 @@ describe('AuthContext', () => {
       </AuthProvider>
     )
     expect(screen.getByTestId('user').textContent).toContain('seed@test.com')
+  })
+
+  it('does not treat pending verification as authenticated', () => {
+    localStorage.setItem(
+      AUTH_STORAGE_KEY,
+      JSON.stringify({
+        id: 2,
+        email: 'pending@test.com',
+        timezone: 'America/Los_Angeles',
+        verificationStatus: 'PENDING_VERIFICATION'
+      })
+    )
+    render(
+      <AuthProvider>
+        <AuthDisplay />
+      </AuthProvider>
+    )
+    expect(screen.getByTestId('user').textContent).toBe('null')
   })
 })

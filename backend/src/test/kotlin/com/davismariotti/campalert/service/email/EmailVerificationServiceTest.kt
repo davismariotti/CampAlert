@@ -175,6 +175,31 @@ class EmailVerificationServiceTest {
         verify(emailVerificationRepository).consumeAllPendingByUserId(anyLong(), anyKt())
     }
 
+    // ensureVerificationForLogin
+
+    @Test
+    fun `ensureVerificationForLogin reuses a valid pending row`() {
+        val row = pendingRow(userId = 1L)
+        `when`(emailVerificationRepository.findLatestByUserId(1L)).thenReturn(row)
+
+        val result = service.ensureVerificationForLogin(1L, "user@example.com")
+
+        assertEquals(row.id, result)
+        assertEquals(0, mailSender.sent.size)
+        verify(emailVerificationRepository, never()).consumeAllPendingByUserId(anyLong(), anyKt())
+    }
+
+    @Test
+    fun `ensureVerificationForLogin issues a code when no usable row exists`() {
+        `when`(emailVerificationRepository.findLatestByUserId(1L)).thenReturn(null)
+
+        val result = service.ensureVerificationForLogin(1L, "user@example.com")
+
+        assertNotNull(result)
+        assertEquals(1, mailSender.sent.size)
+        verify(emailVerificationRepository).consumeAllPendingByUserId(anyLong(), anyKt())
+    }
+
     // ── consumeVerification ───────────────────────────────────────────────────
 
     @Test
