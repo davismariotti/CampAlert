@@ -34,8 +34,7 @@ class SecurityConfig(
 
     @Bean
     fun authenticationProvider(): DaoAuthenticationProvider {
-        val provider = DaoAuthenticationProvider()
-        provider.setUserDetailsService(userDetailsService)
+        val provider = DaoAuthenticationProvider(userDetailsService)
         provider.setPasswordEncoder(passwordEncoder())
         return provider
     }
@@ -66,18 +65,23 @@ class SecurityConfig(
                     .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                     .csrfTokenRequestHandler(CsrfTokenRequestAttributeHandler())
                     .ignoringRequestMatchers("/api/sms/webhook")
-            }
-            .authorizeHttpRequests { auth ->
+            }.authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/sms/webhook").permitAll()
-                    .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
-                    .requestMatchers(HttpMethod.GET, "/actuator/info").permitAll()
-                    .requestMatchers("/error").permitAll()
-                    .anyRequest().authenticated()
-            }
-            .rememberMe { rm -> rm.rememberMeServices(rememberMeServices()) }
+                    .requestMatchers(HttpMethod.POST, "/api/auth/register")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/auth/login")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/sms/webhook")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/actuator/health")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/actuator/info")
+                    .permitAll()
+                    .requestMatchers("/error")
+                    .permitAll()
+                    .anyRequest()
+                    .authenticated()
+            }.rememberMe { rm -> rm.rememberMeServices(rememberMeServices()) }
             .addFilterAfter(CsrfCookieFilter(), UsernamePasswordAuthenticationFilter::class.java)
             .exceptionHandling { ex ->
                 ex.authenticationEntryPoint { _, response, _ ->

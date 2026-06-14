@@ -569,6 +569,7 @@ components:
           type: string
         rememberMe:
           type: boolean
+          nullable: true
 
     CampgroundResponse:
       type: object
@@ -688,6 +689,7 @@ components:
       properties:
         timezone:
           type: string
+          nullable: true
 
     CreateSearchRequestBody:
       type: object

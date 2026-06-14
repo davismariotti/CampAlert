@@ -1,17 +1,17 @@
 plugins {
-    id 'org.jetbrains.kotlin.jvm' version '1.9.25'
-    id 'org.jetbrains.kotlin.plugin.spring' version '1.9.25'
-    id 'org.springframework.boot' version '3.3.3'
-    id 'io.spring.dependency-management' version '1.1.6'
-    id 'org.jetbrains.kotlin.plugin.jpa' version '1.9.25'
-    id 'org.openapi.generator' version '7.7.0'
-    id 'org.jlleitschuh.gradle.ktlint' version '12.1.1'
+    id 'org.jetbrains.kotlin.jvm' version '2.2.21'
+    id 'org.jetbrains.kotlin.plugin.spring' version '2.2.21'
+    id 'org.springframework.boot' version '4.0.7'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.jetbrains.kotlin.plugin.jpa' version '2.2.21'
+    id 'org.openapi.generator' version '7.23.0'
+    id 'org.jlleitschuh.gradle.ktlint' version '14.2.0'
 }
 
 group = 'com.davismariotti'
 
 ext {
-    set('springCloudVersion', '2023.0.3')
+    set('springCloudVersion', '2025.1.2')
 }
 
 java {
@@ -32,44 +32,34 @@ dependencyManagement {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'com.fasterxml.jackson.module:jackson-module-kotlin'
+    implementation 'tools.jackson.module:jackson-module-kotlin'
     implementation 'org.jetbrains.kotlin:kotlin-reflect'
 
-    implementation 'jakarta.xml.bind:jakarta.xml.bind-api:4.0.2'
-    implementation 'org.hibernate.orm:hibernate-core:6.6.0.Final'
-
-    implementation 'com.squareup.retrofit2:retrofit:2.11.0'
-    implementation("com.squareup.retrofit2:converter-jackson:2.11.0")
-    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.2'
+    implementation 'com.squareup.retrofit2:retrofit:3.0.0'
+    implementation 'com.squareup.retrofit2:converter-jackson:3.0.0'
 
     implementation 'com.github.sps.pushover.net:pushover-client:1.0.0'
-    implementation 'com.twilio.sdk:twilio:10.4.1'
+    implementation 'com.twilio.sdk:twilio:12.1.1'
 
-    implementation 'io.swagger.core.v3:swagger-annotations:2.2.22'
-    implementation 'jakarta.validation:jakarta.validation-api:3.0.2'
-    implementation 'jakarta.annotation:jakarta.annotation-api:2.1.1'
+    implementation 'io.swagger.core.v3:swagger-annotations:2.2.51'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-    implementation 'org.springframework.session:spring-session-data-redis'
-    implementation 'net.iakovlev:timeshape:2025b.26'
+    implementation 'org.springframework.boot:spring-boot-starter-session-data-redis'
+    implementation 'net.iakovlev:timeshape:2025b.28'
 
     implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
-    implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
 
-    implementation 'net.javacrumbs.shedlock:shedlock-spring:5.16.0'
-    implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:5.16.0'
+    implementation 'net.javacrumbs.shedlock:shedlock-spring:7.7.0'
+    implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:7.7.0'
 
     runtimeOnly 'org.postgresql:postgresql'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
-    testImplementation 'org.testcontainers:junit-jupiter'
-    testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'org.springframework.boot:spring-boot-webmvc-test'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
     testImplementation 'org.jetbrains.kotlin:kotlin-test-junit5'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 sourceSets {
@@ -93,10 +83,6 @@ configurations {
     integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
 }
 
-dependencies {
-    integrationTestImplementation 'org.springframework.security:spring-security-test'
-}
-
 tasks.register('integrationTest', Test) {
     description = 'Runs integration tests.'
     group = 'verification'
@@ -105,6 +91,10 @@ tasks.register('integrationTest', Test) {
     useJUnitPlatform()
     shouldRunAfter test
     jvmArgs '-Xmx1g'
+}
+
+tasks.named('check') {
+    dependsOn tasks.integrationTest
 }
 
 openApiGenerate {
@@ -127,6 +117,9 @@ openApiGenerate {
 
 compileKotlin.dependsOn tasks.openApiGenerate
 
+tasks.named('runKtlintCheckOverMainSourceSet') {
+    dependsOn tasks.openApiGenerate
+}
 
 kotlin {
     compilerOptions {

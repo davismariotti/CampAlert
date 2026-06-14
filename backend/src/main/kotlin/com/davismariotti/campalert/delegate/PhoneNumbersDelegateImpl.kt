@@ -29,7 +29,7 @@ class PhoneNumbersDelegateImpl(
     private val phoneNumberService: PhoneNumberService,
 ) : PhoneNumbersApiDelegate {
     private fun currentUserId(): Long {
-        val email = SecurityContextHolder.getContext().authentication.name
+        val email = SecurityContextHolder.getContext().authentication!!.name
         return userRepository.findByEmail(email)!!.id!!
     }
 
@@ -84,7 +84,9 @@ class PhoneNumbersDelegateImpl(
     ): ResponseEntity<PhoneNumberResponse> {
         val userId = currentUserId()
         val phoneNumber =
-            phoneNumberRepository.findById(id).orElse(null)
+            phoneNumberRepository
+                .findById(id)
+                .orElse(null)
                 ?.takeIf { it.userId == userId }
                 ?: return ResponseEntity.notFound().build()
 
@@ -120,7 +122,9 @@ class PhoneNumbersDelegateImpl(
     override fun deletePhoneNumber(id: Long): ResponseEntity<Unit> {
         val userId = currentUserId()
         val phoneNumber =
-            phoneNumberRepository.findById(id).orElse(null)
+            phoneNumberRepository
+                .findById(id)
+                .orElse(null)
                 ?.takeIf { it.userId == userId }
                 ?: return ResponseEntity.notFound().build()
         phoneNumberRepository.delete(phoneNumber)
@@ -128,8 +132,7 @@ class PhoneNumbersDelegateImpl(
         return ResponseEntity.noContent().build()
     }
 
-    private fun error(status: Int, message: String, code: String? = null) =
-        ResponseEntity.status(status).body(ErrorResponse(message = message, code = code))
+    private fun error(status: Int, message: String, code: String? = null) = ResponseEntity.status(status).body(ErrorResponse(message = message, code = code))
 
     private fun PhoneNumber.toResponse() =
         PhoneNumberResponse(

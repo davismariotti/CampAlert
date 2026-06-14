@@ -100,11 +100,12 @@ class SmsNotificationService(
 
     private fun sendSms(toPhone: String, body: String) {
         twilioCb.executeRunnable {
-            Message.creator(
-                TwilioPhoneNumber(toPhone),
-                twilioConfiguration.messagingServiceSid,
-                body,
-            ).create()
+            Message
+                .creator(
+                    TwilioPhoneNumber(toPhone),
+                    twilioConfiguration.messagingServiceSid,
+                    body,
+                ).create()
         }
     }
 }

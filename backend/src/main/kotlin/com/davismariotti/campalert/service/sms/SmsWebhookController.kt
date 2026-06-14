@@ -101,10 +101,11 @@ class SmsWebhookController(
 
         // Multiple requests — need disambiguation
         val requests = contextIds.mapNotNull { searchRequestRepository.findById(it).orElse(null) }
-        val lines = requests.mapIndexed { idx, req ->
-            val endDay = req.startDay.plusDays(req.nights.toLong())
-            "${idx + 1}. ${req.campgroundName} ${req.startDay}–$endDay"
-        }.joinToString("\n")
+        val lines = requests
+            .mapIndexed { idx, req ->
+                val endDay = req.startDay.plusDays(req.nights.toLong())
+                "${idx + 1}. ${req.campgroundName} ${req.startDay}–$endDay"
+            }.joinToString("\n")
 
         smsConversationService.setAwaiting(from, "PAUSE", contextIds)
 

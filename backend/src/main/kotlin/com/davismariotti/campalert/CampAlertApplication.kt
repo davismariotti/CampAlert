@@ -19,7 +19,8 @@ class CampFinderApplication {
     @Bean
     fun lockProvider(dataSource: DataSource): LockProvider =
         JdbcTemplateLockProvider(
-            JdbcTemplateLockProvider.Configuration.builder()
+            JdbcTemplateLockProvider.Configuration
+                .builder()
                 .withJdbcTemplate(JdbcTemplate(dataSource))
                 .usingDbTime()
                 .build(),

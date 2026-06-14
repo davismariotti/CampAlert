@@ -65,7 +65,9 @@ class CampgroundsDelegateImpl(
         if (!response.isSuccessful) {
             throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "RIDB upstream error")
         }
-        val bySites = response.body()?.recdata
+        val bySites = response
+            .body()
+            ?.recdata
             ?.filter { !it.loop.isNullOrBlank() }
             ?.groupBy { it.loop!! }
             ?: emptyMap()
@@ -76,8 +78,7 @@ class CampgroundsDelegateImpl(
                     boatInOnly = sites.all { it.campsiteType?.uppercase() == "BOAT IN" } ||
                         loop.uppercase().contains("BOAT"),
                 )
-            }
-            .sortedBy { it.name }
+            }.sortedBy { it.name }
         return ResponseEntity.ok(loops)
     }
 
@@ -97,7 +98,9 @@ class CampgroundsDelegateImpl(
         if (!response.isSuccessful) {
             throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "RIDB upstream error")
         }
-        val results = response.body()?.recdata
+        val results = response
+            .body()
+            ?.recdata
             ?.filter { it.facilityTypeDescription == "Campground" }
             ?.mapNotNull { facility ->
                 facility.facilityId.toIntOrNull()?.let { id ->

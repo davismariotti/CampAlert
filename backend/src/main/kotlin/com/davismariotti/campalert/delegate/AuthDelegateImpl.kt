@@ -38,8 +38,8 @@ class AuthDelegateImpl(
         val user = userRepository.save(
             UserEntity(
                 email = registerBody.email,
-                passwordHash = passwordEncoder.encode(registerBody.password),
-                timezone = registerBody.timezone,
+                passwordHash = passwordEncoder.encode(registerBody.password)!!,
+                timezone = registerBody.timezone ?: "America/Los_Angeles",
             ),
         )
         val auth = authenticationManager.authenticate(
@@ -80,7 +80,7 @@ class AuthDelegateImpl(
 
     @PreAuthorize("isAuthenticated()")
     override fun logout(): ResponseEntity<Unit> {
-        val auth = SecurityContextHolder.getContext().authentication
+        val auth = SecurityContextHolder.getContext().authentication!!
         rememberMeServices.logout(request, response, auth)
         SecurityContextHolder.clearContext()
         request.getSession(false)?.invalidate()
@@ -89,14 +89,14 @@ class AuthDelegateImpl(
 
     @PreAuthorize("isAuthenticated()")
     override fun getMe(): ResponseEntity<AuthResponse> {
-        val auth = SecurityContextHolder.getContext().authentication
+        val auth = SecurityContextHolder.getContext().authentication!!
         val user = userRepository.findByEmail(auth.name)!!
         return ResponseEntity.ok(AuthResponse(id = user.id!!, email = user.email, timezone = user.timezone))
     }
 
     @PreAuthorize("isAuthenticated()")
     override fun updateMe(updateMeBody: UpdateMeBody): ResponseEntity<AuthResponse> {
-        val auth = SecurityContextHolder.getContext().authentication
+        val auth = SecurityContextHolder.getContext().authentication!!
         val user = userRepository.findByEmail(auth.name)!!
         val updated = updateMeBody.timezone?.let { userRepository.save(user.copy(timezone = it)) } ?: user
         return ResponseEntity.ok(

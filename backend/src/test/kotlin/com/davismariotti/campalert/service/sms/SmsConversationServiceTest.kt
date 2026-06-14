@@ -1,7 +1,5 @@
 package com.davismariotti.campalert.service.sms
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.KotlinModule
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
@@ -12,6 +10,8 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.module.kotlin.KotlinModule
 import java.util.concurrent.TimeUnit
 
 class SmsConversationServiceTest {
@@ -20,7 +20,7 @@ class SmsConversationServiceTest {
 
     @Suppress("UNCHECKED_CAST")
     private val valueOps = mock(ValueOperations::class.java) as ValueOperations<String, String>
-    private val objectMapper = ObjectMapper().registerModule(KotlinModule.Builder().build())
+    private val objectMapper = JsonMapper.builder().addModule(KotlinModule.Builder().build()).build()
     private val service = SmsConversationService(redisTemplate, objectMapper)
 
     init {

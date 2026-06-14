@@ -50,7 +50,8 @@ class AvailabilityChecker(
         }
         if (active.isEmpty()) return
 
-        val userMap = userRepository.findAllById(active.mapNotNull { it.userId }.toSet())
+        val userMap = userRepository
+            .findAllById(active.mapNotNull { it.userId }.toSet())
             .associateBy { it.id!! }
         val valid = active.filter { userMap.containsKey(it.userId) }
         if (valid.isEmpty()) return
@@ -106,6 +107,5 @@ class AvailabilityChecker(
         executor.shutdown()
     }
 
-    private fun today(campgroundTimezone: String?): LocalDate =
-        LocalDate.now(campgroundTimezone?.let { ZoneId.of(it) } ?: ZoneOffset.UTC)
+    private fun today(campgroundTimezone: String?): LocalDate = LocalDate.now(campgroundTimezone?.let { ZoneId.of(it) } ?: ZoneOffset.UTC)
 }

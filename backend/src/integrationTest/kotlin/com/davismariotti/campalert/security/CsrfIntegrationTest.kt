@@ -21,23 +21,25 @@ class CsrfIntegrationTest : IntegrationTestBase() {
 
     @Test
     fun `POST login without CSRF token returns 403`() {
-        mockMvc.perform(
-            post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"email":"test@test.com","password":"password1"}""")
-        ).andExpect(status().isForbidden)
+        mockMvc
+            .perform(
+                post("/api/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"email":"test@test.com","password":"password1"}""")
+            ).andExpect(status().isForbidden)
     }
 
     @Test
     fun `POST login with valid CSRF token is not rejected with 403`() {
         val csrfToken = getCsrfToken()
-        val result = mockMvc.perform(
-            post("/api/auth/login")
-                .cookie(Cookie("XSRF-TOKEN", csrfToken))
-                .header("X-XSRF-TOKEN", csrfToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"email":"test@test.com","password":"password1"}""")
-        ).andReturn()
+        val result = mockMvc
+            .perform(
+                post("/api/auth/login")
+                    .cookie(Cookie("XSRF-TOKEN", csrfToken))
+                    .header("X-XSRF-TOKEN", csrfToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"email":"test@test.com","password":"password1"}""")
+            ).andReturn()
         assertThat(result.response.status).isNotEqualTo(HttpStatus.FORBIDDEN.value())
     }
 
@@ -46,12 +48,13 @@ class CsrfIntegrationTest : IntegrationTestBase() {
         // CSRF is bypassed for the webhook — the XSRF-TOKEN cookie appearing in the response
         // proves the request passed through the CSRF filter rather than being blocked by it.
         // The controller itself returns 403 for an invalid Twilio signature, which is expected.
-        val result = mockMvc.perform(
-            post("/api/sms/webhook")
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .param("Body", "STOP")
-                .param("From", "+15550000001")
-        ).andReturn()
+        val result = mockMvc
+            .perform(
+                post("/api/sms/webhook")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .param("Body", "STOP")
+                    .param("From", "+15550000001")
+            ).andReturn()
         assertThat(result.response.getCookie("XSRF-TOKEN")).isNotNull()
     }
 }

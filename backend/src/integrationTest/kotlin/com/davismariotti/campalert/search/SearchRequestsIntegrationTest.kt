@@ -78,8 +78,7 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
         completed = false,
     )
 
-    private fun createRequest(session: Cookie, name: String = "Weekend Trip"): MvcResult =
-        doPost("/api/search-requests", session, defaultCreateBody.copy(name = name))
+    private fun createRequest(session: Cookie, name: String = "Weekend Trip"): MvcResult = doPost("/api/search-requests", session, defaultCreateBody.copy(name = name))
 
     private fun seedVerifiedPhone(userId: Long): PhoneNumber =
         phoneNumberRepository.save(
@@ -110,7 +109,12 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
 
     @Test
     fun `unauthenticated GET list search requests returns 401`() {
-        assertThat(mockMvc.perform(get("/api/search-requests")).andReturn().response.status).isEqualTo(401)
+        assertThat(
+            mockMvc
+                .perform(get("/api/search-requests"))
+                .andReturn()
+                .response.status
+        ).isEqualTo(401)
     }
 
     @Test
@@ -120,7 +124,12 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
 
     @Test
     fun `unauthenticated GET single search request returns 401`() {
-        assertThat(mockMvc.perform(get("/api/search-requests/1")).andReturn().response.status).isEqualTo(401)
+        assertThat(
+            mockMvc
+                .perform(get("/api/search-requests/1"))
+                .andReturn()
+                .response.status
+        ).isEqualTo(401)
     }
 
     @Test
@@ -215,9 +224,11 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
         seedRequest(userId, completed = false)
         seedRequest(userId, completed = true)
         val tree = mapper.readTree(
-            mockMvc.perform(
-                get("/api/search-requests?completed=false").cookie(session)
-            ).andReturn().response.contentAsString
+            mockMvc
+                .perform(
+                    get("/api/search-requests?completed=false").cookie(session)
+                ).andReturn()
+                .response.contentAsString
         )
         assertThat(tree.size()).isEqualTo(1)
         assertThat(tree[0].get("completed").asBoolean()).isFalse()
@@ -230,9 +241,11 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
         seedRequest(userId, completed = false)
         seedRequest(userId, completed = true)
         val tree = mapper.readTree(
-            mockMvc.perform(
-                get("/api/search-requests?completed=true").cookie(session)
-            ).andReturn().response.contentAsString
+            mockMvc
+                .perform(
+                    get("/api/search-requests?completed=true").cookie(session)
+                ).andReturn()
+                .response.contentAsString
         )
         assertThat(tree.size()).isEqualTo(1)
         assertThat(tree[0].get("completed").asBoolean()).isTrue()
@@ -245,7 +258,10 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
         seedRequest(userId, completed = false)
         seedRequest(userId, completed = true)
         val tree = mapper.readTree(
-            mockMvc.perform(get("/api/search-requests").cookie(session)).andReturn().response.contentAsString
+            mockMvc
+                .perform(get("/api/search-requests").cookie(session))
+                .andReturn()
+                .response.contentAsString
         )
         assertThat(tree.size()).isEqualTo(2)
     }
@@ -256,7 +272,10 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
     fun `get nonexistent search request returns 404`() {
         val session = registerAndLogin()
         assertThat(
-            mockMvc.perform(get("/api/search-requests/9999").cookie(session)).andReturn().response.status
+            mockMvc
+                .perform(get("/api/search-requests/9999").cookie(session))
+                .andReturn()
+                .response.status
         ).isEqualTo(404)
     }
 
@@ -266,7 +285,10 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
         val request = seedRequest(userRepository.findByEmail("user1@test.com")!!.id!!)
         val session2 = registerAndLogin("user2@test.com")
         assertThat(
-            mockMvc.perform(get("/api/search-requests/${request.id}").cookie(session2)).andReturn().response.status
+            mockMvc
+                .perform(get("/api/search-requests/${request.id}").cookie(session2))
+                .andReturn()
+                .response.status
         ).isEqualTo(404)
     }
 
@@ -346,7 +368,10 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
         val request = seedRequest(userRepository.findByEmail("user@test.com")!!.id!!)
         assertThat(doDelete("/api/search-requests/${request.id}", session).response.status).isEqualTo(204)
         assertThat(
-            mockMvc.perform(get("/api/search-requests/${request.id}").cookie(session)).andReturn().response.status
+            mockMvc
+                .perform(get("/api/search-requests/${request.id}").cookie(session))
+                .andReturn()
+                .response.status
         ).isEqualTo(404)
     }
 }
