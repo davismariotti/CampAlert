@@ -88,7 +88,7 @@ open class IntegrationTestBase {
     fun resetState() {
         jdbcTemplate.execute(
             "TRUNCATE TABLE notification_outbox, search_request_checks, search_requests_v2, " +
-                "persistent_logins, phone_numbers, users, shedlock CASCADE"
+                "persistent_logins, phone_numbers, email_verifications, password_resets, users, shedlock CASCADE"
         )
         redisConnectionFactory.connection.use { it.serverCommands().flushAll() }
         listOf("ridb", "recreation-gov", "twilio").forEach { name ->

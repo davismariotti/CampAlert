@@ -11,6 +11,7 @@ CREATE TABLE "public"."users" (
   "pushover_api_token" character varying(255) NULL,
   "pushover_override_enabled" boolean NOT NULL DEFAULT false,
   "timezone" character varying(64) NOT NULL DEFAULT 'America/Los_Angeles',
+  "email_verified_at" timestamptz NULL,
   PRIMARY KEY ("id"),
   UNIQUE ("email")
 );
@@ -96,3 +97,33 @@ CREATE TABLE "public"."phone_numbers" (
   CONSTRAINT "fk_phone_numbers_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id")
 );
 CREATE INDEX ON "public"."phone_numbers" ("user_id");
+-- PRODUCTION MIGRATION NOTE: Before deploying login enforcement (section 3 of the
+-- email-verification change), backfill all pre-existing users as verified:
+--   UPDATE users SET email_verified_at = now() WHERE email_verified_at IS NULL;
+-- This must run while the old application code is still live (before the new code
+-- that blocks unverified login is deployed). Do NOT roll this back after it runs.
+-- Create "email_verifications" table
+CREATE TABLE "public"."email_verifications" (
+  "id" uuid NOT NULL,
+  "user_id" bigint NOT NULL,
+  "code_hash" text NOT NULL,
+  "attempts" smallint NOT NULL DEFAULT 0,
+  "created_at" timestamptz NOT NULL,
+  "expires_at" timestamptz NOT NULL,
+  "consumed_at" timestamptz NULL,
+  PRIMARY KEY ("id"),
+  CONSTRAINT "fk_email_verifications_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id")
+);
+CREATE INDEX ON "public"."email_verifications" ("user_id", "consumed_at", "expires_at");
+-- Create "password_resets" table
+CREATE TABLE "public"."password_resets" (
+  "id" uuid NOT NULL,
+  "user_id" bigint NOT NULL,
+  "token_hash" text NOT NULL,
+  "created_at" timestamptz NOT NULL,
+  "expires_at" timestamptz NOT NULL,
+  "consumed_at" timestamptz NULL,
+  PRIMARY KEY ("id"),
+  CONSTRAINT "fk_password_resets_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id")
+);
+CREATE INDEX ON "public"."password_resets" ("user_id", "consumed_at", "expires_at");
