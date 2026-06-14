@@ -2,11 +2,17 @@ package com.davismariotti.campalert.delegate
 
 import com.davismariotti.campalert.api.AuthApiDelegate
 import com.davismariotti.campalert.api.model.AuthResponse
+import com.davismariotti.campalert.api.model.ErrorResponse
 import com.davismariotti.campalert.api.model.LoginBody
 import com.davismariotti.campalert.api.model.RegisterBody
+import com.davismariotti.campalert.api.model.RegisterResponse
+import com.davismariotti.campalert.api.model.ResendVerificationBody
 import com.davismariotti.campalert.api.model.UpdateMeBody
+import com.davismariotti.campalert.api.model.VerifyEmailBody
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.security.RememberMeServices
+import com.davismariotti.campalert.service.email.EmailVerificationService
+import com.davismariotti.campalert.service.email.EmailVerificationService.VerifyResult
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.HttpStatus
@@ -30,8 +36,9 @@ class AuthDelegateImpl(
     private val request: HttpServletRequest,
     private val response: HttpServletResponse,
     private val rememberMeServices: RememberMeServices,
+    private val emailVerificationService: EmailVerificationService,
 ) : AuthApiDelegate {
-    override fun register(registerBody: RegisterBody): ResponseEntity<AuthResponse> {
+    override fun register(registerBody: RegisterBody): ResponseEntity<RegisterResponse> {
         if (userRepository.findByEmail(registerBody.email) != null) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "Email already registered")
         }
@@ -42,19 +49,11 @@ class AuthDelegateImpl(
                 timezone = registerBody.timezone ?: "America/Los_Angeles",
             ),
         )
-        val auth = authenticationManager.authenticate(
-            UsernamePasswordAuthenticationToken(registerBody.email, registerBody.password),
-        )
-        val context = SecurityContextHolder.createEmptyContext()
-        context.authentication = auth
-        SecurityContextHolder.setContext(context)
-        val session = request.getSession(true)
-        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context)
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-            AuthResponse(id = user.id!!, email = user.email, timezone = user.timezone),
-        )
+        val verificationId = emailVerificationService.issueVerification(user.id!!, user.email)
+        return ResponseEntity.status(HttpStatus.CREATED).body(RegisterResponse(verificationId = verificationId))
     }
 
+    @Suppress("UNCHECKED_CAST")
     override fun login(loginBody: LoginBody): ResponseEntity<AuthResponse> {
         val auth = try {
             authenticationManager.authenticate(
@@ -62,6 +61,14 @@ class AuthDelegateImpl(
             )
         } catch (ex: AuthenticationException) {
             throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials")
+        }
+
+        val user = userRepository.findByEmail(loginBody.email)!!
+        if (user.emailVerifiedAt == null) {
+            return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(ErrorResponse(message = "Email not verified", code = "EMAIL_NOT_VERIFIED"))
+                as ResponseEntity<AuthResponse>
         }
 
         val context = SecurityContextHolder.createEmptyContext()
@@ -74,7 +81,6 @@ class AuthDelegateImpl(
             rememberMeServices.loginSuccessForced(request, response, auth)
         }
 
-        val user = userRepository.findByEmail(loginBody.email)!!
         return ResponseEntity.ok(AuthResponse(id = user.id!!, email = user.email, timezone = user.timezone))
     }
 
@@ -103,4 +109,30 @@ class AuthDelegateImpl(
             AuthResponse(id = updated.id!!, email = updated.email, timezone = updated.timezone),
         )
     }
+
+    override fun resendVerification(resendVerificationBody: ResendVerificationBody): ResponseEntity<Unit> {
+        emailVerificationService.resendVerification(resendVerificationBody.email)
+        return ResponseEntity.accepted().build()
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    override fun verifyEmail(verifyEmailBody: VerifyEmailBody): ResponseEntity<Unit> =
+        when (emailVerificationService.consumeVerification(verifyEmailBody.verificationId, verifyEmailBody.code)) {
+            VerifyResult.SUCCESS -> ResponseEntity.ok().build()
+            VerifyResult.ATTEMPTS_EXCEEDED ->
+                ResponseEntity
+                    .status(HttpStatus.UNPROCESSABLE_ENTITY)
+                    .body(ErrorResponse(message = "Attempt limit reached", code = "VERIFICATION_CODE_ATTEMPTS_EXCEEDED"))
+                    as ResponseEntity<Unit>
+            VerifyResult.WRONG_CODE ->
+                ResponseEntity
+                    .status(HttpStatus.UNPROCESSABLE_ENTITY)
+                    .body(ErrorResponse(message = "Invalid verification code", code = "VERIFICATION_CODE_INVALID"))
+                    as ResponseEntity<Unit>
+            VerifyResult.INVALID_OR_EXPIRED ->
+                ResponseEntity
+                    .status(HttpStatus.UNPROCESSABLE_ENTITY)
+                    .body(ErrorResponse(message = "Verification link is invalid or expired", code = "VERIFICATION_INVALID_OR_EXPIRED"))
+                    as ResponseEntity<Unit>
+        }
 }

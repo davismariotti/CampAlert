@@ -4,6 +4,7 @@ import net.javacrumbs.shedlock.core.LockProvider
 import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider
 import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock
 import org.springframework.boot.autoconfigure.SpringBootApplication
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan
 import org.springframework.boot.runApplication
 import org.springframework.context.annotation.Bean
 import org.springframework.core.task.TaskExecutor
@@ -13,6 +14,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import javax.sql.DataSource
 
 @SpringBootApplication
+@ConfigurationPropertiesScan
 @EnableSchedulerLock(defaultLockAtMostFor = "PT90S")
 @EnableAsync
 class CampFinderApplication {
