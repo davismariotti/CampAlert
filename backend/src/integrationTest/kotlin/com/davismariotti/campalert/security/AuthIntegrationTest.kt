@@ -15,14 +15,23 @@ class AuthIntegrationTest : IntegrationTestBase() {
     // --- register ---
 
     @Test
-    fun `successful registration returns 201 with email in body`() {
-        val result =
-            doPost(
-                "/api/auth/register",
-                body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles")
-            )
+    fun `successful registration returns 201 with verificationId in body`() {
+        val result = doPost(
+            "/api/auth/register",
+            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles"),
+        )
         assertThat(result.response.status).isEqualTo(201)
-        assertThat(result.response.contentAsString).contains("user@test.com")
+        assertThat(result.response.contentAsString).contains("verificationId")
+        assertThat(result.response.contentAsString).contains("\"verificationStatus\":\"PENDING_VERIFICATION\"")
+    }
+
+    @Test
+    fun `registration does not create a session`() {
+        val result = doPost(
+            "/api/auth/register",
+            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles"),
+        )
+        assertThat(result.response.getCookie("SESSION")).isNull()
     }
 
     @Test
@@ -34,34 +43,54 @@ class AuthIntegrationTest : IntegrationTestBase() {
 
     @Test
     fun `password shorter than 8 characters returns 400`() {
-        val result =
-            doPost(
-                "/api/auth/register",
-                body = RegisterBody(email = "short@test.com", password = "abc", timezone = "America/Los_Angeles")
-            )
+        val result = doPost(
+            "/api/auth/register",
+            body = RegisterBody(email = "short@test.com", password = "abc", timezone = "America/Los_Angeles"),
+        )
         assertThat(result.response.status).isEqualTo(400)
     }
 
     @Test
     fun `invalid email format returns 400`() {
-        val result =
-            doPost(
-                "/api/auth/register",
-                body = RegisterBody(email = "notanemail", password = "password1", timezone = "America/Los_Angeles")
-            )
+        val result = doPost(
+            "/api/auth/register",
+            body = RegisterBody(email = "notanemail", password = "password1", timezone = "America/Los_Angeles"),
+        )
         assertThat(result.response.status).isEqualTo(400)
     }
 
-    // --- login ---
+    // --- login: email not verified ---
+
+    @Test
+    fun `login with correct credentials on unverified account returns 401 EMAIL_NOT_VERIFIED`() {
+        doPost(
+            "/api/auth/register",
+            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles"),
+        )
+        val result = doPost("/api/auth/login", body = LoginBody(email = "user@test.com", password = "password1"))
+        assertThat(result.response.status).isEqualTo(401)
+        assertThat(result.response.contentAsString).contains("EMAIL_NOT_VERIFIED")
+    }
+
+    @Test
+    fun `login on unverified account does not create a session`() {
+        doPost(
+            "/api/auth/register",
+            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles"),
+        )
+        val result = doPost("/api/auth/login", body = LoginBody(email = "user@test.com", password = "password1"))
+        assertThat(result.response.getCookie("SESSION")).isNull()
+    }
+
+    // --- login: verified ---
 
     @Test
     fun `successful login returns 200 and sets SESSION cookie`() {
-        doPost(
-            "/api/auth/register",
-            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles")
-        )
+        val verificationId = registerOnly()
+        verifyLatestEmail(verificationId)
         val result = doPost("/api/auth/login", body = LoginBody(email = "user@test.com", password = "password1"))
         assertThat(result.response.status).isEqualTo(200)
+        assertThat(result.response.contentAsString).contains("\"verificationStatus\":\"VERIFIED\"")
         assertThat(result.response.getCookie("SESSION")).isNotNull()
     }
 
@@ -69,41 +98,26 @@ class AuthIntegrationTest : IntegrationTestBase() {
     fun `wrong password returns 401`() {
         doPost(
             "/api/auth/register",
-            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles")
+            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles"),
         )
         assertThat(
-            doPost(
-                "/api/auth/login",
-                body = LoginBody(email = "user@test.com", password = "wrongpassword")
-            ).response.status
+            doPost("/api/auth/login", body = LoginBody(email = "user@test.com", password = "wrongpassword")).response.status,
         ).isEqualTo(401)
     }
 
     @Test
     fun `login with rememberMe true sets remember-me cookie`() {
-        doPost(
-            "/api/auth/register",
-            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles")
-        )
-        val result =
-            doPost(
-                "/api/auth/login",
-                body = LoginBody(email = "user@test.com", password = "password1", rememberMe = true)
-            )
+        val verificationId = registerOnly()
+        verifyLatestEmail(verificationId)
+        val result = doPost("/api/auth/login", body = LoginBody(email = "user@test.com", password = "password1", rememberMe = true))
         assertThat(result.response.getCookie("remember-me")).isNotNull()
     }
 
     @Test
     fun `login with rememberMe false does not set remember-me cookie`() {
-        doPost(
-            "/api/auth/register",
-            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles")
-        )
-        val result =
-            doPost(
-                "/api/auth/login",
-                body = LoginBody(email = "user@test.com", password = "password1", rememberMe = false)
-            )
+        val verificationId = registerOnly()
+        verifyLatestEmail(verificationId)
+        val result = doPost("/api/auth/login", body = LoginBody(email = "user@test.com", password = "password1", rememberMe = false))
         assertThat(result.response.getCookie("remember-me")).isNull()
     }
 
@@ -146,7 +160,7 @@ class AuthIntegrationTest : IntegrationTestBase() {
     @Test
     fun `unauthenticated PATCH me returns 401`() {
         assertThat(
-            doPatch("/api/auth/me", body = UpdateMeBody(timezone = "America/New_York")).response.status
+            doPatch("/api/auth/me", body = UpdateMeBody(timezone = "America/New_York")).response.status,
         ).isEqualTo(401)
     }
 
@@ -156,7 +170,7 @@ class AuthIntegrationTest : IntegrationTestBase() {
         val result = doPatch("/api/auth/me", session, UpdateMeBody(timezone = "America/New_York"))
         assertThat(result.response.status).isEqualTo(200)
         assertThat(
-            mapper.readTree(result.response.contentAsString).get("timezone").asText()
+            mapper.readTree(result.response.contentAsString).get("timezone").asText(),
         ).isEqualTo("America/New_York")
     }
 
@@ -166,7 +180,7 @@ class AuthIntegrationTest : IntegrationTestBase() {
         val result = doPatch("/api/auth/me", session, UpdateMeBody(timezone = null))
         assertThat(result.response.status).isEqualTo(200)
         assertThat(
-            mapper.readTree(result.response.contentAsString).get("timezone").asText()
+            mapper.readTree(result.response.contentAsString).get("timezone").asText(),
         ).isEqualTo("America/Los_Angeles")
     }
 
@@ -176,7 +190,7 @@ class AuthIntegrationTest : IntegrationTestBase() {
         doPatch("/api/auth/me", session, UpdateMeBody(timezone = "Europe/London"))
         val getResult = mockMvc.perform(get("/api/auth/me").cookie(session)).andReturn()
         assertThat(
-            mapper.readTree(getResult.response.contentAsString).get("timezone").asText()
+            mapper.readTree(getResult.response.contentAsString).get("timezone").asText(),
         ).isEqualTo("Europe/London")
     }
 }
