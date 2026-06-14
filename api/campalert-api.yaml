@@ -2,7 +2,7 @@ openapi: "3.0.3"
 
 info:
   title: CampAlert API
-  version: "1.2.0"
+  version: "1.3.0"
 
 servers:
   - url: /api
@@ -76,6 +76,42 @@ paths:
           description: Email verified
         "422":
           description: Invalid code, expired, or attempt limit reached (code field contains VERIFICATION_CODE_INVALID, VERIFICATION_CODE_ATTEMPTS_EXCEEDED, or VERIFICATION_INVALID_OR_EXPIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      operationId: forgotPassword
+      summary: Request a password reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordBody'
+      responses:
+        "202":
+          description: Accepted (same response regardless of account state or delivery outcome)
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      operationId: resetPassword
+      summary: Consume a password reset token and set a new password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordBody'
+      responses:
+        "204":
+          description: Password reset successfully
+        "422":
+          description: Invalid or expired token, or new password rejected (code field contains RESET_INVALID_OR_EXPIRED, RESET_PASSWORD_TOO_WEAK, or RESET_PASSWORD_SAME_AS_CURRENT)
           content:
             application/json:
               schema:
@@ -607,6 +643,34 @@ components:
           minLength: 6
           maxLength: 6
           pattern: '^\d{6}$'
+
+    ForgotPasswordBody:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+
+    ResetPasswordBody:
+      type: object
+      required:
+        - resetId
+        - token
+        - newPassword
+      properties:
+        resetId:
+          type: string
+          format: uuid
+        token:
+          type: string
+          minLength: 64
+          maxLength: 64
+          pattern: '^[0-9a-f]{64}$'
+        newPassword:
+          type: string
+          minLength: 8
+          maxLength: 72
 
     RegisterBody:
       type: object
