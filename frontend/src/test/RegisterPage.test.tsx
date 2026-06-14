@@ -53,7 +53,10 @@ describe('RegisterPage', () => {
 
   it('defaults timezone from browser and submits it on register', async () => {
     const registerSpy = vi.spyOn(sdk, 'register').mockResolvedValueOnce({
-      data: { id: 1, email: 'new@b.com', timezone: 'America/Denver' },
+      data: {
+        verificationId: '00000000-0000-0000-0000-000000000001',
+        verificationStatus: 'PENDING_VERIFICATION'
+      },
       error: undefined
     } as Awaited<ReturnType<typeof sdk.register>>)
 

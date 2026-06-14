@@ -25,7 +25,7 @@ class CsrfIntegrationTest : IntegrationTestBase() {
             .perform(
                 post("/api/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("""{"email":"test@test.com","password":"password1"}""")
+                    .content("""{"email":"test@test.com","password":"password1"}"""),
             ).andExpect(status().isForbidden)
     }
 
@@ -38,9 +38,51 @@ class CsrfIntegrationTest : IntegrationTestBase() {
                     .cookie(Cookie("XSRF-TOKEN", csrfToken))
                     .header("X-XSRF-TOKEN", csrfToken)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("""{"email":"test@test.com","password":"password1"}""")
+                    .content("""{"email":"test@test.com","password":"password1"}"""),
             ).andReturn()
         assertThat(result.response.status).isNotEqualTo(HttpStatus.FORBIDDEN.value())
+    }
+
+    @Test
+    fun `POST resend-verification without CSRF token returns 403`() {
+        mockMvc
+            .perform(
+                post("/api/auth/resend-verification")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"email":"test@test.com"}"""),
+            ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `POST verify-email without CSRF token returns 403`() {
+        mockMvc
+            .perform(
+                post("/api/auth/verify-email")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"verificationId":"00000000-0000-0000-0000-000000000000","code":"123456"}"""),
+            ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `POST forgot-password without CSRF token returns 403`() {
+        mockMvc
+            .perform(
+                post("/api/auth/forgot-password")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"email":"test@test.com"}"""),
+            ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `POST reset-password without CSRF token returns 403`() {
+        mockMvc
+            .perform(
+                post("/api/auth/reset-password")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """{"resetId":"00000000-0000-0000-0000-000000000000","token":"${"a".repeat(64)}","newPassword":"newPassword1!"}""",
+                    ),
+            ).andExpect(status().isForbidden)
     }
 
     @Test
@@ -53,7 +95,7 @@ class CsrfIntegrationTest : IntegrationTestBase() {
                 post("/api/sms/webhook")
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .param("Body", "STOP")
-                    .param("From", "+15550000001")
+                    .param("From", "+15550000001"),
             ).andReturn()
         assertThat(result.response.getCookie("XSRF-TOKEN")).isNotNull()
     }

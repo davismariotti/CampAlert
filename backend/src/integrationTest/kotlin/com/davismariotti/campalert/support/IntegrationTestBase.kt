@@ -2,12 +2,16 @@ package com.davismariotti.campalert.support
 
 import com.davismariotti.campalert.api.model.LoginBody
 import com.davismariotti.campalert.api.model.RegisterBody
+import com.davismariotti.campalert.api.model.VerifyEmailBody
 import com.davismariotti.campalert.recreation.RecreationApi
 import com.davismariotti.campalert.recreation.RidbApi
+import com.davismariotti.campalert.service.email.MailSender
 import com.davismariotti.campalert.service.sms.TwilioVerifyService
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.BeforeEach
+import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.doAnswer
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -28,6 +32,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.postgresql.PostgreSQLContainer
 import tools.jackson.databind.ObjectMapper
+import java.util.UUID
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
@@ -69,6 +74,11 @@ open class IntegrationTestBase {
     @MockitoBean
     protected lateinit var recreationApi: RecreationApi
 
+    // Replaces ThymeleafMailSender so no SMTP connection is needed during tests.
+    // Calls are captured in sentEmailVarsList so helpers can extract codes and tokens.
+    @MockitoBean
+    protected lateinit var mailSender: MailSender
+
     @Autowired
     protected lateinit var mockMvc: MockMvc
 
@@ -84,6 +94,9 @@ open class IntegrationTestBase {
     @Autowired
     protected lateinit var mapper: ObjectMapper
 
+    /** All variables maps passed to mailSender.send() during this test, in the order they were sent. */
+    protected val sentEmailVarsList = mutableListOf<Map<String, Any>>()
+
     @BeforeEach
     fun resetState() {
         jdbcTemplate.execute(
@@ -94,6 +107,13 @@ open class IntegrationTestBase {
         listOf("ridb", "recreation-gov", "twilio").forEach { name ->
             circuitBreakerRegistry.circuitBreaker(name).reset()
         }
+
+        sentEmailVarsList.clear()
+        @Suppress("UNCHECKED_CAST")
+        doAnswer { invocation ->
+            sentEmailVarsList.add(invocation.arguments[3] as Map<String, Any>)
+            null
+        }.`when`(mailSender).send(anyString(), anyString(), anyString(), anyKt())
     }
 
     protected fun getCsrfToken(): String {
@@ -107,8 +127,9 @@ open class IntegrationTestBase {
         var req = post(path)
             .cookie(Cookie("XSRF-TOKEN", csrf))
             .header("X-XSRF-TOKEN", csrf)
+            .contentType(MediaType.APPLICATION_JSON)
         if (session != null) req = req.cookie(session)
-        if (body != null) req = req.contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body))
+        if (body != null) req = req.content(mapper.writeValueAsString(body))
         return mockMvc.perform(req).andReturn()
     }
 
@@ -143,13 +164,36 @@ open class IntegrationTestBase {
         return mockMvc.perform(req).andReturn()
     }
 
+    @Suppress("UNCHECKED_CAST")
+    protected fun <T> anyKt(): T = org.mockito.ArgumentMatchers.any<T>() as T
+
     protected fun extractId(result: MvcResult): Long = mapper.readTree(result.response.contentAsString).get("id").asLong()
 
-    protected fun registerAndLogin(email: String = "user@test.com", password: String = "password1"): Cookie {
-        doPost(
+    /** Registers a new account and returns the verificationId from the 201 response body. */
+    protected fun registerOnly(email: String = "user@test.com", password: String = "password1"): String {
+        val result = doPost(
             "/api/auth/register",
-            body = RegisterBody(email = email, password = password, timezone = "America/Los_Angeles")
+            body = RegisterBody(email = email, password = password, timezone = "America/Los_Angeles"),
         )
+        return mapper.readTree(result.response.contentAsString).get("verificationId").asText()
+    }
+
+    /**
+     * Verifies the account using the code from the most recently captured email.
+     * Call after registerOnly() to complete the verification step.
+     */
+    protected fun verifyLatestEmail(verificationId: String): MvcResult {
+        val code = sentEmailVarsList.lastOrNull()?.get("code") as? String
+            ?: error("No verification email captured — did registerOnly() run first?")
+        return doPost(
+            "/api/auth/verify-email",
+            body = VerifyEmailBody(verificationId = UUID.fromString(verificationId), code = code),
+        )
+    }
+
+    protected fun registerAndLogin(email: String = "user@test.com", password: String = "password1"): Cookie {
+        val verificationId = registerOnly(email, password)
+        verifyLatestEmail(verificationId)
         val result = doPost("/api/auth/login", body = LoginBody(email = email, password = password))
         return result.response.getCookie("SESSION") ?: error("SESSION cookie not found after login for $email")
     }

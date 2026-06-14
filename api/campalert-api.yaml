@@ -603,6 +603,7 @@ components:
         - id
         - email
         - timezone
+        - verificationStatus
       properties:
         id:
           type: integer
@@ -611,15 +612,26 @@ components:
           type: string
         timezone:
           type: string
+        verificationStatus:
+          $ref: '#/components/schemas/VerificationStatus'
 
     RegisterResponse:
       type: object
       required:
         - verificationId
+        - verificationStatus
       properties:
         verificationId:
           type: string
           format: uuid
+        verificationStatus:
+          $ref: '#/components/schemas/VerificationStatus'
+
+    VerificationStatus:
+      type: string
+      enum:
+        - PENDING_VERIFICATION
+        - VERIFIED
 
     ResendVerificationBody:
       type: object

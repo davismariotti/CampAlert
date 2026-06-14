@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { register } from '../../api/generated/sdk.gen'
-import { useAuth } from './useAuth'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import landscapeImg from '../../assets/landscape.jpg'
@@ -14,7 +13,6 @@ export function RegisterPage() {
   const [password, setPassword] = useState('')
   const [timezone, setTimezone] = useState(getBrowserTimezone)
   const [error, setError] = useState<string | null>(null)
-  const { login: storeAuth } = useAuth()
   const navigate = useNavigate()
   const timezoneOptions = getTimezoneOptions()
 
@@ -25,8 +23,7 @@ export function RegisterPage() {
       return result.data!
     },
     onSuccess: (data) => {
-      storeAuth(data)
-      navigate('/requests')
+      navigate(`/verify-email?verificationId=${data.verificationId}`)
     },
     onError: (err: AxiosError<{ message: string }>) => {
       if (err.response?.status === 409) {

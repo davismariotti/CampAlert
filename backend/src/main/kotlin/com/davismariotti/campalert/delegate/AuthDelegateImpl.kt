@@ -10,6 +10,7 @@ import com.davismariotti.campalert.api.model.RegisterResponse
 import com.davismariotti.campalert.api.model.ResendVerificationBody
 import com.davismariotti.campalert.api.model.ResetPasswordBody
 import com.davismariotti.campalert.api.model.UpdateMeBody
+import com.davismariotti.campalert.api.model.VerificationStatus
 import com.davismariotti.campalert.api.model.VerifyEmailBody
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.security.RememberMeServices
@@ -55,7 +56,12 @@ class AuthDelegateImpl(
             ),
         )
         val verificationId = emailVerificationService.issueVerification(user.id!!, user.email)
-        return ResponseEntity.status(HttpStatus.CREATED).body(RegisterResponse(verificationId = verificationId))
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+            RegisterResponse(
+                verificationId = verificationId,
+                verificationStatus = VerificationStatus.PENDING_VERIFICATION,
+            ),
+        )
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -86,7 +92,7 @@ class AuthDelegateImpl(
             rememberMeServices.loginSuccessForced(request, response, auth)
         }
 
-        return ResponseEntity.ok(AuthResponse(id = user.id!!, email = user.email, timezone = user.timezone))
+        return ResponseEntity.ok(user.toAuthResponse())
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -102,7 +108,7 @@ class AuthDelegateImpl(
     override fun getMe(): ResponseEntity<AuthResponse> {
         val auth = SecurityContextHolder.getContext().authentication!!
         val user = userRepository.findByEmail(auth.name)!!
-        return ResponseEntity.ok(AuthResponse(id = user.id!!, email = user.email, timezone = user.timezone))
+        return ResponseEntity.ok(user.toAuthResponse())
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -110,9 +116,7 @@ class AuthDelegateImpl(
         val auth = SecurityContextHolder.getContext().authentication!!
         val user = userRepository.findByEmail(auth.name)!!
         val updated = updateMeBody.timezone?.let { userRepository.save(user.copy(timezone = it)) } ?: user
-        return ResponseEntity.ok(
-            AuthResponse(id = updated.id!!, email = updated.email, timezone = updated.timezone),
-        )
+        return ResponseEntity.ok(updated.toAuthResponse())
     }
 
     override fun resendVerification(resendVerificationBody: ResendVerificationBody): ResponseEntity<Unit> {
@@ -166,4 +170,12 @@ class AuthDelegateImpl(
                     .body(ErrorResponse(message = "New password must differ from current password", code = "RESET_PASSWORD_SAME_AS_CURRENT"))
                     as ResponseEntity<Unit>
         }
+
+    private fun UserEntity.toAuthResponse() =
+        AuthResponse(
+            id = id!!,
+            email = email,
+            timezone = timezone,
+            verificationStatus = VerificationStatus.VERIFIED,
+        )
 }
