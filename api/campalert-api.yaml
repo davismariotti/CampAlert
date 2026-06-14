@@ -2,7 +2,7 @@ openapi: "3.0.3"
 
 info:
   title: CampAlert API
-  version: "1.1.0"
+  version: "1.2.0"
 
 servers:
   - url: /api
@@ -27,11 +27,11 @@ paths:
               $ref: '#/components/schemas/RegisterBody'
       responses:
         "201":
-          description: User created
+          description: Account created; email verification required before login
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: '#/components/schemas/RegisterResponse'
         "400":
           description: Validation error
           content:
@@ -40,6 +40,42 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         "409":
           description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/resend-verification:
+    post:
+      tags: [Auth]
+      operationId: resendVerification
+      summary: Resend email verification code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResendVerificationBody'
+      responses:
+        "202":
+          description: Accepted (same response regardless of account state)
+
+  /auth/verify-email:
+    post:
+      tags: [Auth]
+      operationId: verifyEmail
+      summary: Verify email address with a one-time code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEmailBody'
+      responses:
+        "200":
+          description: Email verified
+        "422":
+          description: Invalid code, expired, or attempt limit reached (code field contains VERIFICATION_CODE_INVALID, VERIFICATION_CODE_ATTEMPTS_EXCEEDED, or VERIFICATION_INVALID_OR_EXPIRED)
           content:
             application/json:
               schema:
@@ -539,6 +575,38 @@ components:
           type: string
         timezone:
           type: string
+
+    RegisterResponse:
+      type: object
+      required:
+        - verificationId
+      properties:
+        verificationId:
+          type: string
+          format: uuid
+
+    ResendVerificationBody:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+
+    VerifyEmailBody:
+      type: object
+      required:
+        - verificationId
+        - code
+      properties:
+        verificationId:
+          type: string
+          format: uuid
+        code:
+          type: string
+          minLength: 6
+          maxLength: 6
+          pattern: '^\d{6}$'
 
     RegisterBody:
       type: object
