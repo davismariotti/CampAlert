@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import landscapeImg from '../assets/landscape.jpg'
 import { LoginModal } from '../components/LoginModal'
 
@@ -27,7 +27,13 @@ const steps = [
 ]
 
 export function LandingPage() {
-  const [showLogin, setShowLogin] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [showLogin, setShowLogin] = useState(searchParams.get('login') === '1')
+
+  function closeLogin() {
+    setShowLogin(false)
+    if (searchParams.has('login')) setSearchParams({}, { replace: true })
+  }
 
   return (
     <div className="min-h-screen bg-white text-forest-900">
@@ -46,7 +52,7 @@ export function LandingPage() {
         </button>
       </header>
 
-      {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+      {showLogin && <LoginModal onClose={closeLogin} />}
 
       {/* Hero — full-bleed photo, centered text */}
       <section

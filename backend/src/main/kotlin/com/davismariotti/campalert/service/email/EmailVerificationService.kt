@@ -88,6 +88,21 @@ class EmailVerificationService(
         issueVerification(userId, user.email)
     }
 
+    fun ensureVerificationForLogin(userId: Long, email: String): UUID {
+        val now = Instant.now()
+        val latest = emailVerificationRepository.findLatestByUserId(userId)
+        if (
+            latest != null &&
+            latest.consumedAt == null &&
+            latest.expiresAt.isAfter(now) &&
+            latest.attempts.toInt() < props.maxAttempts
+        ) {
+            return latest.id
+        }
+
+        return issueVerification(userId, email)
+    }
+
     /**
      * Validates the submitted code against the pending email_verifications row.
      * Increments attempt count on wrong code; consumes and marks user verified on success.

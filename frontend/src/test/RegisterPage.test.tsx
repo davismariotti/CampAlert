@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RegisterPage } from '../features/auth/RegisterPage'
 import { AuthProvider } from '../features/auth/AuthContext'
 import * as sdk from '../api/generated/sdk.gen'
+
+function LocationDisplay() {
+  const location = useLocation()
+  return <span data-testid="location">{`${location.pathname}${location.search}`}</span>
+}
 
 function Wrapper() {
   const qc = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
@@ -14,6 +19,7 @@ function Wrapper() {
       <QueryClientProvider client={qc}>
         <AuthProvider>
           <RegisterPage />
+          <LocationDisplay />
         </AuthProvider>
       </QueryClientProvider>
     </MemoryRouter>
@@ -71,6 +77,9 @@ describe('RegisterPage', () => {
       expect(registerSpy).toHaveBeenCalledWith({
         body: { email: 'new@b.com', password: 'password1', timezone: 'America/Denver' }
       })
+    )
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/verify-email?verificationId=00000000-0000-0000-0000-000000000001'
     )
   })
 })

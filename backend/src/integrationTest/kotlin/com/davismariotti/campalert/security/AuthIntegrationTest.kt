@@ -70,6 +70,7 @@ class AuthIntegrationTest : IntegrationTestBase() {
         val result = doPost("/api/auth/login", body = LoginBody(email = "user@test.com", password = "password1"))
         assertThat(result.response.status).isEqualTo(401)
         assertThat(result.response.contentAsString).contains("EMAIL_NOT_VERIFIED")
+        assertThat(mapper.readTree(result.response.contentAsString).get("verificationId").asText()).isNotBlank()
     }
 
     @Test

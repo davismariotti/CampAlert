@@ -1,14 +1,11 @@
 import { createContext } from 'react'
+import type { AuthResponse } from '../../api/generated/types.gen'
 
-export interface AuthUser {
-  id: number
-  email: string
-  timezone: string
-}
+export type AuthUser = AuthResponse & { verificationStatus: 'VERIFIED' }
 
 export interface AuthContextValue {
   user: AuthUser | null
-  login: (user: AuthUser) => void
+  login: (user: AuthResponse) => void
   logout: () => void
 }
 

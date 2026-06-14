@@ -31,7 +31,12 @@ describe('AccountSettingsPage', () => {
 
   it('saves timezone and refreshes stored auth user', async () => {
     const updateSpy = vi.spyOn(sdk, 'updateMe').mockResolvedValueOnce({
-      data: { id: 1, email: 'user@test.com', timezone: 'America/Denver' },
+      data: {
+        id: 1,
+        email: 'user@test.com',
+        timezone: 'America/Denver',
+        verificationStatus: 'VERIFIED'
+      },
       error: undefined
     } as Awaited<ReturnType<typeof sdk.updateMe>>)
 
