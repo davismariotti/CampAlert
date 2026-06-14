@@ -22,6 +22,12 @@ services:
     volumes:
       - ../data/redis:/data
 
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   # Ephemeral dev-db used only by Atlas for diff/planning — no persistent volume needed.
   atlas-dev-db:
     image: postgres:16-alpine
