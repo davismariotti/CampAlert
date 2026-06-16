@@ -5,6 +5,7 @@ import com.davismariotti.campalert.api.model.RegisterBody
 import com.davismariotti.campalert.api.model.VerifyEmailBody
 import com.davismariotti.campalert.recreation.RecreationApi
 import com.davismariotti.campalert.recreation.RidbApi
+import com.davismariotti.campalert.service.email.EmailSender
 import com.davismariotti.campalert.service.email.MailSender
 import com.davismariotti.campalert.service.sms.TwilioVerifyService
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
@@ -74,7 +75,11 @@ open class IntegrationTestBase {
     @MockitoBean
     protected lateinit var recreationApi: RecreationApi
 
-    // Replaces ThymeleafMailSender so no SMTP connection is needed during tests.
+    // Satisfies TemplatedMailSender's constructor so the context loads; never called directly.
+    @MockitoBean
+    protected lateinit var emailSender: EmailSender
+
+    // Replaces TemplatedMailSender so no real email is sent during tests.
     // Calls are captured in sentEmailVarsList so helpers can extract codes and tokens.
     @MockitoBean
     protected lateinit var mailSender: MailSender
