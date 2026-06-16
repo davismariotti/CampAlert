@@ -20,14 +20,14 @@ export function ResetPasswordPage() {
 
   const mutation = useApiMutation({
     mutationFn: async () => {
-      setSubmitted(true)
-      setSearchParams({}, { replace: true })
       await resetPassword({
         body: { resetId, token, newPassword: password },
         throwOnError: true
       })
     },
     onSuccess: () => {
+      setSubmitted(true)
+      setSearchParams({}, { replace: true })
       setSucceeded(true)
       setError(null)
     },
@@ -80,7 +80,7 @@ export function ResetPasswordPage() {
             maxLength={72}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            disabled={submitted}
+            disabled={submitted || mutation.isPending}
           />
           <Input
             aria-label="Confirm new password"
@@ -91,7 +91,7 @@ export function ResetPasswordPage() {
             maxLength={72}
             value={confirmation}
             onChange={(event) => setConfirmation(event.target.value)}
-            disabled={submitted}
+            disabled={submitted || mutation.isPending}
           />
           {!hasResetParams && !submitted && (
             <p className="text-sm text-red-600">This password reset link is missing required information.</p>

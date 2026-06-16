@@ -62,7 +62,7 @@ class PasswordResetService(
                 ),
             )
         } catch (e: Exception) {
-            log.warn("Password reset email delivery failed for userId={}", userId)
+            log.warn("Password reset email delivery failed for userId={}", userId, e)
             passwordResetRepository.consumeAllPendingByUserId(userId, Instant.now())
         }
 

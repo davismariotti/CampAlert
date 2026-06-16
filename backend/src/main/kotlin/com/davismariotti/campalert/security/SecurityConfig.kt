@@ -64,7 +64,7 @@ class SecurityConfig(
                 csrf
                     .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                     .csrfTokenRequestHandler(CsrfTokenRequestAttributeHandler())
-                    .ignoringRequestMatchers("/api/sms/webhook")
+                    .ignoringRequestMatchers("/api/sms/webhook", "/api/email/webhook/bounce")
             }.authorizeHttpRequests { auth ->
                 auth
                     .requestMatchers(HttpMethod.POST, "/api/auth/register")
@@ -80,6 +80,8 @@ class SecurityConfig(
                     .requestMatchers(HttpMethod.POST, "/api/auth/reset-password")
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/sms/webhook")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/email/webhook/bounce")
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/actuator/health")
                     .permitAll()

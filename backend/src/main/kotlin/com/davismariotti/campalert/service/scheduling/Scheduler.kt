@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component
 class Scheduler(
     val availabilityChecker: AvailabilityChecker
 ) {
-    @Scheduled(fixedDelayString = "\${campfinder.polling.interval-ms}")
+    @Scheduled(fixedDelayString = $$"${campfinder.polling.interval-ms}")
     fun execute() {
         availabilityChecker.processSearchRequests()
     }

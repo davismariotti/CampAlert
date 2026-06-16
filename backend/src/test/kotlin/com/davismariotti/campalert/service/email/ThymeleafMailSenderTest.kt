@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
@@ -17,25 +16,20 @@ import org.springframework.mail.javamail.JavaMailSender
 import org.thymeleaf.TemplateEngine
 import org.thymeleaf.context.IContext
 
-class ThymeleafMailSenderTest {
-    private val javaMailSender = mock(JavaMailSender::class.java)
+// ── TemplatedMailSender ───────────────────────────────────────────────────────
+
+class TemplatedMailSenderTest {
+    private val emailSender = InMemoryEmailSender()
     private val templateEngine = mock(TemplateEngine::class.java)
 
-    private val sender = ThymeleafMailSender(
-        javaMailSender = javaMailSender,
+    private val sender = TemplatedMailSender(
+        emailSender = emailSender,
         templateEngine = templateEngine,
-        fromAddress = "noreply@campalert.app",
     )
-
-    private fun mimeMessage() =
-        MimeMessage(null as Session?).also {
-            `when`(javaMailSender.createMimeMessage()).thenReturn(it)
-        }
 
     @Test
     fun `send passes correct template name and variables to TemplateEngine`() {
         `when`(templateEngine.process(eq("email/verify"), any(IContext::class.java))).thenReturn("<html>123456</html>")
-        mimeMessage()
 
         sender.send(
             to = "user@example.com",
@@ -52,22 +46,48 @@ class ThymeleafMailSenderTest {
     }
 
     @Test
-    fun `send invokes javaMailSender with the rendered message`() {
+    fun `send passes rendered HTML to EmailSender`() {
         val renderedHtml = "<html><body>Your code: 654321</body></html>"
         `when`(templateEngine.process(eq("email/verify"), any(IContext::class.java))).thenReturn(renderedHtml)
-        val msg = mimeMessage()
 
         sender.send("user@example.com", "Verify", "email/verify", mapOf("code" to "654321"))
+
+        assertEquals(1, emailSender.sent.size)
+        assertEquals(renderedHtml, emailSender.sent[0].htmlBody)
+        assertEquals("user@example.com", emailSender.sent[0].to)
+        assertEquals("Verify", emailSender.sent[0].subject)
+    }
+}
+
+// ── MailpitEmailSender ────────────────────────────────────────────────────────
+
+class MailpitEmailSenderTest {
+    private val javaMailSender = mock(JavaMailSender::class.java)
+
+    private val sender = MailpitEmailSender(
+        javaMailSender = javaMailSender,
+        fromAddress = "noreply@campalert.app",
+    )
+
+    private fun mimeMessage() =
+        MimeMessage(null as Session?).also {
+            `when`(javaMailSender.createMimeMessage()).thenReturn(it)
+        }
+
+    @Test
+    fun `send invokes javaMailSender with the rendered message`() {
+        val msg = mimeMessage()
+
+        sender.send("user@example.com", "Verify", "<html><body>code</body></html>")
 
         verify(javaMailSender).send(msg)
     }
 
     @Test
     fun `send sets correct from and to addresses`() {
-        `when`(templateEngine.process(anyString(), any(IContext::class.java))).thenReturn("<html></html>")
         val msg = mimeMessage()
 
-        sender.send("camper@example.com", "Verify", "email/verify", emptyMap())
+        sender.send("camper@example.com", "Verify", "<html></html>")
 
         assertEquals("noreply@campalert.app", msg.from.first().toString())
         assertTrue(msg.allRecipients?.any { it.toString() == "camper@example.com" } == true)
@@ -75,10 +95,9 @@ class ThymeleafMailSenderTest {
 
     @Test
     fun `send sets the subject`() {
-        `when`(templateEngine.process(anyString(), any(IContext::class.java))).thenReturn("<html></html>")
         val msg = mimeMessage()
 
-        sender.send("u@example.com", "Verify your CampAlert email", "email/verify", emptyMap())
+        sender.send("u@example.com", "Verify your CampAlert email", "<html></html>")
 
         assertEquals("Verify your CampAlert email", msg.subject)
     }
@@ -86,10 +105,9 @@ class ThymeleafMailSenderTest {
     @Test
     fun `code is not placed in the subject or recipient address`() {
         val secretCode = "987654"
-        `when`(templateEngine.process(anyString(), any(IContext::class.java))).thenReturn("<html>$secretCode</html>")
         val msg = mimeMessage()
 
-        sender.send("user@example.com", "Verify your email", "email/verify", mapOf("code" to secretCode))
+        sender.send("user@example.com", "Verify your email", "<html>$secretCode</html>")
 
         assertFalse(msg.subject.contains(secretCode), "subject must not contain the code")
         assertFalse((msg.allRecipients ?: emptyArray()).joinToString { it.toString() }.contains(secretCode), "recipient must not contain the code")
@@ -98,18 +116,45 @@ class ThymeleafMailSenderTest {
     @Test
     fun `reset token is not placed in the subject or recipient address`() {
         val rawToken = "SUPERSECRETTOKEN"
-        val resetUrl = "http://localhost:5173/reset-password?resetId=xyz&token=$rawToken"
-        `when`(templateEngine.process(anyString(), any(IContext::class.java))).thenReturn("<html>$resetUrl</html>")
         val msg = mimeMessage()
 
-        sender.send("user@example.com", "Reset your password", "email/reset-password", mapOf("resetUrl" to resetUrl))
+        sender.send("user@example.com", "Reset your password", "<html>http://localhost:5173/reset-password?resetId=xyz&token=$rawToken</html>")
 
         assertFalse(msg.subject.contains(rawToken), "subject must not contain the raw token")
         assertFalse((msg.allRecipients ?: emptyArray()).joinToString { it.toString() }.contains(rawToken), "recipient must not contain the raw token")
     }
+}
+
+// ── InMemoryEmailSender ───────────────────────────────────────────────────────
+
+class InMemoryEmailSenderTest {
+    @Test
+    fun `accumulates messages without sending`() {
+        val inMemory = InMemoryEmailSender()
+
+        inMemory.send("a@example.com", "Subject A", "<html>code</html>")
+        inMemory.send("b@example.com", "Subject B", "<html>reset</html>")
+
+        assertEquals(2, inMemory.sent.size)
+        assertEquals("a@example.com", inMemory.sent[0].to)
+        assertEquals("<html>code</html>", inMemory.sent[0].htmlBody)
+        assertEquals("b@example.com", inMemory.sent[1].to)
+    }
 
     @Test
-    fun `InMemoryMailSender accumulates messages without sending`() {
+    fun `reset clears sent messages`() {
+        val inMemory = InMemoryEmailSender()
+        inMemory.send("a@example.com", "Subject", "<html></html>")
+        inMemory.reset()
+        assertTrue(inMemory.sent.isEmpty())
+    }
+}
+
+// ── InMemoryMailSender ────────────────────────────────────────────────────────
+
+class InMemoryMailSenderTest {
+    @Test
+    fun `accumulates messages without sending`() {
         val inMemory = InMemoryMailSender()
 
         inMemory.send("a@example.com", "Subject A", "email/verify", mapOf("code" to "111111"))
@@ -122,7 +167,7 @@ class ThymeleafMailSenderTest {
     }
 
     @Test
-    fun `InMemoryMailSender reset clears sent messages`() {
+    fun `reset clears sent messages`() {
         val inMemory = InMemoryMailSender()
         inMemory.send("a@example.com", "Subject", "email/verify", emptyMap())
         inMemory.reset()

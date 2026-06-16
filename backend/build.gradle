@@ -46,6 +46,7 @@ dependencies {
 
     implementation 'com.github.sps.pushover.net:pushover-client:1.0.0'
     implementation 'com.twilio.sdk:twilio:12.1.1'
+    implementation 'com.postmarkapp:postmark:1.13.0'
 
     implementation 'io.swagger.core.v3:swagger-annotations:2.2.51'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
