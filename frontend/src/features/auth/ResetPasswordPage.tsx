@@ -38,6 +38,7 @@ export function ResetPasswordPage() {
       } else if (errorCode === 'RESET_PASSWORD_TOO_WEAK') {
         setError('Your new password does not meet the password requirements.')
       } else {
+        setSubmitted(true)
         setError('This password reset link is invalid or expired.')
       }
     }
