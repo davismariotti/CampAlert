@@ -44,10 +44,13 @@ client.instance.interceptors.request.use((config) => {
   return config
 })
 
+const PUBLIC_AUTH_PATHS = ['/reset-password', '/forgot-password', '/verify-email', '/register']
+
 client.instance.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401 && !suppress401) {
+    const onPublicAuthPage = PUBLIC_AUTH_PATHS.some((p) => window.location.pathname.startsWith(p))
+    if (error.response?.status === 401 && !suppress401 && !onPublicAuthPage) {
       logoutFn?.()
       navigateFn?.('/login')
     }
