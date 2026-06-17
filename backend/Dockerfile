@@ -1,6 +1,6 @@
 FROM eclipse-temurin:21-jre
 
-ENV SPRING_PROFILES_ACTIVE=docker,log-json
+ENV SPRING_PROFILES_ACTIVE=prod,docker,log-json
 
 RUN apt-get update && apt-get install -y --no-install-recommends unzip curl \
     && curl -fSL https://download.newrelic.com/newrelic/java-agent/newrelic-agent/current/newrelic-java.zip -o /tmp/newrelic-java.zip \
