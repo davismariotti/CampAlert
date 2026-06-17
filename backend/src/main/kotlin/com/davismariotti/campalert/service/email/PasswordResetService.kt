@@ -2,9 +2,12 @@ package com.davismariotti.campalert.service.email
 
 import com.davismariotti.campalert.config.PasswordResetProperties
 import com.davismariotti.campalert.model.PasswordReset
+import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.notification.ResetPasswordNotification
 import com.davismariotti.campalert.repository.PasswordResetRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.SessionRevocationService
+import com.davismariotti.campalert.service.notification.NotificationService
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
@@ -21,7 +24,7 @@ import java.util.UUID
 class PasswordResetService(
     private val passwordResetRepository: PasswordResetRepository,
     private val userRepository: UserRepository,
-    private val mailSender: MailSender,
+    private val notificationService: NotificationService,
     private val passwordEncoder: BCryptPasswordEncoder,
     private val rememberMeTokenRepository: PersistentTokenRepository,
     private val sessionRevocationService: SessionRevocationService,
@@ -52,13 +55,13 @@ class PasswordResetService(
         )
 
         try {
-            mailSender.send(
-                to = email,
-                subject = "Reset your CampAlert password",
-                template = "email/reset-password",
-                variables = mapOf(
-                    "resetUrl" to "$frontendBaseUrl/reset-password?resetId=$id&token=$token",
-                    "expiryMinutes" to props.expiresIn.toMinutes().toString(),
+            val notificationUser = User(id = userId, email = email, passwordHash = "")
+            notificationService.send(
+                ResetPasswordNotification(
+                    user = notificationUser,
+                    resetUrl = "$frontendBaseUrl/reset-password?resetId=$id&token=$token",
+                    expiryMinutes = props.expiresIn.toMinutes().toString(),
+                    frontendBaseUrl = frontendBaseUrl,
                 ),
             )
         } catch (e: Exception) {

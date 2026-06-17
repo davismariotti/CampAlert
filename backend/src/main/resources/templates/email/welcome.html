@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en"
+      th:replace="~{email/layout :: shell(~{::title}, ~{::div#email-body})}">
+<head>
+  <title>Welcome to CampAlert</title>
+</head>
+<body>
+<div id="email-body">
+  <h2 style="margin: 0 0 12px 0; color: #1a3d2e; font-size: 22px; font-weight: 700;">Welcome to CampAlert</h2>
+  <p style="margin: 0 0 24px 0; color: #374151; font-size: 15px; line-height: 1.6;">
+    CampAlert watches Recreation.gov around the clock and texts you the moment a campsite opens up.
+  </p>
+  <div style="text-align: center; margin-bottom: 24px;">
+    <a th:href="${appUrl}"
+       href="#"
+       style="display: inline-block; padding: 13px 32px; background-color: #f59e0b; color: #1a3d2e; text-decoration: none; border-radius: 6px; font-size: 15px; font-weight: 700; letter-spacing: 0.2px;">
+      Set your first alert
+    </a>
+  </div>
+  <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+    You're receiving this because you just verified your CampAlert account. Reply to this email if you have any questions.
+  </p>
+</div>
+</body>
+</html>
