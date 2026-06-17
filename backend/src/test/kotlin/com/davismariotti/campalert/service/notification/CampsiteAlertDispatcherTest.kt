@@ -9,15 +9,14 @@ import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
-import com.davismariotti.campalert.service.sms.PendingNotification
 import com.davismariotti.campalert.service.sms.SmsConversationService
-import com.davismariotti.campalert.service.sms.SmsNotificationService
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
 import org.mockito.Mockito.anyLong
+import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -26,10 +25,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.util.Optional
 
-class NotificationProcessorTest {
-    // Kotlin + Mockito: any() / capture() returns null but Kotlin adds a null check at the call
-    // site when passing to a non-nullable param. Casting as T suppresses that check without
-    // adding mockito-kotlin.
+class CampsiteAlertDispatcherTest {
     @Suppress("UNCHECKED_CAST")
     private fun <T> anyK(): T = Mockito.any<T>() as T
 
@@ -39,30 +35,24 @@ class NotificationProcessorTest {
         return null as T
     }
 
+    private val notificationService = mock(NotificationService::class.java)
     private val outboxRepo = mock(NotificationOutboxRepository::class.java)
     private val searchRequestRepo = mock(SearchRequestRepository::class.java)
-    private val phoneRepo = mock(PhoneNumberRepository::class.java)
     private val userRepo = mock(UserRepository::class.java)
-    private val smsSvc = mock(SmsNotificationService::class.java)
+    private val phoneRepo = mock(PhoneNumberRepository::class.java)
     private val conversationSvc = mock(SmsConversationService::class.java)
-    private val pushoverSvc = mock(PushoverNotificationService::class.java)
 
-    private val processor = NotificationProcessor(
-        outboxRepo,
-        searchRequestRepo,
-        phoneRepo,
-        userRepo,
-        smsSvc,
-        conversationSvc,
-        pushoverSvc,
+    private val dispatcher = CampsiteAlertDispatcher(
+        notificationService = notificationService,
+        notificationOutboxRepository = outboxRepo,
+        searchRequestRepository = searchRequestRepo,
+        userRepository = userRepo,
+        phoneNumberRepository = phoneRepo,
+        smsConversationService = conversationSvc,
+        staleThresholdMinutes = 15L,
     )
 
-    @BeforeEach
-    fun setUp() {
-        // Default: non-pushover user — routes to SMS path
-        val smsUser = User(id = 42L, email = "user@example.com", passwordHash = "hash")
-        `when`(userRepo.findById(42L)).thenReturn(Optional.of(smsUser))
-    }
+    private val smsUser = User(id = 42L, email = "user@example.com", passwordHash = "hash")
 
     private val phone = PhoneNumber(
         id = 1L,
@@ -71,6 +61,11 @@ class NotificationProcessorTest {
         status = PhoneNumberStatus.VERIFIED,
         smsConsentAt = Instant.now(),
     )
+
+    @BeforeEach
+    fun setUp() {
+        `when`(userRepo.findById(42L)).thenReturn(Optional.of(smsUser))
+    }
 
     private fun request(id: Int, state: String = "AVAILABLE") =
         SearchRequest(
@@ -95,17 +90,17 @@ class NotificationProcessorTest {
         )
 
     @Test
-    fun `0 rows claimed — skips processing`() {
+    fun `0 rows claimed skips processing`() {
         val rows = listOf(outboxRow(1L, 10, "AVAILABLE"))
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(0)
 
-        processor.processUser(42L, rows, Instant.now())
+        invokeProcessUser(42L, rows, Instant.now())
 
-        verify(smsSvc, never()).notifyAggregated(anyK(), anyK())
+        verify(notificationService, never()).send(anyK())
     }
 
     @Test
-    fun `stale AVAILABLE row marked missed_at`() {
+    fun `stale AVAILABLE row is marked missedAt`() {
         val req = request(10, state = "UNAVAILABLE")
         val row = outboxRow(1L, 10, "AVAILABLE")
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(1)
@@ -113,9 +108,9 @@ class NotificationProcessorTest {
         `when`(searchRequestRepo.findById(10)).thenReturn(Optional.of(req))
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
-        processor.processUser(42L, listOf(row), Instant.now())
+        invokeProcessUser(42L, listOf(row), Instant.now())
 
-        verify(smsSvc, never()).notifyAggregated(anyK(), anyK())
+        verify(notificationService, never()).send(anyK())
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
         verify(outboxRepo).save(captureK(captor))
         assertNull(captor.value?.sentAt, "sentAt should not be set on stale row")
@@ -123,7 +118,7 @@ class NotificationProcessorTest {
     }
 
     @Test
-    fun `multiple AVAILABLE rows sent as single aggregated SMS`() {
+    fun `multiple AVAILABLE rows sent as single aggregated notification`() {
         val req1 = request(10)
         val req2 = request(11)
         val row1 = outboxRow(1L, 10, "AVAILABLE")
@@ -132,35 +127,68 @@ class NotificationProcessorTest {
         `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
         `when`(searchRequestRepo.findById(10)).thenReturn(Optional.of(req1))
         `when`(searchRequestRepo.findById(11)).thenReturn(Optional.of(req2))
-        `when`(outboxRepo.findById(1L)).thenReturn(Optional.of(row1))
-        `when`(outboxRepo.findById(2L)).thenReturn(Optional.of(row2))
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
-        processor.processUser(42L, listOf(row1, row2), Instant.now())
+        invokeProcessUser(42L, listOf(row1, row2), Instant.now())
 
-        @Suppress("UNCHECKED_CAST")
-        val captor = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<PendingNotification>>
-        verify(smsSvc).notifyAggregated(anyK(), captureK(captor))
-        assert(captor.value.size == 2) { "Should aggregate 2 notifications into one SMS call" }
+        verify(notificationService).send(anyK())
     }
 
     @Test
-    fun `Twilio failure clears claimed_at and increments attempt_count`() {
+    fun `successful send marks outbox rows as sentAt`() {
         val req = request(10)
         val row = outboxRow(1L, 10, "AVAILABLE")
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(1)
         `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
         `when`(searchRequestRepo.findById(10)).thenReturn(Optional.of(req))
-        `when`(smsSvc.notifyAggregated(anyK(), anyK())).thenThrow(RuntimeException("Twilio down"))
-        `when`(outboxRepo.findById(1L)).thenReturn(Optional.of(row))
+        `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
+        `when`(searchRequestRepo.save(anyK())).thenAnswer { it.arguments[0] }
+
+        invokeProcessUser(42L, listOf(row), Instant.now())
+
+        val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
+        verify(outboxRepo).save(captureK(captor))
+        assert(captor.value?.sentAt != null) { "sentAt should be set on successful send" }
+    }
+
+    @Test
+    fun `send failure clears claimedAt and increments attemptCount`() {
+        val req = request(10)
+        val row = outboxRow(1L, 10, "AVAILABLE")
+        `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(1)
+        `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
+        `when`(searchRequestRepo.findById(10)).thenReturn(Optional.of(req))
+        doThrow(RuntimeException("Send failed")).`when`(notificationService).send(anyK())
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
-        processor.processUser(42L, listOf(row), Instant.now())
+        invokeProcessUser(42L, listOf(row), Instant.now())
 
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
         verify(outboxRepo).save(captureK(captor))
         assertNull(captor.value?.claimedAt, "claimedAt should be cleared on failure")
-        assert(captor.value?.attemptCount == 1) { "attempt_count should be incremented" }
+        assert(captor.value?.attemptCount == 1) { "attemptCount should be incremented" }
+    }
+
+    @Test
+    fun `no verified phone marks rows missedAt`() {
+        val row = outboxRow(1L, 10, "AVAILABLE")
+        `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(1)
+        `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(emptyList())
+        `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
+
+        invokeProcessUser(42L, listOf(row), Instant.now())
+
+        verify(notificationService, never()).send(anyK())
+        val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
+        verify(outboxRepo).save(captureK(captor))
+        assert(captor.value?.missedAt != null) { "missedAt should be set when no phone" }
+    }
+
+    private fun invokeProcessUser(userId: Long, rows: List<NotificationOutbox>, now: Instant) {
+        dispatcher.javaClass
+            .getDeclaredMethod("processUser", Long::class.java, List::class.java, Instant::class.java)
+            .also { it.isAccessible = true }
+            .invoke(dispatcher, userId, rows, now)
     }
 }

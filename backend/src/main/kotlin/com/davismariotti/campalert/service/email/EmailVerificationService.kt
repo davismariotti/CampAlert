@@ -2,8 +2,12 @@ package com.davismariotti.campalert.service.email
 
 import com.davismariotti.campalert.config.EmailVerificationProperties
 import com.davismariotti.campalert.model.EmailVerification
+import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.notification.VerifyEmailNotification
+import com.davismariotti.campalert.notification.WelcomeNotification
 import com.davismariotti.campalert.repository.EmailVerificationRepository
 import com.davismariotti.campalert.repository.UserRepository
+import com.davismariotti.campalert.service.notification.NotificationService
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -18,9 +22,9 @@ import java.util.UUID
 class EmailVerificationService(
     private val emailVerificationRepository: EmailVerificationRepository,
     private val userRepository: UserRepository,
-    private val mailSender: MailSender,
     private val props: EmailVerificationProperties,
-    @Value("\${campfinder.email.frontend-base-url}") private val frontendBaseUrl: String,
+    private val notificationService: NotificationService,
+    @param:Value($$"${campfinder.email.frontend-base-url}") private val frontendBaseUrl: String,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val secureRandom = SecureRandom()
@@ -50,14 +54,14 @@ class EmailVerificationService(
         )
 
         try {
-            mailSender.send(
-                to = email,
-                subject = "Verify your CampAlert email",
-                template = "email/verify",
-                variables = mapOf(
-                    "code" to code,
-                    "verifyUrl" to "$frontendBaseUrl/verify-email?verificationId=$id",
-                    "expiryMinutes" to props.expiresIn.toMinutes().toString(),
+            val notificationUser = User(id = userId, email = email, passwordHash = "")
+            notificationService.send(
+                VerifyEmailNotification(
+                    user = notificationUser,
+                    code = code,
+                    verifyUrl = "$frontendBaseUrl/verify-email?verificationId=$id",
+                    expiryMinutes = props.expiresIn.toMinutes().toString(),
+                    frontendBaseUrl = frontendBaseUrl,
                 ),
             )
         } catch (e: Exception) {
@@ -135,6 +139,7 @@ class EmailVerificationService(
         val now = Instant.now()
         emailVerificationRepository.save(row.copy(consumedAt = now))
         userRepository.save(user.copy(emailVerifiedAt = now))
+        notificationService.sendAsync(WelcomeNotification(user, frontendBaseUrl))
         return VerifyResult.SUCCESS
     }
 

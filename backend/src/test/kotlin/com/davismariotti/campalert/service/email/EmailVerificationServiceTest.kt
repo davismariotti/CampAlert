@@ -3,16 +3,20 @@ package com.davismariotti.campalert.service.email
 import com.davismariotti.campalert.config.EmailVerificationProperties
 import com.davismariotti.campalert.model.EmailVerification
 import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.notification.Notification
+import com.davismariotti.campalert.notification.VerifyEmailNotification
+import com.davismariotti.campalert.notification.WelcomeNotification
 import com.davismariotti.campalert.repository.EmailVerificationRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.email.EmailVerificationService.VerifyResult
+import com.davismariotti.campalert.service.notification.NotificationService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyLong
-import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
@@ -28,7 +32,7 @@ import java.util.UUID
 class EmailVerificationServiceTest {
     private val emailVerificationRepository = mock(EmailVerificationRepository::class.java)
     private val userRepository = mock(UserRepository::class.java)
-    private val mailSender = InMemoryMailSender()
+    private val notificationService = mock(NotificationService::class.java)
     private val props = EmailVerificationProperties(
         expiresIn = Duration.ofMinutes(10),
         resendCooldown = Duration.ofSeconds(60),
@@ -37,23 +41,20 @@ class EmailVerificationServiceTest {
     private val service = EmailVerificationService(
         emailVerificationRepository = emailVerificationRepository,
         userRepository = userRepository,
-        mailSender = mailSender,
         props = props,
+        notificationService = notificationService,
         frontendBaseUrl = "http://localhost:5173",
     )
 
-    // Captures every save() call; populated by the setUp stubs so individual tests never override stubs.
     private val savedEmailVerifications = mutableListOf<EmailVerification>()
     private val savedUsers = mutableListOf<User>()
 
     @BeforeEach
     fun setUp() {
-        mailSender.reset()
         savedEmailVerifications.clear()
         savedUsers.clear()
 
         `when`(emailVerificationRepository.consumeAllPendingByUserId(anyLong(), anyKt())).thenReturn(0)
-        // Use safe-cast so re-invocation during stub setup (with null arg from anyKt()) doesn't crash.
         `when`(emailVerificationRepository.save(anyKt())).thenAnswer {
             (it.arguments[0] as? EmailVerification)?.also { row -> savedEmailVerifications.add(row) }
         }
@@ -65,25 +66,37 @@ class EmailVerificationServiceTest {
     // ── issueVerification ─────────────────────────────────────────────────────
 
     @Test
-    fun `issueVerification sends email with 6-digit code and verifyUrl`() {
+    fun `issueVerification sends VerifyEmailNotification with 6-digit code and verifyUrl`() {
+        val sent = mutableListOf<Notification>()
+        doAnswer {
+            sent.add(it.getArgument(0))
+            null
+        }.`when`(notificationService).send(anyKt())
+
         service.issueVerification(1L, "user@example.com")
 
-        assertEquals(1, mailSender.sent.size)
-        val msg = mailSender.sent[0]
-        assertEquals("user@example.com", msg.to)
-        assertEquals("email/verify", msg.template)
-
-        val code = msg.variables["code"] as String
+        assertEquals(1, sent.size)
+        val params = (sent[0] as VerifyEmailNotification).getEmailParameters()
+        val code = params["code"] as String
         assertTrue(code.matches(Regex("\\d{6}")), "code must be 6 digits, was: $code")
-        val verifyUrl = msg.variables["verifyUrl"] as String
-        assertTrue(verifyUrl.startsWith("http://localhost:5173/verify-email?verificationId="), "verifyUrl must include verificationId")
+        val verifyUrl = params["verifyUrl"] as String
+        assertTrue(
+            verifyUrl.startsWith("http://localhost:5173/verify-email?verificationId="),
+            "verifyUrl must include verificationId",
+        )
     }
 
     @Test
     fun `issueVerification stores SHA-256 hash of the generated code`() {
+        val sent = mutableListOf<Notification>()
+        doAnswer {
+            sent.add(it.getArgument(0))
+            null
+        }.`when`(notificationService).send(anyKt())
+
         service.issueVerification(1L, "user@example.com")
 
-        val sentCode = mailSender.sent[0].variables["code"] as String
+        val sentCode = (sent[0] as VerifyEmailNotification).getEmailParameters()["code"] as String
         assertEquals(1, savedEmailVerifications.size)
         assertEquals(service.sha256(sentCode), savedEmailVerifications[0].codeHash)
     }
@@ -99,17 +112,9 @@ class EmailVerificationServiceTest {
 
     @Test
     fun `issueVerification on delivery failure consumes the new row and still returns a verificationId`() {
-        val failingMailSender = mock(MailSender::class.java)
-        doThrow(RuntimeException("SMTP error")).`when`(failingMailSender).send(anyString(), anyString(), anyString(), anyKt())
-        val failService = EmailVerificationService(
-            emailVerificationRepository = emailVerificationRepository,
-            userRepository = userRepository,
-            mailSender = failingMailSender,
-            props = props,
-            frontendBaseUrl = "http://localhost:5173",
-        )
+        doThrow(RuntimeException("SMTP error")).`when`(notificationService).send(anyKt<VerifyEmailNotification>())
 
-        val id = failService.issueVerification(1L, "user@example.com")
+        val id = service.issueVerification(1L, "user@example.com")
 
         assertNotNull(id)
         // consumeAllPendingByUserId called twice: before save and on delivery failure
@@ -126,7 +131,7 @@ class EmailVerificationServiceTest {
 
         service.resendVerification("user@example.com")
 
-        assertEquals(1, mailSender.sent.size)
+        verify(notificationService).send(anyKt<VerifyEmailNotification>())
     }
 
     @Test
@@ -135,8 +140,8 @@ class EmailVerificationServiceTest {
 
         service.resendVerification("ghost@example.com")
 
-        assertEquals(0, mailSender.sent.size)
         verify(emailVerificationRepository, never()).save(anyKt())
+        verify(notificationService, never()).send(anyKt())
     }
 
     @Test
@@ -146,8 +151,8 @@ class EmailVerificationServiceTest {
 
         service.resendVerification("user@example.com")
 
-        assertEquals(0, mailSender.sent.size)
         verify(emailVerificationRepository, never()).save(anyKt())
+        verify(notificationService, never()).send(anyKt())
     }
 
     @Test
@@ -159,7 +164,7 @@ class EmailVerificationServiceTest {
 
         service.resendVerification("user@example.com")
 
-        assertEquals(0, mailSender.sent.size)
+        verify(notificationService, never()).send(anyKt())
     }
 
     @Test
@@ -171,11 +176,11 @@ class EmailVerificationServiceTest {
 
         service.resendVerification("user@example.com")
 
-        assertEquals(1, mailSender.sent.size)
+        verify(notificationService).send(anyKt<VerifyEmailNotification>())
         verify(emailVerificationRepository).consumeAllPendingByUserId(anyLong(), anyKt())
     }
 
-    // ensureVerificationForLogin
+    // ── ensureVerificationForLogin ─────────────────────────────────────────────
 
     @Test
     fun `ensureVerificationForLogin reuses a valid pending row`() {
@@ -185,8 +190,8 @@ class EmailVerificationServiceTest {
         val result = service.ensureVerificationForLogin(1L, "user@example.com")
 
         assertEquals(row.id, result)
-        assertEquals(0, mailSender.sent.size)
         verify(emailVerificationRepository, never()).consumeAllPendingByUserId(anyLong(), anyKt())
+        verify(notificationService, never()).send(anyKt())
     }
 
     @Test
@@ -196,7 +201,7 @@ class EmailVerificationServiceTest {
         val result = service.ensureVerificationForLogin(1L, "user@example.com")
 
         assertNotNull(result)
-        assertEquals(1, mailSender.sent.size)
+        verify(notificationService).send(anyKt<VerifyEmailNotification>())
         verify(emailVerificationRepository).consumeAllPendingByUserId(anyLong(), anyKt())
     }
 
@@ -214,6 +219,29 @@ class EmailVerificationServiceTest {
         assertEquals(VerifyResult.SUCCESS, result)
         assertEquals(1, savedUsers.size)
         assertNotNull(savedUsers[0].emailVerifiedAt)
+    }
+
+    @Test
+    fun `consumeVerification sends welcome email on first verification success`() {
+        val code = "123456"
+        val user = unverifiedUser()
+        val row = pendingRow(user.id!!, codeHash = service.sha256(code))
+        setupConsumeFlow(row, user)
+
+        service.consumeVerification(row.id, code)
+
+        verify(notificationService).sendAsync(anyKt<WelcomeNotification>())
+    }
+
+    @Test
+    fun `consumeVerification does not send welcome email for already-verified account`() {
+        val user = verifiedUser()
+        val row = pendingRow(user.id!!, codeHash = service.sha256("123456"))
+        setupConsumeFlow(row, user)
+
+        service.consumeVerification(row.id, "123456")
+
+        verify(notificationService, never()).sendAsync(anyKt())
     }
 
     @Test
@@ -280,12 +308,6 @@ class EmailVerificationServiceTest {
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    /**
-     * Bypasses Kotlin's `Intrinsics.checkNotNullExpressionValue` that fires when
-     * `ArgumentMatchers.any()` (null) is passed to a method expecting a non-nullable Kotlin type.
-     * Non-reified T means `null as T` is an unchecked cast — no runtime assertion is inserted,
-     * so the caller sees a non-nullable T and skips the call-site null check.
-     */
     @Suppress("UNCHECKED_CAST")
     private fun <T> anyKt(): T = org.mockito.ArgumentMatchers.any<T>() as T
 

@@ -3,16 +3,19 @@ package com.davismariotti.campalert.service.email
 import com.davismariotti.campalert.config.PasswordResetProperties
 import com.davismariotti.campalert.model.PasswordReset
 import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.notification.Notification
+import com.davismariotti.campalert.notification.ResetPasswordNotification
 import com.davismariotti.campalert.repository.PasswordResetRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.SessionRevocationService
 import com.davismariotti.campalert.service.email.PasswordResetService.ResetResult
+import com.davismariotti.campalert.service.notification.NotificationService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.ArgumentMatchers.anyLong
-import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.anyLong
+import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -29,7 +32,7 @@ import java.util.UUID
 class PasswordResetServiceTest {
     private val passwordResetRepository = mock(PasswordResetRepository::class.java)
     private val userRepository = mock(UserRepository::class.java)
-    private val mailSender = InMemoryMailSender()
+    private val notificationService = mock(NotificationService::class.java)
     private val passwordEncoder = BCryptPasswordEncoder()
     private val rememberMeTokenRepository = mock(PersistentTokenRepository::class.java)
     private val sessionRevocationService = mock(SessionRevocationService::class.java)
@@ -40,7 +43,7 @@ class PasswordResetServiceTest {
     private val service = PasswordResetService(
         passwordResetRepository = passwordResetRepository,
         userRepository = userRepository,
-        mailSender = mailSender,
+        notificationService = notificationService,
         passwordEncoder = passwordEncoder,
         rememberMeTokenRepository = rememberMeTokenRepository,
         sessionRevocationService = sessionRevocationService,
@@ -53,7 +56,6 @@ class PasswordResetServiceTest {
 
     @BeforeEach
     fun setUp() {
-        mailSender.reset()
         savedPasswordResets.clear()
         savedUsers.clear()
 
@@ -70,14 +72,19 @@ class PasswordResetServiceTest {
 
     @Test
     fun `forgotPassword issues reset to verified account outside cooldown`() {
+        val sent = mutableListOf<Notification>()
+        doAnswer {
+            sent.add(it.getArgument(0))
+            null
+        }.`when`(notificationService).send(anyKt())
         val user = verifiedUser()
         `when`(userRepository.findByEmail("user@example.com")).thenReturn(user)
         `when`(passwordResetRepository.findLatestByUserId(anyLong())).thenReturn(null)
 
         service.forgotPassword("user@example.com")
 
-        assertEquals(1, mailSender.sent.size)
-        assertEquals("email/reset-password", mailSender.sent[0].template)
+        assertEquals(1, sent.size)
+        assertEquals("email/reset-password", (sent[0] as ResetPasswordNotification).getEmailTemplate().get())
     }
 
     @Test
@@ -86,8 +93,8 @@ class PasswordResetServiceTest {
 
         service.forgotPassword("ghost@example.com")
 
-        assertEquals(0, mailSender.sent.size)
         verify(passwordResetRepository, never()).save(anyKt())
+        verify(notificationService, never()).send(anyKt())
     }
 
     @Test
@@ -97,8 +104,8 @@ class PasswordResetServiceTest {
 
         service.forgotPassword("user@example.com")
 
-        assertEquals(0, mailSender.sent.size)
         verify(passwordResetRepository, never()).save(anyKt())
+        verify(notificationService, never()).send(anyKt())
     }
 
     @Test
@@ -111,7 +118,7 @@ class PasswordResetServiceTest {
 
         service.forgotPassword("user@example.com")
 
-        assertEquals(0, mailSender.sent.size)
+        verify(notificationService, never()).send(anyKt())
     }
 
     @Test
@@ -124,29 +131,18 @@ class PasswordResetServiceTest {
 
         service.forgotPassword("user@example.com")
 
-        assertEquals(1, mailSender.sent.size)
+        verify(notificationService).send(anyKt<ResetPasswordNotification>())
         verify(passwordResetRepository).consumeAllPendingByUserId(anyLong(), anyKt())
     }
 
     @Test
     fun `forgotPassword returns normally on delivery failure (same public response)`() {
-        val failingMailSender = mock(MailSender::class.java)
-        doThrow(RuntimeException("SMTP error")).`when`(failingMailSender).send(anyString(), anyString(), anyString(), anyKt())
+        doThrow(RuntimeException("SMTP error")).`when`(notificationService).send(anyKt<ResetPasswordNotification>())
         val user = verifiedUser()
         `when`(userRepository.findByEmail("user@example.com")).thenReturn(user)
         `when`(passwordResetRepository.findLatestByUserId(anyLong())).thenReturn(null)
-        val failService = PasswordResetService(
-            passwordResetRepository = passwordResetRepository,
-            userRepository = userRepository,
-            mailSender = failingMailSender,
-            passwordEncoder = passwordEncoder,
-            rememberMeTokenRepository = rememberMeTokenRepository,
-            sessionRevocationService = sessionRevocationService,
-            props = props,
-            frontendBaseUrl = "http://localhost:5173",
-        )
 
-        failService.forgotPassword("user@example.com")
+        service.forgotPassword("user@example.com")
 
         // consumeAllPendingByUserId called twice: before save and on delivery failure
         verify(passwordResetRepository, times(2)).consumeAllPendingByUserId(anyLong(), anyKt())
@@ -155,22 +151,32 @@ class PasswordResetServiceTest {
     // ── issueReset ────────────────────────────────────────────────────────────
 
     @Test
-    fun `issueReset sends email with resetUrl containing resetId and token`() {
+    fun `issueReset sends ResetPasswordNotification with resetUrl containing resetId and token`() {
+        val sent = mutableListOf<Notification>()
+        doAnswer {
+            sent.add(it.getArgument(0))
+            null
+        }.`when`(notificationService).send(anyKt())
+
         service.issueReset(1L, "user@example.com")
 
-        assertEquals(1, mailSender.sent.size)
-        val msg = mailSender.sent[0]
-        assertEquals("user@example.com", msg.to)
-        val resetUrl = msg.variables["resetUrl"] as String
+        assertEquals(1, sent.size)
+        val resetUrl = (sent[0] as ResetPasswordNotification).getEmailParameters()["resetUrl"] as String
         assertTrue(resetUrl.startsWith("http://localhost:5173/reset-password?resetId="), "resetUrl must include resetId")
         assertTrue(resetUrl.contains("&token="), "resetUrl must include token")
     }
 
     @Test
     fun `issueReset stores SHA-256 hash of the generated token`() {
+        val sent = mutableListOf<Notification>()
+        doAnswer {
+            sent.add(it.getArgument(0))
+            null
+        }.`when`(notificationService).send(anyKt())
+
         service.issueReset(1L, "user@example.com")
 
-        val resetUrl = mailSender.sent[0].variables["resetUrl"] as String
+        val resetUrl = (sent[0] as ResetPasswordNotification).getEmailParameters()["resetUrl"] as String
         val token = resetUrl.substringAfter("&token=")
         assertEquals(1, savedPasswordResets.size)
         assertEquals(service.sha256(token), savedPasswordResets[0].tokenHash)
