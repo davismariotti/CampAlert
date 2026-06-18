@@ -4,19 +4,29 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { VerifyEmailPage } from '../features/auth/VerifyEmailPage'
+import { AuthProvider } from '../features/auth/AuthContext'
 import * as sdk from '../api/generated/sdk.gen'
+import type { AuthResponse } from '../api/generated/types.gen'
 
 const verificationId = '00000000-0000-0000-0000-000000000001'
+const verifiedAuth: AuthResponse = {
+  id: 1,
+  email: 'user@test.com',
+  timezone: 'America/Los_Angeles',
+  verificationStatus: 'VERIFIED'
+}
 
 function Wrapper({ initialEntry = `/verify-email?verificationId=${verificationId}` }: { initialEntry?: string }) {
   const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
   return (
     <MemoryRouter initialEntries={[initialEntry]}>
       <QueryClientProvider client={queryClient}>
-        <Routes>
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
-          <Route path="/" element={<div>Sign in destination</div>} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/" element={<div>Sign in destination</div>} />
+          </Routes>
+        </AuthProvider>
       </QueryClientProvider>
     </MemoryRouter>
   )
@@ -27,7 +37,7 @@ describe('VerifyEmailPage', () => {
 
   it('submits the URL verificationId and routes successful verification to sign in', async () => {
     const verifySpy = vi.spyOn(sdk, 'verifyEmail').mockResolvedValueOnce({
-      data: undefined
+      data: verifiedAuth
     } as Awaited<ReturnType<typeof sdk.verifyEmail>>)
     render(<Wrapper />)
 
@@ -59,16 +69,18 @@ describe('VerifyEmailPage', () => {
 
   it('falls back to a verificationId from navigation state', async () => {
     const verifySpy = vi.spyOn(sdk, 'verifyEmail').mockResolvedValueOnce({
-      data: undefined
+      data: verifiedAuth
     } as Awaited<ReturnType<typeof sdk.verifyEmail>>)
     const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
     render(
       <MemoryRouter initialEntries={[{ pathname: '/verify-email', state: { verificationId } }]}>
         <QueryClientProvider client={queryClient}>
-          <Routes>
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
-            <Route path="/" element={<div>Sign in destination</div>} />
-          </Routes>
+          <AuthProvider>
+            <Routes>
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/" element={<div>Sign in destination</div>} />
+            </Routes>
+          </AuthProvider>
         </QueryClientProvider>
       </MemoryRouter>
     )
