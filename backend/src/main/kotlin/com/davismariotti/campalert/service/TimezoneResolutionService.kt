@@ -20,7 +20,7 @@ class TimezoneResolutionService(
     private val ridbCb by lazy { circuitBreakerRegistry.circuitBreaker("ridb") }
 
     @Async("timezoneResolutionExecutor")
-    fun resolveAndPersistAsync(searchRequestId: Int, campsiteId: Int) {
+    fun resolveAndPersistAsync(searchRequestId: Long, campsiteId: Int) {
         try {
             val facilityResponse = ridbCb.executeSupplier { ridbApi.getFacility(campsiteId).execute() }
             val facility = facilityResponse.body()?.recdata

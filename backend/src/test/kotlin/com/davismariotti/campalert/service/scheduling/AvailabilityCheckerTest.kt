@@ -28,14 +28,16 @@ class AvailabilityCheckerTest {
     private val availabilityStateService = mock(AvailabilityStateService::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
 
+    private val executor = java.util.concurrent.Executors
+        .newSingleThreadExecutor()
+
     private val checker = AvailabilityChecker(
         searchRequestRepository,
         userRepository,
         recreationService,
         availabilityStateService,
         eventPublisher,
-        threadPoolSize = 1,
-        threadPoolQueueCapacity = 10,
+        executor,
     )
 
     private val futureDay = LocalDate.now(ZoneOffset.UTC).plusDays(1)
@@ -56,7 +58,7 @@ class AvailabilityCheckerTest {
     )
 
     private fun request(
-        id: Int = 1,
+        id: Long = 1L,
         userId: Long? = 1L,
         pauseReason: String? = null,
         startDay: LocalDate = futureDay,

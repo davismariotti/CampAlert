@@ -8,7 +8,7 @@ import com.davismariotti.campalert.service.availability.RecreationService
 import com.davismariotti.campalert.service.state.AvailabilityStateService
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Value
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import java.time.LocalDate
@@ -17,9 +17,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 
 @Service
@@ -29,10 +27,7 @@ class AvailabilityChecker(
     private val recreationService: RecreationService,
     private val availabilityStateService: AvailabilityStateService,
     private val eventPublisher: ApplicationEventPublisher,
-    @param:Value("\${campfinder.checker.thread-pool-size:20}")
-    private val threadPoolSize: Int,
-    @param:Value("\${campfinder.checker.thread-pool-queue-capacity:100}")
-    private val threadPoolQueueCapacity: Int,
+    @Qualifier("availabilityCheckerExecutor") private val executor: Executor,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -65,14 +60,6 @@ class AvailabilityChecker(
         // Tick-scoped dedup cache: (campsiteId, yearMonth) → Future<Campground>
         val cache = ConcurrentHashMap<Pair<Int, YearMonth>, CompletableFuture<Campground>>()
 
-        val executor = ThreadPoolExecutor(
-            threadPoolSize,
-            threadPoolSize,
-            0L,
-            TimeUnit.MILLISECONDS,
-            LinkedBlockingQueue(threadPoolQueueCapacity),
-            ThreadPoolExecutor.CallerRunsPolicy(),
-        )
         val futures = valid.map { request ->
             CompletableFuture.runAsync(
                 {
@@ -104,7 +91,6 @@ class AvailabilityChecker(
         }
 
         CompletableFuture.allOf(*futures.toTypedArray()).join()
-        executor.shutdown()
     }
 
     private fun today(campgroundTimezone: String?): LocalDate = LocalDate.now(campgroundTimezone?.let { ZoneId.of(it) } ?: ZoneOffset.UTC)

@@ -6,9 +6,9 @@ import net.pushover.client.PushoverRestClient
 import org.springframework.stereotype.Service
 
 @Service
-class PushoverNotificationService {
-    private val client = PushoverRestClient()
-
+class PushoverNotificationService(
+    private val client: PushoverRestClient,
+) {
     fun notify(user: User, message: String) {
         val apiToken = requireNotNull(user.pushoverApiToken) { "User ${user.id} has no Pushover API token" }
         val userKey = requireNotNull(user.pushoverUserKey) { "User ${user.id} has no Pushover user key" }

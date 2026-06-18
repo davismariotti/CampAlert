@@ -12,10 +12,10 @@ import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.PhoneNumberService
 import com.davismariotti.campalert.service.sms.TwilioVerifyService
 import com.davismariotti.campalert.service.sms.VerifyResult
+import com.davismariotti.campalert.util.currentUserId
 import com.twilio.exception.TwilioException
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
-import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -28,10 +28,7 @@ class PhoneNumbersDelegateImpl(
     private val twilioVerifyService: TwilioVerifyService,
     private val phoneNumberService: PhoneNumberService,
 ) : PhoneNumbersApiDelegate {
-    private fun currentUserId(): Long {
-        val email = SecurityContextHolder.getContext().authentication!!.name
-        return userRepository.findByEmail(email)!!.id!!
-    }
+    private fun currentUserId(): Long = currentUserId(userRepository)
 
     @PreAuthorize("isAuthenticated()")
     override fun listPhoneNumbers(): ResponseEntity<List<PhoneNumberResponse>> {

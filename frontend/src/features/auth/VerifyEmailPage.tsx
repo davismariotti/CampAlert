@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import type { AxiosError } from 'axios'
 import { resendVerification, verifyEmail } from '../../api/generated/sdk.gen'
 import type { ErrorResponse } from '../../api/generated/types.gen'
+import { useAuth } from './useAuth'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -19,10 +20,12 @@ export function VerifyEmailPage() {
   const [searchParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
+  const { login: storeAuth } = useAuth()
   const locationState = location.state as VerificationLocationState | null
   const verificationId = searchParams.get('verificationId') ?? locationState?.verificationId ?? ''
+  const urlCode = searchParams.get('code') ?? ''
   const [email, setEmail] = useState(locationState?.email ?? '')
-  const [code, setCode] = useState('')
+  const [code, setCode] = useState(urlCode)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [cooldown, setCooldown] = useState(0)
@@ -34,10 +37,14 @@ export function VerifyEmailPage() {
   }, [cooldown])
 
   const verifyMutation = useApiMutation({
-    mutationFn: async () => {
-      await verifyEmail({ body: { verificationId, code }, throwOnError: true })
+    mutationFn: async (codeToVerify: string) => {
+      const result = await verifyEmail({ body: { verificationId, code: codeToVerify }, throwOnError: true })
+      return result.data
     },
-    onSuccess: () => navigate('/?login=1', { replace: true }),
+    onSuccess: (data) => {
+      storeAuth(data)
+      navigate('/', { replace: true })
+    },
     onError: (err: AxiosError<ErrorResponse>) => {
       const errorCode = err.response?.data?.code
       if (errorCode === 'VERIFICATION_CODE_INVALID') {
@@ -49,6 +56,14 @@ export function VerifyEmailPage() {
       }
     }
   })
+
+  // Auto-submit when code is pre-filled from URL
+  useEffect(() => {
+    if (verificationId && urlCode && !verifyMutation.isPending && !verifyMutation.isSuccess) {
+      verifyMutation.mutate(urlCode)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const resendMutation = useApiMutation({
     mutationFn: async () => {
@@ -62,6 +77,15 @@ export function VerifyEmailPage() {
     onError: () => setError('Unable to request a new code. Please try again.')
   })
 
+  // Show loading state while auto-verifying from link
+  if (urlCode && verifyMutation.isPending) {
+    return (
+      <AuthPageShell>
+        <p className="text-sm text-forest-600">Verifying your email…</p>
+      </AuthPageShell>
+    )
+  }
+
   return (
     <AuthPageShell>
       <h1 className="mb-1 text-xl font-semibold text-forest-900">Verify your email</h1>
@@ -74,7 +98,7 @@ export function VerifyEmailPage() {
             event.preventDefault()
             setError(null)
             setMessage(null)
-            verifyMutation.mutate()
+            verifyMutation.mutate(code)
           }}
         >
           <Input

@@ -4,6 +4,7 @@ import com.davismariotti.campalert.api.model.LoginBody
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.security.RememberMeServices
+import com.davismariotti.campalert.security.UserDetailsServiceImpl
 import com.davismariotti.campalert.service.email.EmailVerificationService
 import com.davismariotti.campalert.service.email.PasswordResetService
 import jakarta.servlet.http.HttpServletRequest
@@ -46,6 +47,7 @@ class AuthLoginGatingTest {
         rememberMeServices = rememberMeServices,
         emailVerificationService = emailVerificationService,
         passwordResetService = passwordResetService,
+        userDetailsService = mock(UserDetailsServiceImpl::class.java),
     )
 
     @AfterEach
@@ -97,8 +99,13 @@ class AuthLoginGatingTest {
 
     @Test
     fun `login proceeds normally for verified account`() {
-        val auth = UsernamePasswordAuthenticationToken(
+        val userDetails = org.springframework.security.core.userdetails.User(
             "user@example.com",
+            "password",
+            listOf(SimpleGrantedAuthority("ROLE_USER"))
+        )
+        val auth = UsernamePasswordAuthenticationToken(
+            userDetails,
             null,
             listOf(SimpleGrantedAuthority("ROLE_USER")),
         )

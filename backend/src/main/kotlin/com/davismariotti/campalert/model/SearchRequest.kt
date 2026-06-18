@@ -2,6 +2,8 @@ package com.davismariotti.campalert.model
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
@@ -12,11 +14,11 @@ import java.time.Instant
 import java.time.LocalDate
 
 @Entity
-@Table(name = "search_requests_v2")
+@Table(name = "search_requests")
 data class SearchRequest(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Int? = null,
+    val id: Long? = null,
 
     @Column(name = "start_day")
     val startDay: LocalDate,
@@ -49,8 +51,9 @@ data class SearchRequest(
     @Column(name = "campground_name")
     val campgroundName: String = "",
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "last_availability_state")
-    val lastAvailabilityState: String? = null,
+    val lastAvailabilityState: AvailabilityState? = null,
 
     @Column(name = "user_paused", nullable = false)
     val userPaused: Boolean = false,

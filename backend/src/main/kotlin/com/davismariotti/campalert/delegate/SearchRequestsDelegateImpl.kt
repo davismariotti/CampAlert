@@ -14,9 +14,9 @@ import com.davismariotti.campalert.repository.SearchRequestCheckRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.TimezoneResolutionService
+import com.davismariotti.campalert.util.currentUserId
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
-import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 
 @Service
@@ -28,10 +28,7 @@ class SearchRequestsDelegateImpl(
     private val notificationOutboxRepository: NotificationOutboxRepository,
     private val timezoneResolutionService: TimezoneResolutionService,
 ) : SearchRequestsApiDelegate {
-    private fun currentUserId(): Long {
-        val email = SecurityContextHolder.getContext().authentication!!.name
-        return userRepository.findByEmail(email)!!.id!!
-    }
+    private fun currentUserId(): Long = currentUserId(userRepository)
 
     @PreAuthorize("isAuthenticated()")
     override fun listSearchRequests(completed: Boolean?): ResponseEntity<List<SearchRequestResponse>> {
@@ -41,7 +38,31 @@ class SearchRequestsDelegateImpl(
         } else {
             searchRequestRepository.findByUserId(userId)
         }
-        return ResponseEntity.ok(results.map { it.toResponse() })
+        if (results.isEmpty()) return ResponseEntity.ok(emptyList())
+
+        val ids = results.map { it.id!! }
+        val countStatsById = searchRequestCheckRepository.findCountStatsByRequestIds(ids).associateBy { it.getSearchRequestId() }
+        val avgWindowById = searchRequestCheckRepository.findAvgWindowByRequestIds(ids).associateBy { it.getSearchRequestId() }
+        val missedById = notificationOutboxRepository.findMissedWindowCountsByRequestIds(ids).associateBy { it.getRequestId() }
+
+        return ResponseEntity.ok(
+            results.map { request ->
+                val id = request.id!!
+                val counts = countStatsById[id]
+                val total = counts?.getTotalChecks() ?: 0L
+                val available = counts?.getAvailableChecks() ?: 0L
+                val avgWindow = avgWindowById[id]?.getAvgWindowMinutes() ?: 0.0
+                val missed = missedById[id]?.getMissedCount() ?: 0L
+                val stats = SearchRequestStats(
+                    totalChecks = total,
+                    availableChecks = available,
+                    avgAvailabilityWindowMinutes = avgWindow,
+                    missedQuietHoursWindows = missed,
+                    availabilityRate = if (total > 0) available.toDouble() / total.toDouble() else null,
+                )
+                request.toResponse(stats)
+            },
+        )
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -71,24 +92,24 @@ class SearchRequestsDelegateImpl(
         )
         val savedRequest = searchRequestRepository.save(entity)
         timezoneResolutionService.resolveAndPersistAsync(savedRequest.id!!, createSearchRequestBody.campsiteId)
-        return ResponseEntity.status(201).body(savedRequest.toResponse())
+        return ResponseEntity.status(201).body(savedRequest.toResponse(fetchStats(savedRequest.id!!)))
     }
 
     @PreAuthorize("isAuthenticated()")
-    override fun getSearchRequest(id: Int): ResponseEntity<SearchRequestResponse> {
+    override fun getSearchRequest(id: Long): ResponseEntity<SearchRequestResponse> {
         val userId = currentUserId()
         val entity = searchRequestRepository
             .findById(id)
             .orElse(null)
             ?.takeIf { it.userId == userId }
             ?: return ResponseEntity.notFound().build()
-        return ResponseEntity.ok(entity.toResponse())
+        return ResponseEntity.ok(entity.toResponse(fetchStats(id)))
     }
 
     @PreAuthorize("isAuthenticated()")
     override fun updateSearchRequest(
-        id: Int,
-        updateSearchRequestBody: UpdateSearchRequestBody
+        id: Long,
+        updateSearchRequestBody: UpdateSearchRequestBody,
     ): ResponseEntity<SearchRequestResponse> {
         val userId = currentUserId()
         val existing = searchRequestRepository
@@ -105,38 +126,37 @@ class SearchRequestsDelegateImpl(
             name = updateSearchRequestBody.name,
             completed = updateSearchRequestBody.completed,
         )
-        return ResponseEntity.ok(searchRequestRepository.save(updated).toResponse())
+        val saved = searchRequestRepository.save(updated)
+        return ResponseEntity.ok(saved.toResponse(fetchStats(id)))
     }
 
     @PreAuthorize("isAuthenticated()")
-    override fun deleteSearchRequest(id: Int): ResponseEntity<Unit> {
+    override fun deleteSearchRequest(id: Long): ResponseEntity<Unit> {
         val userId = currentUserId()
-        val entity = searchRequestRepository
+        searchRequestRepository
             .findById(id)
             .orElse(null)
             ?.takeIf { it.userId == userId }
             ?: return ResponseEntity.notFound().build()
-        searchRequestRepository.deleteById(entity.id!!)
+        searchRequestRepository.deleteById(id)
         return ResponseEntity.noContent().build()
     }
 
-    private fun SearchRequest.toResponse(): SearchRequestResponse {
-        val requestId = this.id ?: error("Cannot map unsaved search request")
+    private fun fetchStats(requestId: Long): SearchRequestStats {
         val total = searchRequestCheckRepository.countBySearchRequestId(requestId)
         val available = searchRequestCheckRepository.countAvailableBySearchRequestId(requestId)
-        val stats = SearchRequestStats(
+        return SearchRequestStats(
             totalChecks = total,
             availableChecks = available,
-            avgAvailabilityWindowMinutes = if (total > 0) {
-                searchRequestCheckRepository.computeAvgWindowMinutes(requestId)
-            } else {
-                0.0
-            },
+            avgAvailabilityWindowMinutes = if (total > 0) searchRequestCheckRepository.computeAvgWindowMinutes(requestId) else 0.0,
             missedQuietHoursWindows = notificationOutboxRepository.countMissedWindowsByRequestId(requestId),
             availabilityRate = if (total > 0) available.toDouble() / total.toDouble() else null,
         )
-        return SearchRequestResponse(
-            id = requestId,
+    }
+
+    private fun SearchRequest.toResponse(stats: SearchRequestStats): SearchRequestResponse =
+        SearchRequestResponse(
+            id = this.id ?: error("Cannot map unsaved search request"),
             startDay = this.startDay,
             nights = this.nights,
             groupSize = this.groupSize,
@@ -148,5 +168,4 @@ class SearchRequestsDelegateImpl(
             pauseReason = this.pauseReason,
             stats = stats,
         )
-    }
 }

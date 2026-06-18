@@ -10,6 +10,7 @@ import net.iakovlev.timeshape.TimeZoneEngine
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.anyInt
+import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -53,9 +54,9 @@ class TimezoneResolutionServiceTest {
             timeZoneEngine.query(37.8716, -122.2727)
         ).thenReturn(Optional.of(java.time.ZoneId.of("America/Los_Angeles")))
 
-        service.resolveAndPersistAsync(1, 10)
+        service.resolveAndPersistAsync(1L, 10)
 
-        verify(searchRequestRepository).updateTimezone(1, "America/Los_Angeles")
+        verify(searchRequestRepository).updateTimezone(1L, "America/Los_Angeles")
     }
 
     @Test
@@ -65,18 +66,18 @@ class TimezoneResolutionServiceTest {
         `when`(ridbApi.getFacility(10)).thenReturn(call as Call<RidbFacilityResponse>)
         `when`(call.execute()).thenThrow(RuntimeException("RIDB down"))
 
-        service.resolveAndPersistAsync(1, 10)
+        service.resolveAndPersistAsync(1L, 10)
 
-        verify(searchRequestRepository, never()).updateTimezone(anyInt(), org.mockito.Mockito.any())
+        verify(searchRequestRepository, never()).updateTimezone(anyLong(), org.mockito.Mockito.any())
     }
 
     @Test
     fun `circuit open logs warn and does not call repository`() {
         circuitBreakerRegistry.circuitBreaker("ridb").transitionToOpenState()
 
-        service.resolveAndPersistAsync(1, 10)
+        service.resolveAndPersistAsync(1L, 10)
 
-        verify(searchRequestRepository, never()).updateTimezone(anyInt(), org.mockito.Mockito.any())
+        verify(searchRequestRepository, never()).updateTimezone(anyLong(), org.mockito.Mockito.any())
         verify(ridbApi, never()).getFacility(anyInt())
     }
 

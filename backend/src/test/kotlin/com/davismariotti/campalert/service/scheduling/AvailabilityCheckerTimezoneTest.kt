@@ -28,13 +28,13 @@ class AvailabilityCheckerTimezoneTest {
         mock(RecreationService::class.java),
         mock(AvailabilityStateService::class.java),
         mock(ApplicationEventPublisher::class.java),
-        threadPoolSize = 1,
-        threadPoolQueueCapacity = 10,
+        java.util.concurrent.Executors
+            .newSingleThreadExecutor(),
     )
 
     private fun request(startDay: LocalDate, timezone: String?) =
         SearchRequest(
-            id = 1,
+            id = 1L,
             startDay = startDay,
             nights = 1,
             groupSize = 2,

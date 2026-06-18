@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.CrudRepository
 import org.springframework.transaction.annotation.Transactional
 
-interface SearchRequestRepository : CrudRepository<SearchRequest, Int> {
+interface SearchRequestRepository : CrudRepository<SearchRequest, Long> {
     fun findByCompletedFalse(): List<SearchRequest>
 
     fun findByCompleted(completed: Boolean): List<SearchRequest>
@@ -22,5 +22,5 @@ interface SearchRequestRepository : CrudRepository<SearchRequest, Int> {
     @Modifying
     @Transactional
     @Query("UPDATE SearchRequest r SET r.campgroundTimezone = :timezone WHERE r.id = :id")
-    fun updateTimezone(id: Int, timezone: String?)
+    fun updateTimezone(id: Long, timezone: String?)
 }

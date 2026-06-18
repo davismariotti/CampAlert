@@ -73,7 +73,11 @@ paths:
               $ref: '#/components/schemas/VerifyEmailBody'
       responses:
         "200":
-          description: Email verified
+          description: Email verified — session established, returns authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
         "422":
           description: Invalid code, expired, or attempt limit reached (code field contains VERIFICATION_CODE_INVALID, VERIFICATION_CODE_ATTEMPTS_EXCEEDED, or VERIFICATION_INVALID_OR_EXPIRED)
           content:
@@ -375,6 +379,7 @@ paths:
           required: true
           schema:
             type: integer
+            format: int64
       responses:
         "200":
           description: Search request
@@ -404,6 +409,7 @@ paths:
           required: true
           schema:
             type: integer
+            format: int64
       requestBody:
         required: true
         content:
@@ -445,6 +451,7 @@ paths:
           required: true
           schema:
             type: integer
+            format: int64
       responses:
         "204":
           description: Deleted
@@ -775,6 +782,7 @@ components:
       properties:
         id:
           type: integer
+          format: int64
         startDay:
           type: string
           format: date

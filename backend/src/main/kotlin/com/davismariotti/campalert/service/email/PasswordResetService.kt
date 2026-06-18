@@ -8,13 +8,13 @@ import com.davismariotti.campalert.repository.PasswordResetRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.SessionRevocationService
 import com.davismariotti.campalert.service.notification.NotificationService
+import com.davismariotti.campalert.util.CryptoUtils
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Duration
 import java.time.Instant
@@ -54,20 +54,15 @@ class PasswordResetService(
             ),
         )
 
-        try {
-            val notificationUser = User(id = userId, email = email, passwordHash = "")
-            notificationService.send(
-                ResetPasswordNotification(
-                    user = notificationUser,
-                    resetUrl = "$frontendBaseUrl/reset-password?resetId=$id&token=$token",
-                    expiryMinutes = props.expiresIn.toMinutes().toString(),
-                    frontendBaseUrl = frontendBaseUrl,
-                ),
-            )
-        } catch (e: Exception) {
-            log.warn("Password reset email delivery failed for userId={}", userId, e)
-            passwordResetRepository.consumeAllPendingByUserId(userId, Instant.now())
-        }
+        val notificationUser = User(id = userId, email = email, passwordHash = "")
+        notificationService.sendAsync(
+            ResetPasswordNotification(
+                user = notificationUser,
+                resetUrl = "$frontendBaseUrl/reset-password?resetId=$id&token=$token",
+                expiryMinutes = props.expiresIn.toMinutes().toString(),
+                frontendBaseUrl = frontendBaseUrl,
+            ),
+        )
 
         return id
     }
@@ -109,8 +104,5 @@ class PasswordResetService(
         return ResetResult.SUCCESS
     }
 
-    internal fun sha256(input: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
-        return bytes.joinToString("") { "%02x".format(it) }
-    }
+    internal fun sha256(input: String): String = CryptoUtils.sha256(input)
 }

@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.service.notification
 
+import com.davismariotti.campalert.model.PhoneNumber
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.notification.Notification
@@ -27,7 +28,8 @@ class NotificationService(
         }
     }
 
-    fun send(notification: Notification) {
+    /** Sends the notification and returns the PhoneNumber used for SMS, or null if Pushover or no SMS was sent. */
+    fun send(notification: Notification): PhoneNumber? {
         notification.getEmailTemplate().ifPresent { template ->
             mailSender.send(
                 notification.user.email,
@@ -36,21 +38,24 @@ class NotificationService(
                 notification.getEmailParameters(),
             )
         }
-        notification.getSmsContent().ifPresent { content ->
-            dispatchSms(notification.user, content)
-        }
+        return notification
+            .getSmsContent()
+            .map { content ->
+                dispatchSms(notification.user, content)
+            }.orElse(null)
     }
 
-    private fun dispatchSms(user: User, content: String) {
+    private fun dispatchSms(user: User, content: String): PhoneNumber? {
         if (user.pushoverOverrideEnabled && user.pushoverApiToken != null && user.pushoverUserKey != null) {
             pushoverNotificationService.notify(user, content)
-            return
+            return null
         }
         val phone = phoneNumberRepository.findByUserIdAndStatus(user.id!!, PhoneNumberStatus.VERIFIED).firstOrNull()
         if (phone == null) {
             log.warn("No verified phone for userId={}, skipping SMS", user.id)
-            return
+            return null
         }
         smsSender.send(phone.phone, content)
+        return phone
     }
 }

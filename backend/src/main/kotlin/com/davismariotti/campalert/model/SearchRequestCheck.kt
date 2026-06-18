@@ -16,7 +16,7 @@ data class SearchRequestCheck(
     val id: Long? = null,
 
     @Column(name = "search_request_id", nullable = false)
-    val searchRequestId: Int,
+    val searchRequestId: Long,
 
     @Column(name = "checked_at", nullable = false)
     val checkedAt: Instant,

@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.security
 
+import jakarta.annotation.PostConstruct
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
@@ -29,6 +30,13 @@ class SecurityConfig(
     @Value("\${campfinder.security.remember-me-key}")
     private val rememberMeKey: String,
 ) {
+    @PostConstruct
+    fun validateRememberMeKey() {
+        check(rememberMeKey != "change-me-in-production") {
+            "campfinder.security.remember-me-key must be changed from the default value before starting"
+        }
+    }
+
     @Bean
     fun passwordEncoder(): BCryptPasswordEncoder = BCryptPasswordEncoder()
 
