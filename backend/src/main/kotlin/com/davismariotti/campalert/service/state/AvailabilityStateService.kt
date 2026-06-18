@@ -1,6 +1,8 @@
 package com.davismariotti.campalert.service.state
 
+import com.davismariotti.campalert.model.AvailabilityState
 import com.davismariotti.campalert.model.NotificationOutbox
+import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.SearchRequestCheck
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
@@ -29,7 +31,7 @@ class AvailabilityStateService(
         val request = result.searchRequest
         val hasAvailable = result.hasAvailableSites
         val currentState = request.lastAvailabilityState
-        val newState = if (hasAvailable) "AVAILABLE" else "UNAVAILABLE"
+        val newState = if (hasAvailable) AvailabilityState.AVAILABLE else AvailabilityState.UNAVAILABLE
 
         searchRequestCheckRepository.save(
             SearchRequestCheck(
@@ -40,20 +42,20 @@ class AvailabilityStateService(
             ),
         )
 
-        val outboxType: String? = when {
+        val outboxType: OutboxType? = when {
             // null → AVAILABLE or UNAVAILABLE → AVAILABLE: alert
-            (currentState == null || currentState == "UNAVAILABLE") && hasAvailable -> "AVAILABLE"
+            (currentState == null || currentState == AvailabilityState.UNAVAILABLE) && hasAvailable -> OutboxType.AVAILABLE
 
             // AVAILABLE → UNAVAILABLE: gone alert; clears pause/reminder state
-            currentState == "AVAILABLE" && !hasAvailable -> "UNAVAILABLE"
+            currentState == AvailabilityState.AVAILABLE && !hasAvailable -> OutboxType.UNAVAILABLE
 
             // AVAILABLE → AVAILABLE: reminder if eligible
-            currentState == "AVAILABLE" && hasAvailable -> {
+            currentState == AvailabilityState.AVAILABLE && hasAvailable -> {
                 when {
                     request.userPaused -> null
                     request.reminderSentAt != null -> null
                     request.lastNotifiedAt == null -> null
-                    Duration.between(request.lastNotifiedAt, now) > Duration.ofMinutes(30) -> "REMINDER"
+                    Duration.between(request.lastNotifiedAt, now) > Duration.ofMinutes(30) -> OutboxType.REMINDER
                     else -> null
                 }
             }
@@ -63,10 +65,10 @@ class AvailabilityStateService(
         }
 
         var updated = request.copy(lastAvailabilityState = newState)
-        if (currentState == "AVAILABLE" && !hasAvailable) {
+        if (currentState == AvailabilityState.AVAILABLE && !hasAvailable) {
             updated = updated.copy(userPaused = false, reminderSentAt = null)
         }
-        if (outboxType == "REMINDER") {
+        if (outboxType == OutboxType.REMINDER) {
             updated = updated.copy(reminderSentAt = now)
         }
         searchRequestRepository.save(updated)

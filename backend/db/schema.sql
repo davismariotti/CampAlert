@@ -15,9 +15,10 @@ CREATE TABLE "public"."users" (
   PRIMARY KEY ("id"),
   UNIQUE ("email")
 );
--- Create "search_requests_v2" table
-CREATE TABLE "public"."search_requests_v2" (
-  "id" serial NOT NULL,
+-- Create "search_requests" table
+-- atlas:renamed_from search_requests_v2
+CREATE TABLE "public"."search_requests" (
+  "id" bigserial NOT NULL,
   "start_day" date NOT NULL,
   "nights" integer NOT NULL,
   "group_size" integer NOT NULL,
@@ -34,25 +35,27 @@ CREATE TABLE "public"."search_requests_v2" (
   "reminder_sent_at" timestamptz NULL,
   "campground_timezone" character varying(64) NULL,
   PRIMARY KEY ("id"),
-  CONSTRAINT "fk_search_requests_v2_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id")
+  -- atlas:renamed_from fk_search_requests_v2_user
+  CONSTRAINT "fk_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
+  CONSTRAINT "chk_search_requests_last_availability_state" CHECK (last_availability_state IN ('AVAILABLE', 'UNAVAILABLE'))
 );
-CREATE INDEX ON "public"."search_requests_v2" ("user_id");
+CREATE INDEX ON "public"."search_requests" ("user_id");
 -- Create "search_request_checks" table
 CREATE TABLE "public"."search_request_checks" (
   "id" bigserial NOT NULL,
-  "search_request_id" integer NOT NULL,
+  "search_request_id" bigint NOT NULL,
   "checked_at" timestamptz NOT NULL,
   "available" boolean NOT NULL,
   "available_site_count" integer NOT NULL,
   PRIMARY KEY ("id"),
-  CONSTRAINT "fk_src_search_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests_v2" ("id") ON DELETE CASCADE
+  CONSTRAINT "fk_src_search_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests" ("id") ON DELETE CASCADE
 );
 CREATE INDEX ON "public"."search_request_checks" ("search_request_id");
 -- Create "notification_outbox" table
 CREATE TABLE "public"."notification_outbox" (
   "id" bigserial NOT NULL,
   "user_id" bigint NOT NULL,
-  "request_id" integer NOT NULL,
+  "request_id" bigint NOT NULL,
   "type" character varying(16) NOT NULL,
   "send_after" timestamptz NOT NULL,
   "sent_at" timestamptz NULL,
@@ -61,7 +64,8 @@ CREATE TABLE "public"."notification_outbox" (
   "attempt_count" integer NOT NULL DEFAULT 0,
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_outbox_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
-  CONSTRAINT "fk_outbox_request" FOREIGN KEY ("request_id") REFERENCES "public"."search_requests_v2" ("id") ON DELETE CASCADE
+  CONSTRAINT "fk_outbox_request" FOREIGN KEY ("request_id") REFERENCES "public"."search_requests" ("id") ON DELETE CASCADE,
+  CONSTRAINT "chk_outbox_type" CHECK (type IN ('AVAILABLE', 'UNAVAILABLE', 'REMINDER'))
 );
 CREATE INDEX ON "public"."notification_outbox" ("send_after") WHERE sent_at IS NULL AND missed_at IS NULL;
 CREATE INDEX ON "public"."notification_outbox" ("request_id");

@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.service.notification
 
+import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.notification.CampsiteAlertNotification
@@ -13,7 +14,7 @@ class CampsiteAlertNotificationTest {
     private val user = User(id = 1L, email = "user@example.com", passwordHash = "hash")
 
     private val request = SearchRequest(
-        id = 1,
+        id = 1L,
         startDay = LocalDate.now().plusDays(10),
         nights = 2,
         groupSize = 2,
@@ -25,7 +26,7 @@ class CampsiteAlertNotificationTest {
 
     @Test
     fun `getSmsContent includes campground name, date range, and URL for available alert`() {
-        val notifications = listOf(PendingNotification(request = request, type = "AVAILABLE", outboxId = 1L))
+        val notifications = listOf(PendingNotification(request = request, type = OutboxType.AVAILABLE, outboxId = 1L))
         val notification = CampsiteAlertNotification(user, available = notifications, gone = emptyList())
 
         val content = notification.getSmsContent()
@@ -42,8 +43,8 @@ class CampsiteAlertNotificationTest {
     fun `getSmsContent includes count header for multiple available alerts`() {
         val req2 = request.copy(id = 2, campsiteId = 100, campgroundName = "Yosemite Valley")
         val notifications = listOf(
-            PendingNotification(request = request, type = "AVAILABLE", outboxId = 1L),
-            PendingNotification(request = req2, type = "AVAILABLE", outboxId = 2L),
+            PendingNotification(request = request, type = OutboxType.AVAILABLE, outboxId = 1L),
+            PendingNotification(request = req2, type = OutboxType.AVAILABLE, outboxId = 2L),
         )
         val notification = CampsiteAlertNotification(user, available = notifications, gone = emptyList())
 
@@ -56,7 +57,7 @@ class CampsiteAlertNotificationTest {
 
     @Test
     fun `getSmsContent includes unavailability message for gone alerts`() {
-        val notifications = listOf(PendingNotification(request = request, type = "UNAVAILABLE", outboxId = 1L))
+        val notifications = listOf(PendingNotification(request = request, type = OutboxType.UNAVAILABLE, outboxId = 1L))
         val notification = CampsiteAlertNotification(user, available = emptyList(), gone = notifications)
 
         val body = notification.getSmsContent().get()
@@ -79,8 +80,8 @@ class CampsiteAlertNotificationTest {
         val goneReq = request.copy(id = 2, campgroundName = "Lower Pines")
         val notification = CampsiteAlertNotification(
             user,
-            available = listOf(PendingNotification(request = availableReq, type = "AVAILABLE", outboxId = 1L)),
-            gone = listOf(PendingNotification(request = goneReq, type = "UNAVAILABLE", outboxId = 2L)),
+            available = listOf(PendingNotification(request = availableReq, type = OutboxType.AVAILABLE, outboxId = 1L)),
+            gone = listOf(PendingNotification(request = goneReq, type = OutboxType.UNAVAILABLE, outboxId = 2L)),
         )
 
         val body = notification.getSmsContent().get()

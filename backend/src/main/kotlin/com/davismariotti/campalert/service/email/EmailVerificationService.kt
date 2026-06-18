@@ -8,11 +8,12 @@ import com.davismariotti.campalert.notification.WelcomeNotification
 import com.davismariotti.campalert.repository.EmailVerificationRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.notification.NotificationService
+import com.davismariotti.campalert.util.CryptoUtils
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Duration
 import java.time.Instant
@@ -25,6 +26,7 @@ class EmailVerificationService(
     private val props: EmailVerificationProperties,
     private val notificationService: NotificationService,
     @param:Value($$"${campfinder.email.frontend-base-url}") private val frontendBaseUrl: String,
+    @Lazy private val self: EmailVerificationService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val secureRandom = SecureRandom()
@@ -53,34 +55,20 @@ class EmailVerificationService(
             ),
         )
 
-        try {
-            val notificationUser = User(id = userId, email = email, passwordHash = "")
-            notificationService.send(
-                VerifyEmailNotification(
-                    user = notificationUser,
-                    code = code,
-                    verifyUrl = "$frontendBaseUrl/verify-email?verificationId=$id",
-                    expiryMinutes = props.expiresIn.toMinutes().toString(),
-                    frontendBaseUrl = frontendBaseUrl,
-                ),
-            )
-        } catch (e: Exception) {
-            log.warn("Verification email delivery failed for userId={}", userId)
-            emailVerificationRepository.consumeAllPendingByUserId(userId, Instant.now())
-        }
+        val notificationUser = User(id = userId, email = email, passwordHash = "")
+        notificationService.sendAsync(
+            VerifyEmailNotification(
+                user = notificationUser,
+                code = code,
+                verifyUrl = "$frontendBaseUrl/verify-email?verificationId=$id&code=$code",
+                expiryMinutes = props.expiresIn.toMinutes().toString(),
+                frontendBaseUrl = frontendBaseUrl,
+            ),
+        )
 
         return id
     }
 
-    /**
-     * Issues a replacement code for an unverified account. Enforces the resend cooldown.
-     * Always returns normally — never surfaces whether an account exists.
-     *
-     * Note: calls issueVerification on the same bean instance (self-call bypasses the @Transactional
-     * proxy). The individual repository operations inside issueVerification each participate in their
-     * own transaction via @Modifying/@Transactional on the repository methods, which is sufficient
-     * for this use case.
-     */
     fun resendVerification(email: String) {
         val user = userRepository.findByEmail(email) ?: return
         if (user.emailVerifiedAt != null) return
@@ -89,7 +77,7 @@ class EmailVerificationService(
         val latest = emailVerificationRepository.findLatestByUserId(userId)
         if (latest != null && Duration.between(latest.createdAt, Instant.now()) < props.resendCooldown) return
 
-        issueVerification(userId, user.email)
+        self.issueVerification(userId, user.email)
     }
 
     fun ensureVerificationForLogin(userId: Long, email: String): UUID {
@@ -107,44 +95,47 @@ class EmailVerificationService(
         return issueVerification(userId, email)
     }
 
+    data class VerifyOutcome(
+        val result: VerifyResult,
+        val user: User? = null
+    )
+
     /**
      * Validates the submitted code against the pending email_verifications row.
      * Increments attempt count on wrong code; consumes and marks user verified on success.
+     * Returns the verified User on SUCCESS so the caller can establish a session.
      */
     @Transactional
-    fun consumeVerification(verificationId: UUID, code: String): VerifyResult {
+    fun consumeVerification(verificationId: UUID, code: String): VerifyOutcome {
         val row = emailVerificationRepository.findPendingByIdForUpdate(verificationId)
-            ?: return VerifyResult.INVALID_OR_EXPIRED
+            ?: return VerifyOutcome(VerifyResult.INVALID_OR_EXPIRED)
 
         if (row.expiresAt.isBefore(Instant.now())) {
-            return VerifyResult.INVALID_OR_EXPIRED
+            return VerifyOutcome(VerifyResult.INVALID_OR_EXPIRED)
         }
 
         val user = userRepository.findById(row.userId).orElseThrow()
 
         if (user.emailVerifiedAt != null) {
             emailVerificationRepository.save(row.copy(consumedAt = Instant.now()))
-            return VerifyResult.SUCCESS
+            return VerifyOutcome(VerifyResult.SUCCESS, user)
         }
 
         if (row.attempts.toInt() >= props.maxAttempts) {
-            return VerifyResult.ATTEMPTS_EXCEEDED
+            return VerifyOutcome(VerifyResult.ATTEMPTS_EXCEEDED)
         }
 
         if (sha256(code) != row.codeHash) {
             emailVerificationRepository.save(row.copy(attempts = (row.attempts + 1).toShort()))
-            return VerifyResult.WRONG_CODE
+            return VerifyOutcome(VerifyResult.WRONG_CODE)
         }
 
         val now = Instant.now()
         emailVerificationRepository.save(row.copy(consumedAt = now))
-        userRepository.save(user.copy(emailVerifiedAt = now))
-        notificationService.sendAsync(WelcomeNotification(user, frontendBaseUrl))
-        return VerifyResult.SUCCESS
+        val verifiedUser = userRepository.save(user.copy(emailVerifiedAt = now))
+        notificationService.sendAsync(WelcomeNotification(verifiedUser, frontendBaseUrl))
+        return VerifyOutcome(VerifyResult.SUCCESS, verifiedUser)
     }
 
-    internal fun sha256(input: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
-        return bytes.joinToString("") { "%02x".format(it) }
-    }
+    internal fun sha256(input: String): String = CryptoUtils.sha256(input)
 }

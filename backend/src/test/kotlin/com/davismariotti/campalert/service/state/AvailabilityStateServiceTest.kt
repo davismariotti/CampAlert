@@ -1,6 +1,8 @@
 package com.davismariotti.campalert.service.state
 
+import com.davismariotti.campalert.model.AvailabilityState
 import com.davismariotti.campalert.model.NotificationOutbox
+import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestCheck
 import com.davismariotti.campalert.model.User
@@ -30,12 +32,12 @@ class AvailabilityStateServiceTest {
     private val user = User(id = 1L, email = "a@b.com", passwordHash = "x", timezone = "UTC")
 
     private fun request(
-        state: String? = null,
+        state: AvailabilityState? = null,
         paused: Boolean = false,
         lastNotified: Instant? = null,
-        reminderSent: Instant? = null
+        reminderSent: Instant? = null,
     ) = SearchRequest(
-        id = 10,
+        id = 10L,
         startDay = LocalDate.now().plusDays(5),
         nights = 2,
         groupSize = 2,
@@ -78,12 +80,12 @@ class AvailabilityStateServiceTest {
 
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
         verify(outboxRepository).save(captor.capture())
-        assertEquals("AVAILABLE", captor.value.type)
+        assertEquals(OutboxType.AVAILABLE, captor.value.type)
     }
 
     @Test
     fun `UNAVAILABLE to AVAILABLE inserts AVAILABLE outbox row`() {
-        val req = request(state = "UNAVAILABLE")
+        val req = request(state = AvailabilityState.UNAVAILABLE)
         `when`(checkRepository.save(any(SearchRequestCheck::class.java))).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
         `when`(outboxRepository.save(any(NotificationOutbox::class.java))).thenAnswer { it.arguments[0] }
@@ -92,12 +94,12 @@ class AvailabilityStateServiceTest {
 
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
         verify(outboxRepository).save(captor.capture())
-        assertEquals("AVAILABLE", captor.value.type)
+        assertEquals(OutboxType.AVAILABLE, captor.value.type)
     }
 
     @Test
     fun `AVAILABLE to UNAVAILABLE inserts UNAVAILABLE row and clears paused and reminderSentAt`() {
-        val req = request(state = "AVAILABLE", paused = true, reminderSent = Instant.now())
+        val req = request(state = AvailabilityState.AVAILABLE, paused = true, reminderSent = Instant.now())
         `when`(checkRepository.save(any(SearchRequestCheck::class.java))).thenAnswer { it.arguments[0] }
         `when`(outboxRepository.save(any(NotificationOutbox::class.java))).thenAnswer { it.arguments[0] }
 
@@ -108,7 +110,7 @@ class AvailabilityStateServiceTest {
 
         val outboxCaptor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
         verify(outboxRepository).save(outboxCaptor.capture())
-        assertEquals("UNAVAILABLE", outboxCaptor.value.type)
+        assertEquals(OutboxType.UNAVAILABLE, outboxCaptor.value.type)
 
         val savedReq = savedCaptor.value
         assertEquals(false, savedReq.userPaused)
@@ -118,7 +120,7 @@ class AvailabilityStateServiceTest {
     @Test
     fun `AVAILABLE to AVAILABLE with reminder eligibility inserts REMINDER row`() {
         val thirtyOneMinutesAgo = Instant.now().minus(Duration.ofMinutes(31))
-        val req = request(state = "AVAILABLE", lastNotified = thirtyOneMinutesAgo)
+        val req = request(state = AvailabilityState.AVAILABLE, lastNotified = thirtyOneMinutesAgo)
         `when`(checkRepository.save(any(SearchRequestCheck::class.java))).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
         `when`(outboxRepository.save(any(NotificationOutbox::class.java))).thenAnswer { it.arguments[0] }
@@ -127,22 +129,20 @@ class AvailabilityStateServiceTest {
 
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
         verify(outboxRepository).save(captor.capture())
-        assertEquals("REMINDER", captor.value.type)
+        assertEquals(OutboxType.REMINDER, captor.value.type)
     }
 
     @Test
     fun `AVAILABLE to AVAILABLE with user_paused inserts no outbox row`() {
-        val req = request(state = "AVAILABLE", paused = true)
+        val req = request(state = AvailabilityState.AVAILABLE, paused = true)
         `when`(checkRepository.save(any(SearchRequestCheck::class.java))).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
 
         service.processUserResults(listOf(result(req, true)), user)
 
         org.mockito.Mockito
-            .verify(
-                outboxRepository,
-                org.mockito.Mockito.never()
-            ).save(any(NotificationOutbox::class.java))
+            .verify(outboxRepository, org.mockito.Mockito.never())
+            .save(any(NotificationOutbox::class.java))
     }
 
     @Test
@@ -154,18 +154,14 @@ class AvailabilityStateServiceTest {
         service.processUserResults(listOf(result(req, false)), user)
 
         org.mockito.Mockito
-            .verify(
-                outboxRepository,
-                org.mockito.Mockito.never()
-            ).save(any(NotificationOutbox::class.java))
+            .verify(outboxRepository, org.mockito.Mockito.never())
+            .save(any(NotificationOutbox::class.java))
     }
 
     @Test
     fun `quiet hours defers send_after to 6am local`() {
-        // 3am UTC is inside quiet hours for UTC user
         val threeAm = Instant.parse("2024-06-15T03:00:00Z")
         val sendAfter = service.computeSendAfter(threeAm, "UTC")
-        // Should be 6am same day UTC
         assertEquals(Instant.parse("2024-06-15T06:00:00Z"), sendAfter)
     }
 

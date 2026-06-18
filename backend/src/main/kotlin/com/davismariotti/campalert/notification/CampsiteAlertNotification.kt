@@ -1,12 +1,13 @@
 package com.davismariotti.campalert.notification
 
+import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.User
 import java.util.Optional
 
 data class PendingNotification(
     val request: SearchRequest,
-    val type: String,
+    val type: OutboxType,
     val outboxId: Long,
 )
 

@@ -1,6 +1,8 @@
 package com.davismariotti.campalert.service.notification
 
+import com.davismariotti.campalert.model.AvailabilityState
 import com.davismariotti.campalert.model.NotificationOutbox
+import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.notification.CampsiteAlertNotification
 import com.davismariotti.campalert.notification.PendingNotification
@@ -71,15 +73,18 @@ class CampsiteAlertDispatcher(
             phones.first()
         }
 
+        val requestById = searchRequestRepository.findAllById(rows.map { it.requestId }).associateBy { it.id!! }
         val rowById = rows.associateBy { it.id!! }
         val toSend = mutableListOf<PendingNotification>()
         rows.forEach { row ->
-            val request = searchRequestRepository.findById(row.requestId).orElse(null)
+            val request = requestById[row.requestId]
             if (request == null) {
                 notificationOutboxRepository.save(row.copy(missedAt = now))
                 return@forEach
             }
-            if ((row.type == "AVAILABLE" || row.type == "REMINDER") && request.lastAvailabilityState == "UNAVAILABLE") {
+            if ((row.type == OutboxType.AVAILABLE || row.type == OutboxType.REMINDER) &&
+                request.lastAvailabilityState == AvailabilityState.UNAVAILABLE
+            ) {
                 notificationOutboxRepository.save(row.copy(missedAt = now))
                 return@forEach
             }
@@ -88,24 +93,24 @@ class CampsiteAlertDispatcher(
 
         if (toSend.isEmpty()) return
 
-        val available = toSend.filter { it.type == "AVAILABLE" || it.type == "REMINDER" }
-        val gone = toSend.filter { it.type == "UNAVAILABLE" }
+        val available = toSend.filter { it.type == OutboxType.AVAILABLE || it.type == OutboxType.REMINDER }
+        val gone = toSend.filter { it.type == OutboxType.UNAVAILABLE }
         val notification = CampsiteAlertNotification(user, available, gone)
 
         try {
-            notificationService.send(notification)
+            val usedPhone = notificationService.send(notification)
             toSend.forEach { n ->
                 notificationOutboxRepository.save(rowById[n.outboxId]!!.copy(sentAt = now))
-                if (n.type == "AVAILABLE" || n.type == "REMINDER") {
+                if (n.type == OutboxType.AVAILABLE || n.type == OutboxType.REMINDER) {
                     searchRequestRepository.save(n.request.copy(lastNotifiedAt = now))
                 }
             }
-            if (smsPhone != null) {
+            if (usedPhone != null) {
                 val contextIds = toSend
-                    .filter { it.type == "AVAILABLE" || it.type == "REMINDER" }
+                    .filter { it.type == OutboxType.AVAILABLE || it.type == OutboxType.REMINDER }
                     .map { it.request.id!! }
                 if (contextIds.isNotEmpty()) {
-                    smsConversationService.setContext(smsPhone.phone, contextIds)
+                    smsConversationService.setContext(usedPhone.phone, contextIds)
                 }
             }
         } catch (e: Exception) {

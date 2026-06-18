@@ -3,6 +3,7 @@ package com.davismariotti.campalert
 import net.javacrumbs.shedlock.core.LockProvider
 import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider
 import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan
 import org.springframework.boot.runApplication
@@ -11,6 +12,7 @@ import org.springframework.core.task.TaskExecutor
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.scheduling.annotation.EnableAsync
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+import java.util.concurrent.ThreadPoolExecutor
 import javax.sql.DataSource
 
 @SpringBootApplication
@@ -27,6 +29,20 @@ class CampFinderApplication {
                 .usingDbTime()
                 .build(),
         )
+
+    @Bean("availabilityCheckerExecutor")
+    fun availabilityCheckerExecutor(
+        @Value("\${campfinder.checker.thread-pool-size:20}") poolSize: Int,
+        @Value("\${campfinder.checker.thread-pool-queue-capacity:100}") queueCapacity: Int,
+    ): TaskExecutor =
+        ThreadPoolTaskExecutor().apply {
+            corePoolSize = poolSize
+            maxPoolSize = poolSize
+            this.queueCapacity = queueCapacity
+            setRejectedExecutionHandler(ThreadPoolExecutor.CallerRunsPolicy())
+            setThreadNamePrefix("availability-checker-")
+            initialize()
+        }
 
     @Bean("timezoneResolutionExecutor")
     fun timezoneResolutionExecutor(): TaskExecutor =

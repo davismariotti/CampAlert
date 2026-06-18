@@ -11,18 +11,18 @@ class SmsConversationService(
     private val redisTemplate: StringRedisTemplate,
     private val objectMapper: ObjectMapper,
 ) {
-    fun getContext(phone: String): List<Int>? {
+    fun getContext(phone: String): List<Long>? {
         val json = redisTemplate.opsForValue().get(contextKey(phone)) ?: return null
-        val map = objectMapper.readValue(json, object : TypeReference<Map<String, List<Int>>>() {})
+        val map = objectMapper.readValue(json, object : TypeReference<Map<String, List<Long>>>() {})
         return map["requestIds"]
     }
 
-    fun setContext(phone: String, requestIds: List<Int>) {
+    fun setContext(phone: String, requestIds: List<Long>) {
         val json = objectMapper.writeValueAsString(mapOf("requestIds" to requestIds))
         redisTemplate.opsForValue().set(contextKey(phone), json, 24, TimeUnit.HOURS)
     }
 
-    fun setAwaiting(phone: String, intent: String, requestIds: List<Int>) {
+    fun setAwaiting(phone: String, intent: String, requestIds: List<Long>) {
         val json = objectMapper.writeValueAsString(AwaitingContext(intent = intent, requestIds = requestIds))
         redisTemplate.opsForValue().set(awaitingKey(phone), json, 10, TimeUnit.MINUTES)
     }

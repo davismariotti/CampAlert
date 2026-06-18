@@ -14,6 +14,7 @@ import com.davismariotti.campalert.api.model.VerificationStatus
 import com.davismariotti.campalert.api.model.VerifyEmailBody
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.security.RememberMeServices
+import com.davismariotti.campalert.security.UserDetailsServiceImpl
 import com.davismariotti.campalert.service.email.EmailVerificationService
 import com.davismariotti.campalert.service.email.EmailVerificationService.VerifyResult
 import com.davismariotti.campalert.service.email.PasswordResetService
@@ -27,6 +28,7 @@ import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.AuthenticationException
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
 import org.springframework.stereotype.Service
@@ -43,6 +45,7 @@ class AuthDelegateImpl(
     private val rememberMeServices: RememberMeServices,
     private val emailVerificationService: EmailVerificationService,
     private val passwordResetService: PasswordResetService,
+    private val userDetailsService: UserDetailsServiceImpl,
 ) : AuthApiDelegate {
     override fun register(registerBody: RegisterBody): ResponseEntity<RegisterResponse> {
         if (userRepository.findByEmail(registerBody.email) != null) {
@@ -89,11 +92,8 @@ class AuthDelegateImpl(
                 as ResponseEntity<AuthResponse>
         }
 
-        val context = SecurityContextHolder.createEmptyContext()
-        context.authentication = auth
-        SecurityContextHolder.setContext(context)
-        val session = request.getSession(true)
-        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context)
+        val userDetails = auth.principal as UserDetails
+        establishSession(userDetails)
 
         if (loginBody.rememberMe == true) {
             rememberMeServices.loginSuccessForced(request, response, auth)
@@ -132,25 +132,41 @@ class AuthDelegateImpl(
     }
 
     @Suppress("UNCHECKED_CAST")
-    override fun verifyEmail(verifyEmailBody: VerifyEmailBody): ResponseEntity<Unit> =
-        when (emailVerificationService.consumeVerification(verifyEmailBody.verificationId, verifyEmailBody.code)) {
-            VerifyResult.SUCCESS -> ResponseEntity.ok().build()
+    override fun verifyEmail(verifyEmailBody: VerifyEmailBody): ResponseEntity<AuthResponse> {
+        val outcome = emailVerificationService.consumeVerification(verifyEmailBody.verificationId, verifyEmailBody.code)
+        return when (outcome.result) {
+            VerifyResult.SUCCESS -> {
+                val user = outcome.user!!
+                val userDetails = userDetailsService.loadUserByUsername(user.email)
+                establishSession(userDetails)
+                ResponseEntity.ok(user.toAuthResponse())
+            }
             VerifyResult.ATTEMPTS_EXCEEDED ->
                 ResponseEntity
                     .status(HttpStatus.UNPROCESSABLE_ENTITY)
                     .body(ErrorResponse(message = "Attempt limit reached", code = "VERIFICATION_CODE_ATTEMPTS_EXCEEDED"))
-                    as ResponseEntity<Unit>
+                    as ResponseEntity<AuthResponse>
             VerifyResult.WRONG_CODE ->
                 ResponseEntity
                     .status(HttpStatus.UNPROCESSABLE_ENTITY)
                     .body(ErrorResponse(message = "Invalid verification code", code = "VERIFICATION_CODE_INVALID"))
-                    as ResponseEntity<Unit>
+                    as ResponseEntity<AuthResponse>
             VerifyResult.INVALID_OR_EXPIRED ->
                 ResponseEntity
                     .status(HttpStatus.UNPROCESSABLE_ENTITY)
                     .body(ErrorResponse(message = "Verification link is invalid or expired", code = "VERIFICATION_INVALID_OR_EXPIRED"))
-                    as ResponseEntity<Unit>
+                    as ResponseEntity<AuthResponse>
         }
+    }
+
+    private fun establishSession(userDetails: UserDetails) {
+        val auth = UsernamePasswordAuthenticationToken(userDetails, null, userDetails.authorities)
+        val context = SecurityContextHolder.createEmptyContext()
+        context.authentication = auth
+        SecurityContextHolder.setContext(context)
+        val session = request.getSession(true)
+        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context)
+    }
 
     override fun forgotPassword(forgotPasswordBody: ForgotPasswordBody): ResponseEntity<Unit> {
         passwordResetService.forgotPassword(forgotPasswordBody.email)

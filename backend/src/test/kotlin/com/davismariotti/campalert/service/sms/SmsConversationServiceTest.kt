@@ -39,7 +39,7 @@ class SmsConversationServiceTest {
     fun `getContext returns request IDs from Redis`() {
         `when`(valueOps.get("sms:context:+15550001234"))
             .thenReturn("""{"requestIds":[1,2]}""")
-        assertEquals(listOf(1, 2), service.getContext("+15550001234"))
+        assertEquals(listOf(1L, 2L), service.getContext("+15550001234"))
     }
 
     @Test
@@ -62,7 +62,7 @@ class SmsConversationServiceTest {
             .thenReturn("""{"intent":"PAUSE","requestIds":[3]}""")
         val ctx = service.getAwaiting("+15550001234")!!
         assertEquals("PAUSE", ctx.intent)
-        assertEquals(listOf(3), ctx.requestIds)
+        assertEquals(listOf(3L), ctx.requestIds)
     }
 
     @Test

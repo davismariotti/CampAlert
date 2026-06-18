@@ -16,10 +16,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.doAnswer
-import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
-import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
@@ -76,7 +74,7 @@ class PasswordResetServiceTest {
         doAnswer {
             sent.add(it.getArgument(0))
             null
-        }.`when`(notificationService).send(anyKt())
+        }.`when`(notificationService).sendAsync(anyKt())
         val user = verifiedUser()
         `when`(userRepository.findByEmail("user@example.com")).thenReturn(user)
         `when`(passwordResetRepository.findLatestByUserId(anyLong())).thenReturn(null)
@@ -94,7 +92,7 @@ class PasswordResetServiceTest {
         service.forgotPassword("ghost@example.com")
 
         verify(passwordResetRepository, never()).save(anyKt())
-        verify(notificationService, never()).send(anyKt())
+        verify(notificationService, never()).sendAsync(anyKt())
     }
 
     @Test
@@ -105,7 +103,7 @@ class PasswordResetServiceTest {
         service.forgotPassword("user@example.com")
 
         verify(passwordResetRepository, never()).save(anyKt())
-        verify(notificationService, never()).send(anyKt())
+        verify(notificationService, never()).sendAsync(anyKt())
     }
 
     @Test
@@ -118,7 +116,7 @@ class PasswordResetServiceTest {
 
         service.forgotPassword("user@example.com")
 
-        verify(notificationService, never()).send(anyKt())
+        verify(notificationService, never()).sendAsync(anyKt())
     }
 
     @Test
@@ -131,21 +129,20 @@ class PasswordResetServiceTest {
 
         service.forgotPassword("user@example.com")
 
-        verify(notificationService).send(anyKt<ResetPasswordNotification>())
+        verify(notificationService).sendAsync(anyKt<ResetPasswordNotification>())
         verify(passwordResetRepository).consumeAllPendingByUserId(anyLong(), anyKt())
     }
 
     @Test
-    fun `forgotPassword returns normally on delivery failure (same public response)`() {
-        doThrow(RuntimeException("SMTP error")).`when`(notificationService).send(anyKt<ResetPasswordNotification>())
+    fun `forgotPassword issues sendAsync and saves reset row`() {
         val user = verifiedUser()
         `when`(userRepository.findByEmail("user@example.com")).thenReturn(user)
         `when`(passwordResetRepository.findLatestByUserId(anyLong())).thenReturn(null)
 
         service.forgotPassword("user@example.com")
 
-        // consumeAllPendingByUserId called twice: before save and on delivery failure
-        verify(passwordResetRepository, times(2)).consumeAllPendingByUserId(anyLong(), anyKt())
+        verify(notificationService).sendAsync(anyKt<ResetPasswordNotification>())
+        assertEquals(1, savedPasswordResets.size)
     }
 
     // ── issueReset ────────────────────────────────────────────────────────────
@@ -156,7 +153,7 @@ class PasswordResetServiceTest {
         doAnswer {
             sent.add(it.getArgument(0))
             null
-        }.`when`(notificationService).send(anyKt())
+        }.`when`(notificationService).sendAsync(anyKt())
 
         service.issueReset(1L, "user@example.com")
 
@@ -172,7 +169,7 @@ class PasswordResetServiceTest {
         doAnswer {
             sent.add(it.getArgument(0))
             null
-        }.`when`(notificationService).send(anyKt())
+        }.`when`(notificationService).sendAsync(anyKt())
 
         service.issueReset(1L, "user@example.com")
 

@@ -17,11 +17,9 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.Mockito.doAnswer
-import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
-import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import java.time.Duration
@@ -33,6 +31,7 @@ class EmailVerificationServiceTest {
     private val emailVerificationRepository = mock(EmailVerificationRepository::class.java)
     private val userRepository = mock(UserRepository::class.java)
     private val notificationService = mock(NotificationService::class.java)
+    private val mockSelf = mock(EmailVerificationService::class.java)
     private val props = EmailVerificationProperties(
         expiresIn = Duration.ofMinutes(10),
         resendCooldown = Duration.ofSeconds(60),
@@ -44,6 +43,7 @@ class EmailVerificationServiceTest {
         props = props,
         notificationService = notificationService,
         frontendBaseUrl = "http://localhost:5173",
+        self = mockSelf,
     )
 
     private val savedEmailVerifications = mutableListOf<EmailVerification>()
@@ -71,7 +71,7 @@ class EmailVerificationServiceTest {
         doAnswer {
             sent.add(it.getArgument(0))
             null
-        }.`when`(notificationService).send(anyKt())
+        }.`when`(notificationService).sendAsync(anyKt())
 
         service.issueVerification(1L, "user@example.com")
 
@@ -92,7 +92,7 @@ class EmailVerificationServiceTest {
         doAnswer {
             sent.add(it.getArgument(0))
             null
-        }.`when`(notificationService).send(anyKt())
+        }.`when`(notificationService).sendAsync(anyKt())
 
         service.issueVerification(1L, "user@example.com")
 
@@ -110,17 +110,6 @@ class EmailVerificationServiceTest {
         ordered.verify(emailVerificationRepository).save(anyKt())
     }
 
-    @Test
-    fun `issueVerification on delivery failure consumes the new row and still returns a verificationId`() {
-        doThrow(RuntimeException("SMTP error")).`when`(notificationService).send(anyKt<VerifyEmailNotification>())
-
-        val id = service.issueVerification(1L, "user@example.com")
-
-        assertNotNull(id)
-        // consumeAllPendingByUserId called twice: before save and on delivery failure
-        verify(emailVerificationRepository, times(2)).consumeAllPendingByUserId(anyLong(), anyKt())
-    }
-
     // ── resendVerification ────────────────────────────────────────────────────
 
     @Test
@@ -131,7 +120,7 @@ class EmailVerificationServiceTest {
 
         service.resendVerification("user@example.com")
 
-        verify(notificationService).send(anyKt<VerifyEmailNotification>())
+        verify(mockSelf).issueVerification(user.id!!, user.email)
     }
 
     @Test
@@ -141,7 +130,7 @@ class EmailVerificationServiceTest {
         service.resendVerification("ghost@example.com")
 
         verify(emailVerificationRepository, never()).save(anyKt())
-        verify(notificationService, never()).send(anyKt())
+        verify(mockSelf, never()).issueVerification(anyLong(), anyKt())
     }
 
     @Test
@@ -152,7 +141,7 @@ class EmailVerificationServiceTest {
         service.resendVerification("user@example.com")
 
         verify(emailVerificationRepository, never()).save(anyKt())
-        verify(notificationService, never()).send(anyKt())
+        verify(mockSelf, never()).issueVerification(anyLong(), anyKt())
     }
 
     @Test
@@ -164,7 +153,7 @@ class EmailVerificationServiceTest {
 
         service.resendVerification("user@example.com")
 
-        verify(notificationService, never()).send(anyKt())
+        verify(mockSelf, never()).issueVerification(anyLong(), anyKt())
     }
 
     @Test
@@ -176,8 +165,7 @@ class EmailVerificationServiceTest {
 
         service.resendVerification("user@example.com")
 
-        verify(notificationService).send(anyKt<VerifyEmailNotification>())
-        verify(emailVerificationRepository).consumeAllPendingByUserId(anyLong(), anyKt())
+        verify(mockSelf).issueVerification(user.id!!, user.email)
     }
 
     // ── ensureVerificationForLogin ─────────────────────────────────────────────
@@ -191,7 +179,7 @@ class EmailVerificationServiceTest {
 
         assertEquals(row.id, result)
         verify(emailVerificationRepository, never()).consumeAllPendingByUserId(anyLong(), anyKt())
-        verify(notificationService, never()).send(anyKt())
+        verify(notificationService, never()).sendAsync(anyKt())
     }
 
     @Test
@@ -201,7 +189,7 @@ class EmailVerificationServiceTest {
         val result = service.ensureVerificationForLogin(1L, "user@example.com")
 
         assertNotNull(result)
-        verify(notificationService).send(anyKt<VerifyEmailNotification>())
+        verify(notificationService).sendAsync(anyKt<VerifyEmailNotification>())
         verify(emailVerificationRepository).consumeAllPendingByUserId(anyLong(), anyKt())
     }
 
@@ -214,9 +202,9 @@ class EmailVerificationServiceTest {
         val row = pendingRow(user.id!!, codeHash = service.sha256(code))
         setupConsumeFlow(row, user)
 
-        val result = service.consumeVerification(row.id, code)
+        val outcome = service.consumeVerification(row.id, code)
 
-        assertEquals(VerifyResult.SUCCESS, result)
+        assertEquals(VerifyResult.SUCCESS, outcome.result)
         assertEquals(1, savedUsers.size)
         assertNotNull(savedUsers[0].emailVerifiedAt)
     }
@@ -250,9 +238,9 @@ class EmailVerificationServiceTest {
         val row = pendingRow(user.id!!, codeHash = service.sha256("999999"))
         setupConsumeFlow(row, user)
 
-        val result = service.consumeVerification(row.id, "123456")
+        val outcome = service.consumeVerification(row.id, "123456")
 
-        assertEquals(VerifyResult.WRONG_CODE, result)
+        assertEquals(VerifyResult.WRONG_CODE, outcome.result)
         assertEquals(1, savedEmailVerifications.size)
         assertEquals(1.toShort(), savedEmailVerifications[0].attempts)
         assertTrue(savedUsers.isEmpty())
@@ -264,9 +252,9 @@ class EmailVerificationServiceTest {
         val row = pendingRow(user.id!!, codeHash = service.sha256("999999"), attempts = 5)
         setupConsumeFlow(row, user)
 
-        val result = service.consumeVerification(row.id, "123456")
+        val outcome = service.consumeVerification(row.id, "123456")
 
-        assertEquals(VerifyResult.ATTEMPTS_EXCEEDED, result)
+        assertEquals(VerifyResult.ATTEMPTS_EXCEEDED, outcome.result)
         assertTrue(savedEmailVerifications.isEmpty())
         assertTrue(savedUsers.isEmpty())
     }
@@ -275,9 +263,9 @@ class EmailVerificationServiceTest {
     fun `consumeVerification returns INVALID_OR_EXPIRED for unknown verificationId`() {
         `when`(emailVerificationRepository.findPendingByIdForUpdate(anyKt())).thenReturn(null)
 
-        val result = service.consumeVerification(UUID.randomUUID(), "123456")
+        val outcome = service.consumeVerification(UUID.randomUUID(), "123456")
 
-        assertEquals(VerifyResult.INVALID_OR_EXPIRED, result)
+        assertEquals(VerifyResult.INVALID_OR_EXPIRED, outcome.result)
     }
 
     @Test
@@ -286,9 +274,9 @@ class EmailVerificationServiceTest {
         val row = pendingRow(user.id!!, expiresAt = Instant.now().minusSeconds(1))
         setupConsumeFlow(row, user)
 
-        val result = service.consumeVerification(row.id, "123456")
+        val outcome = service.consumeVerification(row.id, "123456")
 
-        assertEquals(VerifyResult.INVALID_OR_EXPIRED, result)
+        assertEquals(VerifyResult.INVALID_OR_EXPIRED, outcome.result)
         assertTrue(savedEmailVerifications.isEmpty())
     }
 
@@ -298,9 +286,9 @@ class EmailVerificationServiceTest {
         val row = pendingRow(user.id!!, codeHash = service.sha256("123456"))
         setupConsumeFlow(row, user)
 
-        val result = service.consumeVerification(row.id, "123456")
+        val outcome = service.consumeVerification(row.id, "123456")
 
-        assertEquals(VerifyResult.SUCCESS, result)
+        assertEquals(VerifyResult.SUCCESS, outcome.result)
         assertEquals(1, savedEmailVerifications.size)
         assertNotNull(savedEmailVerifications[0].consumedAt)
         assertTrue(savedUsers.isEmpty())

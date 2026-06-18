@@ -37,12 +37,26 @@ interface NotificationOutboxRepository : JpaRepository<NotificationOutbox, Long>
         @Param("claimedAt") claimedAt: Instant,
     ): Int
 
-    fun findByRequestId(requestId: Int): List<NotificationOutbox>
+    fun findByRequestId(requestId: Long): List<NotificationOutbox>
 
     @Query(
-        "SELECT COUNT(n) FROM NotificationOutbox n WHERE n.requestId = :id AND n.type = 'AVAILABLE' AND n.missedAt IS NOT NULL"
+        "SELECT COUNT(n) FROM NotificationOutbox n WHERE n.requestId = :id AND n.type = 'AVAILABLE' AND n.missedAt IS NOT NULL",
     )
     fun countMissedWindowsByRequestId(
-        @Param("id") id: Int
+        @Param("id") id: Long,
     ): Long
+
+    @Query(
+        """
+        SELECT n.requestId AS requestId, COUNT(n) AS missedCount
+        FROM NotificationOutbox n
+        WHERE n.requestId IN :ids
+          AND n.type = 'AVAILABLE'
+          AND n.missedAt IS NOT NULL
+        GROUP BY n.requestId
+        """,
+    )
+    fun findMissedWindowCountsByRequestIds(
+        @Param("ids") ids: List<Long>,
+    ): List<MissedWindowsProjection>
 }

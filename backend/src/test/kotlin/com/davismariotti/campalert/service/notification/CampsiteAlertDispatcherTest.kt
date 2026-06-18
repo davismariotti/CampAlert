@@ -1,6 +1,8 @@
 package com.davismariotti.campalert.service.notification
 
+import com.davismariotti.campalert.model.AvailabilityState
 import com.davismariotti.campalert.model.NotificationOutbox
+import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.PhoneNumber
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
@@ -67,7 +69,7 @@ class CampsiteAlertDispatcherTest {
         `when`(userRepo.findById(42L)).thenReturn(Optional.of(smsUser))
     }
 
-    private fun request(id: Int, state: String = "AVAILABLE") =
+    private fun request(id: Long, state: AvailabilityState = AvailabilityState.AVAILABLE) =
         SearchRequest(
             id = id,
             startDay = LocalDate.now().plusDays(5),
@@ -80,7 +82,7 @@ class CampsiteAlertDispatcherTest {
             lastAvailabilityState = state,
         )
 
-    private fun outboxRow(id: Long, requestId: Int, type: String) =
+    private fun outboxRow(id: Long, requestId: Long, type: OutboxType) =
         NotificationOutbox(
             id = id,
             userId = 42L,
@@ -91,7 +93,7 @@ class CampsiteAlertDispatcherTest {
 
     @Test
     fun `0 rows claimed skips processing`() {
-        val rows = listOf(outboxRow(1L, 10, "AVAILABLE"))
+        val rows = listOf(outboxRow(1L, 10L, OutboxType.AVAILABLE))
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(0)
 
         invokeProcessUser(42L, rows, Instant.now())
@@ -101,11 +103,11 @@ class CampsiteAlertDispatcherTest {
 
     @Test
     fun `stale AVAILABLE row is marked missedAt`() {
-        val req = request(10, state = "UNAVAILABLE")
-        val row = outboxRow(1L, 10, "AVAILABLE")
+        val req = request(10L, state = AvailabilityState.UNAVAILABLE)
+        val row = outboxRow(1L, 10L, OutboxType.AVAILABLE)
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(1)
         `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
-        `when`(searchRequestRepo.findById(10)).thenReturn(Optional.of(req))
+        `when`(searchRequestRepo.findAllById(anyK())).thenReturn(listOf(req))
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
         invokeProcessUser(42L, listOf(row), Instant.now())
@@ -119,14 +121,13 @@ class CampsiteAlertDispatcherTest {
 
     @Test
     fun `multiple AVAILABLE rows sent as single aggregated notification`() {
-        val req1 = request(10)
-        val req2 = request(11)
-        val row1 = outboxRow(1L, 10, "AVAILABLE")
-        val row2 = outboxRow(2L, 11, "AVAILABLE")
+        val req1 = request(10L)
+        val req2 = request(11L)
+        val row1 = outboxRow(1L, 10L, OutboxType.AVAILABLE)
+        val row2 = outboxRow(2L, 11L, OutboxType.AVAILABLE)
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(2)
         `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
-        `when`(searchRequestRepo.findById(10)).thenReturn(Optional.of(req1))
-        `when`(searchRequestRepo.findById(11)).thenReturn(Optional.of(req2))
+        `when`(searchRequestRepo.findAllById(anyK())).thenReturn(listOf(req1, req2))
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
@@ -137,11 +138,11 @@ class CampsiteAlertDispatcherTest {
 
     @Test
     fun `successful send marks outbox rows as sentAt`() {
-        val req = request(10)
-        val row = outboxRow(1L, 10, "AVAILABLE")
+        val req = request(10L)
+        val row = outboxRow(1L, 10L, OutboxType.AVAILABLE)
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(1)
         `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
-        `when`(searchRequestRepo.findById(10)).thenReturn(Optional.of(req))
+        `when`(searchRequestRepo.findAllById(anyK())).thenReturn(listOf(req))
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
@@ -154,11 +155,11 @@ class CampsiteAlertDispatcherTest {
 
     @Test
     fun `send failure clears claimedAt and increments attemptCount`() {
-        val req = request(10)
-        val row = outboxRow(1L, 10, "AVAILABLE")
+        val req = request(10L)
+        val row = outboxRow(1L, 10L, OutboxType.AVAILABLE)
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(1)
         `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
-        `when`(searchRequestRepo.findById(10)).thenReturn(Optional.of(req))
+        `when`(searchRequestRepo.findAllById(anyK())).thenReturn(listOf(req))
         doThrow(RuntimeException("Send failed")).`when`(notificationService).send(anyK())
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
@@ -172,7 +173,7 @@ class CampsiteAlertDispatcherTest {
 
     @Test
     fun `no verified phone marks rows missedAt`() {
-        val row = outboxRow(1L, 10, "AVAILABLE")
+        val row = outboxRow(1L, 10L, OutboxType.AVAILABLE)
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(1)
         `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(emptyList())
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }

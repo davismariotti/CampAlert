@@ -2,6 +2,8 @@ package com.davismariotti.campalert.model
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
@@ -19,10 +21,11 @@ data class NotificationOutbox(
     val userId: Long,
 
     @Column(name = "request_id", nullable = false)
-    val requestId: Int,
+    val requestId: Long,
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false)
-    val type: String,
+    val type: OutboxType,
 
     @Column(name = "send_after", nullable = false)
     val sendAfter: Instant,
