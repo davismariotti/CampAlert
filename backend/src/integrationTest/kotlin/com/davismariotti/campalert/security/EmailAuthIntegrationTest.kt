@@ -161,8 +161,9 @@ class EmailAuthIntegrationTest : IntegrationTestBase() {
     @Test
     fun `reset-password does not set a session cookie`() {
         registerAndLogin()
+        val emailCount = sentEmailVarsList.size
         doPost("/api/auth/forgot-password", body = ForgotPasswordBody(email = "user@test.com"))
-        val resetUrl = sentEmailVarsList.last()["resetUrl"] as String
+        val resetUrl = latestEmailVar("resetUrl", emailCount) as String
         val resetId = resetUrl.substringAfter("resetId=").substringBefore("&token=")
         val token = resetUrl.substringAfter("&token=")
         val result = doPost(
@@ -192,7 +193,7 @@ class EmailAuthIntegrationTest : IntegrationTestBase() {
     @Test
     fun `resend-verification replaces prior code and new code works`() {
         val firstVerificationId = registerOnly()
-        val firstCode = sentEmailVarsList.last()["code"] as String
+        val firstCode = verificationCodeFor(firstVerificationId)
 
         // Wait for cooldown (resend throttles within 60s by default, but we can trigger via direct call bypassing cooldown isn't easy)
         // Instead, verify that the resend endpoint itself doesn't error and the new code works.
@@ -203,7 +204,7 @@ class EmailAuthIntegrationTest : IntegrationTestBase() {
 
         // The first code was consumed by the resend (prior pending rows are invalidated).
         // Try the first code — it may have been consumed. Try the latest code instead.
-        val currentCode = sentEmailVarsList.last()["code"] as? String
+        val currentCode = latestEmailVar("code") as? String
         if (currentCode != null && currentCode != firstCode) {
             // A new code was sent (cooldown elapsed or cooldown not enforced in test timing).
             val result = doPost(
@@ -220,9 +221,10 @@ class EmailAuthIntegrationTest : IntegrationTestBase() {
     fun `full password reset flow - forgot-password then reset-password allows login with new password`() {
         registerAndLogin()
 
+        val emailCount = sentEmailVarsList.size
         doPost("/api/auth/forgot-password", body = ForgotPasswordBody(email = "user@test.com"))
 
-        val resetUrl = sentEmailVarsList.last()["resetUrl"] as String
+        val resetUrl = latestEmailVar("resetUrl", emailCount) as String
         val resetId = resetUrl.substringAfter("resetId=").substringBefore("&token=")
         val token = resetUrl.substringAfter("&token=")
 
@@ -244,9 +246,10 @@ class EmailAuthIntegrationTest : IntegrationTestBase() {
     fun `reset-password with same password returns 422 RESET_PASSWORD_SAME_AS_CURRENT`() {
         registerAndLogin()
 
+        val emailCount = sentEmailVarsList.size
         doPost("/api/auth/forgot-password", body = ForgotPasswordBody(email = "user@test.com"))
 
-        val resetUrl = sentEmailVarsList.last()["resetUrl"] as String
+        val resetUrl = latestEmailVar("resetUrl", emailCount) as String
         val resetId = resetUrl.substringAfter("resetId=").substringBefore("&token=")
         val token = resetUrl.substringAfter("&token=")
 
@@ -262,9 +265,10 @@ class EmailAuthIntegrationTest : IntegrationTestBase() {
     fun `reset-password replay returns 422 RESET_INVALID_OR_EXPIRED`() {
         registerAndLogin()
 
+        val emailCount = sentEmailVarsList.size
         doPost("/api/auth/forgot-password", body = ForgotPasswordBody(email = "user@test.com"))
 
-        val resetUrl = sentEmailVarsList.last()["resetUrl"] as String
+        val resetUrl = latestEmailVar("resetUrl", emailCount) as String
         val resetId = UUID.fromString(resetUrl.substringAfter("resetId=").substringBefore("&token="))
         val token = resetUrl.substringAfter("&token=")
 

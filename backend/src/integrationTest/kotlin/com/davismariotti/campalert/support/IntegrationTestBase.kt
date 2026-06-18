@@ -34,6 +34,7 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.postgresql.PostgreSQLContainer
 import tools.jackson.databind.ObjectMapper
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
@@ -100,7 +101,7 @@ open class IntegrationTestBase {
     protected lateinit var mapper: ObjectMapper
 
     /** All variables maps passed to mailSender.send() during this test, in the order they were sent. */
-    protected val sentEmailVarsList = mutableListOf<Map<String, Any>>()
+    protected val sentEmailVarsList = CopyOnWriteArrayList<Map<String, Any>>()
 
     @BeforeEach
     fun resetState() {
@@ -174,6 +175,35 @@ open class IntegrationTestBase {
 
     protected fun extractId(result: MvcResult): Long = mapper.readTree(result.response.contentAsString).get("id").asLong()
 
+    protected fun latestEmailVar(key: String, startIndex: Int = 0): Any {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (System.currentTimeMillis() < deadline) {
+            sentEmailVarsList
+                .drop(startIndex)
+                .asReversed()
+                .firstOrNull { it.containsKey(key) }
+                ?.get(key)
+                ?.let { return it }
+            Thread.sleep(25)
+        }
+        val capturedKeys = sentEmailVarsList.map { it.keys }.joinToString()
+        error("No email captured with key '$key'. Captured keys: $capturedKeys")
+    }
+
+    protected fun verificationCodeFor(verificationId: String): String {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (System.currentTimeMillis() < deadline) {
+            val emailVars =
+                sentEmailVarsList
+                    .asReversed()
+                    .firstOrNull { (it["verifyUrl"] as? String)?.contains("verificationId=$verificationId") == true }
+            (emailVars?.get("code") as? String)?.let { return it }
+            Thread.sleep(25)
+        }
+        val verifyUrls = sentEmailVarsList.mapNotNull { it["verifyUrl"] as? String }
+        error("No verification email captured for verificationId '$verificationId'. Captured verifyUrls: $verifyUrls")
+    }
+
     /** Registers a new account and returns the verificationId from the 201 response body. */
     protected fun registerOnly(email: String = "user@test.com", password: String = "password1"): String {
         val result = doPost(
@@ -188,8 +218,7 @@ open class IntegrationTestBase {
      * Call after registerOnly() to complete the verification step.
      */
     protected fun verifyLatestEmail(verificationId: String): MvcResult {
-        val code = sentEmailVarsList.lastOrNull()?.get("code") as? String
-            ?: error("No verification email captured — did registerOnly() run first?")
+        val code = verificationCodeFor(verificationId)
         return doPost(
             "/api/auth/verify-email",
             body = VerifyEmailBody(verificationId = UUID.fromString(verificationId), code = code),
