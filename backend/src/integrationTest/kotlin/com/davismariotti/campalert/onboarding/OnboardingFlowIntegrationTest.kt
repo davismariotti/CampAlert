@@ -135,7 +135,7 @@ class OnboardingFlowIntegrationTest : IntegrationTestBase() {
         val phoneBId = extractId(addPhone(session, "+12125552222"))
         verifyPhone(session, phoneBId)
 
-        val request = searchRequestRepository.findById(searchId.toInt()).orElseThrow()
+        val request = searchRequestRepository.findById(searchId).orElseThrow()
         assertThat(request.pauseReason).isNull()
 
         val phones = phoneNumberRepository.findByUserId(user.id!!)
@@ -152,7 +152,7 @@ class OnboardingFlowIntegrationTest : IntegrationTestBase() {
         val phoneId = extractId(addPhone(session))
         verifyPhone(session, phoneId)
 
-        val searchId = extractId(createSearchRequest(session)).toInt()
+        val searchId = extractId(createSearchRequest(session))
 
         deletePhone(session, phoneId)
         assertThat(searchRequestRepository.findById(searchId).orElseThrow().pauseReason).isEqualTo("NO_VERIFIED_PHONE")
