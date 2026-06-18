@@ -91,10 +91,10 @@ class EmailAuthIntegrationTest : IntegrationTestBase() {
     }
 
     @Test
-    fun `verify-email does not set a session cookie`() {
+    fun `verify-email signs in without remember-me cookie`() {
         val verificationId = registerOnly()
         val result = verifyLatestEmail(verificationId)
-        assertThat(result.response.getCookie("SESSION")).isNull()
+        assertThat(result.response.getCookie("SESSION")).isNotNull()
         assertThat(result.response.getCookie("remember-me")).isNull()
     }
 
