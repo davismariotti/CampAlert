@@ -20,7 +20,7 @@ class RecreationConfiguration(
     @Value("\${ridb.apiKey}") val ridbApiKey: String
 ) {
     @Bean
-    fun timeZoneEngine(): TimeZoneEngine = TimeZoneEngine.initialize()
+    fun timeZoneEngine(): TimeZoneEngine = TimeZoneEngine.initialize(17.0, -180.0, 72.0, -65.0)
 
     @Bean
     fun getRecreationClient(): RecreationApi {
