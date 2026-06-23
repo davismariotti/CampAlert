@@ -33,9 +33,9 @@ class TimezoneResolutionService(
             }
             searchRequestRepository.updateTimezone(searchRequestId, timezone)
         } catch (e: CallNotPermittedException) {
-            log.warn("RIDB circuit open for timezone resolution requestId=$searchRequestId campsiteId=$campsiteId")
+            log.warn("RIDB circuit open for timezone resolution requestId={} campsiteId={}", searchRequestId, campsiteId)
         } catch (e: Exception) {
-            log.warn("Failed to resolve timezone for requestId=$searchRequestId campsiteId=$campsiteId: ${e.message}")
+            log.warn("Failed to resolve timezone for requestId={} campsiteId={}", searchRequestId, campsiteId, e)
         }
     }
 }

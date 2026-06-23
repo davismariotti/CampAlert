@@ -36,13 +36,13 @@ class AvailabilityChecker(
         val allRequests = searchRequestRepository.findByCompletedFalse()
 
         // Auto-complete past-date requests first, using campground local midnight
-        allRequests.filter { it.startDay < today(it.campgroundTimezone) }.forEach { req ->
-            searchRequestRepository.save(req.copy(completed = true))
-        }
+        val toComplete = allRequests.filter { it.startDay < today(it.campgroundTimezone) }
+        toComplete.forEach { req -> searchRequestRepository.save(req.copy(completed = true)) }
 
         val active = allRequests.filter { req ->
             req.startDay >= today(req.campgroundTimezone) && req.pauseReason == null && req.userId != null
         }
+        log.info("Availability check started active={} autoCompleted={}", active.size, toComplete.size)
         if (active.isEmpty()) return
 
         val userMap = userRepository
@@ -69,7 +69,7 @@ class AvailabilityChecker(
                         val result = recreationService.checkAvailability(request, user, cache)
                         userResults[uid]!!.add(result)
                     } catch (e: Exception) {
-                        log.error("Error processing request=${request.id}", e)
+                        log.error("Error processing requestId={}", request.id, e)
                     } finally {
                         val remaining = userCountdowns[uid]!!.decrementAndGet()
                         if (remaining == 0) {
@@ -79,7 +79,7 @@ class AvailabilityChecker(
                                 try {
                                     availabilityStateService.processUserResults(results, user)
                                 } catch (e: Exception) {
-                                    log.error("Error persisting state for user=$uid", e)
+                                    log.error("Error persisting state for userId={}", uid, e)
                                 }
                             }
                             eventPublisher.publishEvent(UserAvailabilityProcessedEvent(uid))

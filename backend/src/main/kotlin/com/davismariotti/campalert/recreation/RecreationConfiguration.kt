@@ -29,9 +29,14 @@ class RecreationConfiguration(
             .registerModule(JavaTimeModule())
             .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+        val okHttpClient = OkHttpClient
+            .Builder()
+            .addInterceptor(MetricsInterceptor("Custom/RecreationGov/AvailabilityFetch"))
+            .build()
         val retrofit = Retrofit
             .Builder()
             .baseUrl(baseUrl)
+            .client(okHttpClient)
             .addConverterFactory(JacksonConverterFactory.create(objectMapper))
             .build()
         return retrofit.create(RecreationApi::class.java)
@@ -51,7 +56,8 @@ class RecreationConfiguration(
                     .addHeader("apikey", ridbApiKey)
                     .build()
                 chain.proceed(request)
-            }.build()
+            }.addInterceptor(MetricsInterceptor("Custom/Ridb/Request"))
+            .build()
         val retrofit = Retrofit
             .Builder()
             .baseUrl(ridbBaseUrl)

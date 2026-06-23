@@ -7,6 +7,7 @@ import com.davismariotti.campalert.service.PhoneNumberService
 import com.twilio.twiml.MessagingResponse
 import com.twilio.twiml.messaging.Body
 import com.twilio.twiml.messaging.Message
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -17,12 +18,15 @@ class SmsWebhookService(
     private val searchRequestRepository: SearchRequestRepository,
     private val smsConversationService: SmsConversationService,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     @Transactional
     fun handleStop(from: String): String {
         val phoneNumber = phoneNumberRepository.findByPhone(from)
         if (phoneNumber != null) {
             phoneNumberRepository.save(phoneNumber.copy(status = PhoneNumberStatus.OPTED_OUT))
             phoneNumberService.pauseRequestsIfNoVerifiedPhone(phoneNumber.userId)
+            log.info("SMS opt-out from={}", from)
         }
         return emptyTwiml()
     }
@@ -33,6 +37,7 @@ class SmsWebhookService(
         if (phoneNumber != null && phoneNumber.status == PhoneNumberStatus.OPTED_OUT) {
             phoneNumberRepository.save(phoneNumber.copy(status = PhoneNumberStatus.VERIFIED))
             phoneNumberService.resumeRequestsIfVerifiedPhone(phoneNumber.userId)
+            log.info("SMS opt-in from={}", from)
         }
         return emptyTwiml()
     }
@@ -73,6 +78,7 @@ class SmsWebhookService(
     fun pauseRequest(from: String, requestId: Long): String {
         val request = searchRequestRepository.findById(requestId).orElse(null) ?: return emptyTwiml()
         searchRequestRepository.save(request.copy(userPaused = true))
+        log.info("SMS pause from={} requestId={}", from, requestId)
         return twimlMessage("Alert paused. We'll notify you if ${request.campgroundName} opens a new window.")
     }
 
