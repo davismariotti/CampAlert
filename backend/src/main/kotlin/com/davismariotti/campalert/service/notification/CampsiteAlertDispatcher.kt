@@ -12,6 +12,7 @@ import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.scheduling.UserAvailabilityProcessedEvent
 import com.davismariotti.campalert.service.sms.SmsConversationService
+import com.newrelic.api.agent.NewRelic
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
@@ -97,8 +98,20 @@ class CampsiteAlertDispatcher(
         val gone = toSend.filter { it.type == OutboxType.UNAVAILABLE }
         val notification = CampsiteAlertNotification(user, available, gone)
 
+        val channel = if (usePushover) "PUSHOVER" else "SMS"
+
         try {
             val usedPhone = notificationService.send(notification)
+            log.info("Notification sent userId={} channel={} available={} gone={}", userId, channel, available.size, gone.size)
+            NewRelic.getAgent().insights.recordCustomEvent(
+                "NotificationSent",
+                mapOf(
+                    "userId" to userId,
+                    "channel" to channel,
+                    "availableCount" to available.size,
+                    "goneCount" to gone.size,
+                ),
+            )
             toSend.forEach { n ->
                 notificationOutboxRepository.save(rowById[n.outboxId]!!.copy(sentAt = now))
                 if (n.type == OutboxType.AVAILABLE || n.type == OutboxType.REMINDER) {
@@ -114,7 +127,7 @@ class CampsiteAlertDispatcher(
                 }
             }
         } catch (e: Exception) {
-            log.error("Failed to send campsite alert to userId=$userId", e)
+            log.error("Failed to send campsite alert to userId={}", userId, e)
             rows.forEach { row ->
                 notificationOutboxRepository.save(row.copy(claimedAt = null, attemptCount = row.attemptCount + 1))
             }

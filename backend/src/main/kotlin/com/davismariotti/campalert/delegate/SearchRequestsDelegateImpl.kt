@@ -15,6 +15,7 @@ import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.TimezoneResolutionService
 import com.davismariotti.campalert.util.currentUserId
+import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
@@ -28,6 +29,8 @@ class SearchRequestsDelegateImpl(
     private val notificationOutboxRepository: NotificationOutboxRepository,
     private val timezoneResolutionService: TimezoneResolutionService,
 ) : SearchRequestsApiDelegate {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     private fun currentUserId(): Long = currentUserId(userRepository)
 
     @PreAuthorize("isAuthenticated()")
@@ -91,6 +94,7 @@ class SearchRequestsDelegateImpl(
             userId = userId,
         )
         val savedRequest = searchRequestRepository.save(entity)
+        log.info("Search request created userId={} requestId={} campsiteId={} nights={}", userId, savedRequest.id, savedRequest.campsiteId, savedRequest.nights)
         timezoneResolutionService.resolveAndPersistAsync(savedRequest.id!!, createSearchRequestBody.campsiteId)
         return ResponseEntity.status(201).body(savedRequest.toResponse(fetchStats(savedRequest.id!!)))
     }

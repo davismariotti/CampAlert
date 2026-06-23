@@ -9,6 +9,8 @@ import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.SearchRequestCheckRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.service.availability.AvailabilityResult
+import com.newrelic.api.agent.NewRelic
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Duration
@@ -21,6 +23,8 @@ class AvailabilityStateService(
     private val searchRequestCheckRepository: SearchRequestCheckRepository,
     private val notificationOutboxRepository: NotificationOutboxRepository,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     @Transactional
     fun processUserResults(results: List<AvailabilityResult>, user: User) {
         val now = Instant.now()
@@ -74,6 +78,28 @@ class AvailabilityStateService(
         searchRequestRepository.save(updated)
 
         if (outboxType != null) {
+            log.info(
+                "Availability transition requestId={} campsiteId={} from={} to={} availableSites={} outboxType={}",
+                request.id,
+                request.campsiteId,
+                currentState,
+                newState,
+                result.campground.campsites.size,
+                outboxType,
+            )
+            NewRelic.getAgent().insights.recordCustomEvent(
+                "AvailabilityStateChange",
+                mapOf(
+                    "userId" to user.id!!,
+                    "requestId" to request.id!!,
+                    "campsiteId" to request.campsiteId,
+                    "campgroundName" to (request.campgroundName ?: ""),
+                    "from" to (currentState?.name ?: "null"),
+                    "to" to newState.name,
+                    "availableSiteCount" to result.campground.campsites.size,
+                ),
+            )
+
             val sendAfter = computeSendAfter(now, user.timezone)
             notificationOutboxRepository.save(
                 NotificationOutbox(

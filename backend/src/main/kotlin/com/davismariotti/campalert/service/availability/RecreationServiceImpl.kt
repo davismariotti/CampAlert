@@ -92,7 +92,7 @@ class RecreationServiceImpl(
                 }
             }
         } catch (e: Exception) {
-            log.warn("Recreation.gov call failed for campsiteId=$campsiteId month=$monthStart: ${e.message}")
+            log.warn("Recreation.gov call failed for campsiteId={} month={}", campsiteId, monthStart, e)
             Campground(emptyMap())
         }
 
@@ -104,7 +104,7 @@ class RecreationServiceImpl(
             ).execute()
             .body()
         if (body == null) {
-            log.warn("Null body from Recreation.gov for campsiteId=$campsiteId month=$monthStart")
+            log.warn("Null body from Recreation.gov for campsiteId={} month={}", campsiteId, monthStart)
             return Campground(emptyMap())
         }
         return body

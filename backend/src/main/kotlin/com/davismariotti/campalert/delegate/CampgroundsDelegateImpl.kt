@@ -57,9 +57,10 @@ class CampgroundsDelegateImpl(
         val response = try {
             ridbCb.executeSupplier { ridbApi.getCampsites(id).execute() }
         } catch (e: CallNotPermittedException) {
-            log.warn("RIDB circuit open for getCampsites id=$id")
+            log.warn("RIDB circuit open for getCampgroundLoops id={}", id)
             return ResponseEntity.ok(emptyList())
         } catch (ex: Exception) {
+            log.warn("RIDB error for getCampgroundLoops id={}", id, ex)
             throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "RIDB upstream error")
         }
         if (!response.isSuccessful) {
@@ -90,9 +91,10 @@ class CampgroundsDelegateImpl(
         val response = try {
             ridbCb.executeSupplier { ridbApi.getFacilities(q).execute() }
         } catch (e: CallNotPermittedException) {
-            log.warn("RIDB circuit open for searchCampgrounds q=$q")
+            log.warn("RIDB circuit open for searchCampgrounds q={}", q)
             return ResponseEntity.ok(emptyList())
         } catch (ex: Exception) {
+            log.warn("RIDB error for searchCampgrounds q={}", q, ex)
             throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "RIDB upstream error")
         }
         if (!response.isSuccessful) {
