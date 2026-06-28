@@ -127,8 +127,6 @@ The webhook validates `X-Twilio-Signature`. Twilio signs requests with your `twi
 
 ## Tests
 
-`SearchRequestRepositoryTest` is `@Disabled` — the Testcontainers setup connects correctly but the schema isn't being created in the fresh container. Needs investigation before enabling.
-
 Run the suite:
 ```bash
 cd backend
