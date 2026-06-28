@@ -44,14 +44,13 @@ class CampsiteAlertDispatcherTest {
     private val phoneRepo = mock(PhoneNumberRepository::class.java)
     private val conversationSvc = mock(SmsConversationService::class.java)
 
-    private val dispatcher = CampsiteAlertDispatcher(
+    private val processor = CampsiteAlertOutboxProcessor(
         notificationService = notificationService,
         notificationOutboxRepository = outboxRepo,
         searchRequestRepository = searchRequestRepo,
         userRepository = userRepo,
         phoneNumberRepository = phoneRepo,
         smsConversationService = conversationSvc,
-        staleThresholdMinutes = 15L,
     )
 
     private val smsUser = User(id = 42L, email = "user@example.com", passwordHash = "hash")
@@ -96,7 +95,7 @@ class CampsiteAlertDispatcherTest {
         val rows = listOf(outboxRow(1L, 10L, OutboxType.AVAILABLE))
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(0)
 
-        invokeProcessUser(42L, rows, Instant.now())
+        processor.processUser(42L, rows, Instant.now())
 
         verify(notificationService, never()).send(anyK())
     }
@@ -110,7 +109,7 @@ class CampsiteAlertDispatcherTest {
         `when`(searchRequestRepo.findAllById(anyK())).thenReturn(listOf(req))
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
-        invokeProcessUser(42L, listOf(row), Instant.now())
+        processor.processUser(42L, listOf(row), Instant.now())
 
         verify(notificationService, never()).send(anyK())
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
@@ -131,7 +130,7 @@ class CampsiteAlertDispatcherTest {
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
-        invokeProcessUser(42L, listOf(row1, row2), Instant.now())
+        processor.processUser(42L, listOf(row1, row2), Instant.now())
 
         verify(notificationService).send(anyK())
     }
@@ -146,7 +145,7 @@ class CampsiteAlertDispatcherTest {
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
-        invokeProcessUser(42L, listOf(row), Instant.now())
+        processor.processUser(42L, listOf(row), Instant.now())
 
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
         verify(outboxRepo).save(captureK(captor))
@@ -163,7 +162,7 @@ class CampsiteAlertDispatcherTest {
         doThrow(RuntimeException("Send failed")).`when`(notificationService).send(anyK())
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
-        invokeProcessUser(42L, listOf(row), Instant.now())
+        processor.processUser(42L, listOf(row), Instant.now())
 
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
         verify(outboxRepo).save(captureK(captor))
@@ -178,18 +177,11 @@ class CampsiteAlertDispatcherTest {
         `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(emptyList())
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
-        invokeProcessUser(42L, listOf(row), Instant.now())
+        processor.processUser(42L, listOf(row), Instant.now())
 
         verify(notificationService, never()).send(anyK())
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
         verify(outboxRepo).save(captureK(captor))
         assert(captor.value?.missedAt != null) { "missedAt should be set when no phone" }
-    }
-
-    private fun invokeProcessUser(userId: Long, rows: List<NotificationOutbox>, now: Instant) {
-        dispatcher.javaClass
-            .getDeclaredMethod("processUser", Long::class.java, List::class.java, Instant::class.java)
-            .also { it.isAccessible = true }
-            .invoke(dispatcher, userId, rows, now)
     }
 }

@@ -7,6 +7,7 @@ import com.davismariotti.campalert.recreation.RecreationApi
 import com.davismariotti.campalert.recreation.RidbApi
 import com.davismariotti.campalert.service.email.EmailSender
 import com.davismariotti.campalert.service.email.MailSender
+import com.davismariotti.campalert.service.notification.SmsSender
 import com.davismariotti.campalert.service.sms.TwilioVerifyService
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import jakarta.servlet.http.Cookie
@@ -69,6 +70,9 @@ open class IntegrationTestBase {
     // Declared here so all subclasses share a single Spring context (same @MockitoBean set = same cache key).
     @MockitoBean
     protected lateinit var twilioVerifyService: TwilioVerifyService
+
+    @MockitoBean
+    protected lateinit var smsSender: SmsSender
 
     @MockitoBean
     protected lateinit var ridbApi: RidbApi
