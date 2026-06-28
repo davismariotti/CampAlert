@@ -8,6 +8,12 @@ services:
     env_file: .env.prod
     environment:
       SPRING_DATA_REDIS_HOST: redis
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
     networks:
       - proxy
       - db
