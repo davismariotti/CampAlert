@@ -66,7 +66,7 @@ if [ "$FRONTEND_ONLY" = "false" ]; then
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d
 
   echo "Rolling out app..."
-  docker rollout -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile app app
+  docker rollout -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile app --timeout 300 app
 fi
 
 echo "Deploying frontend..."
