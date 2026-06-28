@@ -50,6 +50,13 @@ class CampsiteAlertOutboxProcessor(
 
         val requestById = searchRequestRepository.findAllById(rows.map { it.requestId }).associateBy { it.id!! }
         val rowById = rows.associateBy { it.id!! }
+
+        // For UNAVAILABLE type, only keep the latest entry per request; miss superseded ones.
+        val latestUnavailableIdByRequest = rows
+            .filter { it.type == OutboxType.UNAVAILABLE }
+            .groupBy { it.requestId }
+            .mapValues { (_, entries) -> entries.maxBy { it.sendAfter }.id!! }
+
         val toSend = mutableListOf<PendingNotification>()
         rows.forEach { row ->
             val request = requestById[row.requestId]
@@ -60,6 +67,10 @@ class CampsiteAlertOutboxProcessor(
             if ((row.type == OutboxType.AVAILABLE || row.type == OutboxType.REMINDER) &&
                 request.lastAvailabilityState == AvailabilityState.UNAVAILABLE
             ) {
+                notificationOutboxRepository.save(row.copy(missedAt = now))
+                return@forEach
+            }
+            if (row.type == OutboxType.UNAVAILABLE && row.id != latestUnavailableIdByRequest[row.requestId]) {
                 notificationOutboxRepository.save(row.copy(missedAt = now))
                 return@forEach
             }

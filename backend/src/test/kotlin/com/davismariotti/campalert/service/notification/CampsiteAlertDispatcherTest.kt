@@ -81,14 +81,18 @@ class CampsiteAlertDispatcherTest {
             lastAvailabilityState = state,
         )
 
-    private fun outboxRow(id: Long, requestId: Long, type: OutboxType) =
-        NotificationOutbox(
-            id = id,
-            userId = 42L,
-            requestId = requestId,
-            type = type,
-            sendAfter = Instant.now().minusSeconds(10),
-        )
+    private fun outboxRow(
+        id: Long,
+        requestId: Long,
+        type: OutboxType,
+        sendAfter: Instant = Instant.now().minusSeconds(10),
+    ) = NotificationOutbox(
+        id = id,
+        userId = 42L,
+        requestId = requestId,
+        type = type,
+        sendAfter = sendAfter,
+    )
 
     @Test
     fun `0 rows claimed skips processing`() {
@@ -168,6 +172,48 @@ class CampsiteAlertDispatcherTest {
         verify(outboxRepo).save(captureK(captor))
         assertNull(captor.value?.claimedAt, "claimedAt should be cleared on failure")
         assert(captor.value?.attemptCount == 1) { "attemptCount should be incremented" }
+    }
+
+    @Test
+    fun `duplicate UNAVAILABLE rows for same request sends only latest and misses older`() {
+        val req = request(10L, state = AvailabilityState.UNAVAILABLE)
+        val now = Instant.now()
+        val older = outboxRow(1L, 10L, OutboxType.UNAVAILABLE, sendAfter = now.minusSeconds(60))
+        val latest = outboxRow(2L, 10L, OutboxType.UNAVAILABLE, sendAfter = now.minusSeconds(10))
+        `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(2)
+        `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
+        `when`(searchRequestRepo.findAllById(anyK())).thenReturn(listOf(req))
+        `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
+
+        processor.processUser(42L, listOf(older, latest), now)
+
+        verify(notificationService).send(anyK())
+        val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
+        verify(outboxRepo, Mockito.times(2)).save(captureK(captor))
+        val byId = captor.allValues.associateBy { it.id }
+        assert(byId[1L]?.missedAt != null) { "older UNAVAILABLE row should be missed" }
+        assertNull(byId[1L]?.sentAt)
+        assert(byId[2L]?.sentAt != null) { "latest UNAVAILABLE row should be sent" }
+        assertNull(byId[2L]?.missedAt)
+    }
+
+    @Test
+    fun `UNAVAILABLE rows for distinct requests are each sent`() {
+        val req1 = request(10L, state = AvailabilityState.UNAVAILABLE)
+        val req2 = request(11L, state = AvailabilityState.UNAVAILABLE)
+        val row1 = outboxRow(1L, 10L, OutboxType.UNAVAILABLE)
+        val row2 = outboxRow(2L, 11L, OutboxType.UNAVAILABLE)
+        `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(2)
+        `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
+        `when`(searchRequestRepo.findAllById(anyK())).thenReturn(listOf(req1, req2))
+        `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
+
+        processor.processUser(42L, listOf(row1, row2), Instant.now())
+
+        verify(notificationService).send(anyK())
+        val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
+        verify(outboxRepo, Mockito.times(2)).save(captureK(captor))
+        assert(captor.allValues.all { it.sentAt != null }) { "both UNAVAILABLE rows for distinct requests should be sent" }
     }
 
     @Test
