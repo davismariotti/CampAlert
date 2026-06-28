@@ -71,13 +71,17 @@ class CampsiteAlertDispatcherIntegrationTest : IntegrationTestBase() {
             )
         )
 
-    private fun seedClaimableRow(request: SearchRequest, type: OutboxType = OutboxType.AVAILABLE): NotificationOutbox =
+    private fun seedClaimableRow(
+        request: SearchRequest,
+        type: OutboxType = OutboxType.AVAILABLE,
+        sendAfter: Instant = Instant.now().minusSeconds(60),
+    ): NotificationOutbox =
         outboxRepository.save(
             NotificationOutbox(
                 userId = userId,
                 requestId = request.id!!,
                 type = type,
-                sendAfter = Instant.now().minusSeconds(60),
+                sendAfter = sendAfter,
             )
         )
 
@@ -132,6 +136,23 @@ class CampsiteAlertDispatcherIntegrationTest : IntegrationTestBase() {
         assertThat(reloaded.claimedAt).isNull()
         assertThat(reloaded.attemptCount).isEqualTo(1)
         assertThat(reloaded.sentAt).isNull()
+    }
+
+    @Test
+    fun `duplicate UNAVAILABLE outbox rows for same request sends only latest`() {
+        seedVerifiedPhone()
+        val request = seedRequest(availabilityState = AvailabilityState.UNAVAILABLE)
+        val now = Instant.now()
+        val older = seedClaimableRow(request, type = OutboxType.UNAVAILABLE, sendAfter = now.minusSeconds(120))
+        val latest = seedClaimableRow(request, type = OutboxType.UNAVAILABLE, sendAfter = now.minusSeconds(10))
+
+        runSafetyNet()
+
+        assertThat(reload(older).missedAt).isNotNull()
+        assertThat(reload(older).sentAt).isNull()
+        assertThat(reload(latest).sentAt).isNotNull()
+        assertThat(reload(latest).missedAt).isNull()
+        verify(smsSender).send(anyKt(), anyKt())
     }
 
     @Test
