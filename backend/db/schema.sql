@@ -25,7 +25,7 @@ CREATE TABLE "public"."search_requests" (
   "campsite_id" integer NOT NULL,
   "loops" json NULL,
   "name" character varying(255) NOT NULL,
-  "completed" boolean NOT NULL,
+  "completed" boolean NOT NULL DEFAULT false,
   "user_id" bigint NULL,
   "pause_reason" character varying(64) NULL,
   "campground_name" character varying(255) NOT NULL DEFAULT '',

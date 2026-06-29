@@ -136,7 +136,7 @@ class OnboardingFlowIntegrationTest : IntegrationTestBase() {
         verifyPhone(session, phoneBId)
 
         val request = searchRequestRepository.findById(searchId).orElseThrow()
-        assertThat(request.pauseReason).isNull()
+        assertThat(request.state.pauseReason).isNull()
 
         val phones = phoneNumberRepository.findByUserId(user.id!!)
         assertThat(phones).hasSize(1)
@@ -155,10 +155,20 @@ class OnboardingFlowIntegrationTest : IntegrationTestBase() {
         val searchId = extractId(createSearchRequest(session))
 
         deletePhone(session, phoneId)
-        assertThat(searchRequestRepository.findById(searchId).orElseThrow().pauseReason).isEqualTo("NO_VERIFIED_PHONE")
+        assertThat(
+            searchRequestRepository
+                .findById(searchId)
+                .orElseThrow()
+                .state.pauseReason
+        ).isEqualTo("NO_VERIFIED_PHONE")
 
         val newPhoneId = extractId(addPhone(session, "+12125559999"))
         verifyPhone(session, newPhoneId)
-        assertThat(searchRequestRepository.findById(searchId).orElseThrow().pauseReason).isNull()
+        assertThat(
+            searchRequestRepository
+                .findById(searchId)
+                .orElseThrow()
+                .state.pauseReason
+        ).isNull()
     }
 }

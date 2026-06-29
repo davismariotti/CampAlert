@@ -5,6 +5,7 @@ import com.davismariotti.campalert.api.model.VerifyPhoneNumberBody
 import com.davismariotti.campalert.model.PhoneNumber
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
@@ -59,20 +60,22 @@ class PhoneNumbersIntegrationTest : IntegrationTestBase() {
             )
         )
 
-    private fun seedSearchRequest(userId: Long, pauseReason: String? = null): SearchRequest =
-        searchRequestRepository.save(
-            SearchRequest(
-                userId = userId,
-                startDay = LocalDate.now().plusDays(30),
-                nights = 1,
-                groupSize = 2,
-                campsiteId = 99,
-                name = "Test Request",
-                campgroundName = "Test Campground",
-                completed = false,
-                pauseReason = pauseReason,
-            )
+    private fun seedSearchRequest(userId: Long, pauseReason: String? = null): SearchRequest {
+        val req = SearchRequest(
+            userId = userId,
+            startDay = LocalDate.now().plusDays(30),
+            nights = 1,
+            groupSize = 2,
+            campsiteId = 99,
+            name = "Test Request",
+            campgroundName = "Test Campground",
         )
+        val st = SearchRequestState()
+        st.searchRequest = req
+        st.pauseReason = pauseReason
+        req.state = st
+        return searchRequestRepository.save(req)
+    }
 
     // --- 2.3 Unauthenticated 401 ---
 
@@ -266,7 +269,7 @@ class PhoneNumbersIntegrationTest : IntegrationTestBase() {
         verifyPhone(session, id)
 
         val updated = searchRequestRepository.findById(request.id!!).orElseThrow()
-        assertThat(updated.pauseReason).isNull()
+        assertThat(updated.state.pauseReason).isNull()
     }
 
     // --- 2.12 deletePhoneNumber errors ---
@@ -305,7 +308,7 @@ class PhoneNumbersIntegrationTest : IntegrationTestBase() {
         deletePhone(session, phone.id!!)
 
         val updated = searchRequestRepository.findById(request.id!!).orElseThrow()
-        assertThat(updated.pauseReason).isEqualTo("NO_VERIFIED_PHONE")
+        assertThat(updated.state.pauseReason).isEqualTo("NO_VERIFIED_PHONE")
     }
 
     // --- 2.15 no pause on pending delete (when verified phone still exists) ---
@@ -322,6 +325,6 @@ class PhoneNumbersIntegrationTest : IntegrationTestBase() {
         deletePhone(session, pendingId)
 
         val updated = searchRequestRepository.findById(request.id!!).orElseThrow()
-        assertThat(updated.pauseReason).isNull()
+        assertThat(updated.state.pauseReason).isNull()
     }
 }
