@@ -197,6 +197,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /auth/me/password:
+    put:
+      tags: [Auth]
+      operationId: changePassword
+      summary: Change the authenticated user's password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordBody'
+      responses:
+        "204":
+          description: Password changed successfully
+        "400":
+          description: Current password incorrect, new password same as current, or validation failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "403":
+          description: CSRF token missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /campground-search:
     get:
       tags: [Campgrounds]
@@ -835,6 +868,21 @@ components:
         missedQuietHoursWindows:
           type: integer
           format: int64
+
+    ChangePasswordBody:
+      type: object
+      required:
+        - currentPassword
+        - newPassword
+      properties:
+        currentPassword:
+          type: string
+          minLength: 8
+          maxLength: 72
+        newPassword:
+          type: string
+          minLength: 8
+          maxLength: 72
 
     UpdateMeBody:
       type: object

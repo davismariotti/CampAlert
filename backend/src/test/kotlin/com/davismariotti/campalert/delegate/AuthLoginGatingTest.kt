@@ -5,6 +5,7 @@ import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.security.RememberMeServices
 import com.davismariotti.campalert.security.UserDetailsServiceImpl
+import com.davismariotti.campalert.service.SessionRevocationService
 import com.davismariotti.campalert.service.email.EmailVerificationService
 import com.davismariotti.campalert.service.email.PasswordResetService
 import jakarta.servlet.http.HttpServletRequest
@@ -48,6 +49,7 @@ class AuthLoginGatingTest {
         emailVerificationService = emailVerificationService,
         passwordResetService = passwordResetService,
         userDetailsService = mock(UserDetailsServiceImpl::class.java),
+        sessionRevocationService = mock(SessionRevocationService::class.java),
     )
 
     @AfterEach
