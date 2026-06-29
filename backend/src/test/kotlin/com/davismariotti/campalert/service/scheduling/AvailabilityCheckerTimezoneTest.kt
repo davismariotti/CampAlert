@@ -1,6 +1,7 @@
 package com.davismariotti.campalert.service.scheduling
 
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
@@ -32,24 +33,29 @@ class AvailabilityCheckerTimezoneTest {
             .newSingleThreadExecutor(),
     )
 
-    private fun request(startDay: LocalDate, timezone: String?) =
-        SearchRequest(
+    private fun request(startDay: LocalDate, timezone: String?): SearchRequest {
+        val req = SearchRequest(
             id = 1L,
             startDay = startDay,
             nights = 1,
             groupSize = 2,
             campsiteId = 233359,
             name = "test",
-            completed = false,
             userId = 1L,
             campgroundTimezone = timezone,
         )
+        val st = SearchRequestState()
+        st.searchRequest = req
+        st.searchRequestId = 1L
+        req.state = st
+        return req
+    }
 
     @Test
     fun `request for today in campground timezone is not auto-completed`() {
         val today = LocalDate.now(ZoneId.of("America/Los_Angeles"))
         val req = request(today, "America/Los_Angeles")
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
+        `when`(searchRequestRepository.findAllIncomplete()).thenReturn(listOf(req))
         // Return no users so processing exits early — we only care the auto-complete block is skipped
         `when`(userRepository.findAllById(any())).thenReturn(emptyList<User>())
 
@@ -62,26 +68,26 @@ class AvailabilityCheckerTimezoneTest {
     fun `request for yesterday in campground timezone is auto-completed`() {
         val yesterday = LocalDate.now(ZoneId.of("America/Los_Angeles")).minusDays(1)
         val req = request(yesterday, "America/Los_Angeles")
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
+        `when`(searchRequestRepository.findAllIncomplete()).thenReturn(listOf(req))
 
         checker.processSearchRequests()
 
         val captor = ArgumentCaptor.forClass(SearchRequest::class.java)
         verify(searchRequestRepository).save(captor.capture())
-        assertTrue(captor.value.completed)
+        assertTrue(captor.value.state.completed)
     }
 
     @Test
     fun `null timezone falls back to UTC for completion check`() {
         val yesterdayUtc = LocalDate.now(ZoneOffset.UTC).minusDays(1)
         val req = request(yesterdayUtc, null)
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
+        `when`(searchRequestRepository.findAllIncomplete()).thenReturn(listOf(req))
 
         checker.processSearchRequests()
 
         val captor = ArgumentCaptor.forClass(SearchRequest::class.java)
         verify(searchRequestRepository).save(captor.capture())
-        assertTrue(captor.value.completed)
+        assertTrue(captor.value.state.completed)
     }
 
     // Suppress unchecked cast — Mockito's any() returns null for Kotlin non-nullable types but

@@ -1,16 +1,16 @@
 package com.davismariotti.campalert.model
 
+import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
-import jakarta.persistence.EnumType
-import jakarta.persistence.Enumerated
+import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.OneToOne
 import jakarta.persistence.Table
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
-import java.time.Instant
 import java.time.LocalDate
 
 @Entity
@@ -39,31 +39,16 @@ data class SearchRequest(
     @Column(name = "name")
     val name: String,
 
-    @Column(name = "completed")
-    val completed: Boolean,
-
     @Column(name = "user_id")
     val userId: Long? = null,
-
-    @Column(name = "pause_reason")
-    val pauseReason: String? = null,
 
     @Column(name = "campground_name")
     val campgroundName: String = "",
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "last_availability_state")
-    val lastAvailabilityState: AvailabilityState? = null,
-
-    @Column(name = "user_paused", nullable = false)
-    val userPaused: Boolean = false,
-
-    @Column(name = "last_notified_at")
-    val lastNotifiedAt: Instant? = null,
-
-    @Column(name = "reminder_sent_at")
-    val reminderSentAt: Instant? = null,
-
     @Column(name = "campground_timezone")
     val campgroundTimezone: String? = null,
-)
+) {
+    // Body property: excluded from equals/hashCode/copy/toString to prevent circular reference.
+    @OneToOne(mappedBy = "searchRequest", cascade = [CascadeType.ALL], fetch = FetchType.EAGER, orphanRemoval = true)
+    lateinit var state: SearchRequestState
+}

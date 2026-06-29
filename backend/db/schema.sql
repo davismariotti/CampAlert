@@ -70,6 +70,24 @@ CREATE TABLE "public"."notification_outbox" (
 CREATE INDEX ON "public"."notification_outbox" ("send_after") WHERE sent_at IS NULL AND missed_at IS NULL;
 CREATE INDEX ON "public"."notification_outbox" ("request_id");
 CREATE INDEX ON "public"."notification_outbox" ("user_id");
+-- Create "search_request_state" table
+CREATE TABLE "public"."search_request_state" (
+  "search_request_id" bigint NOT NULL,
+  "completed" boolean NOT NULL DEFAULT false,
+  "user_paused" boolean NOT NULL DEFAULT false,
+  "pause_reason" character varying(64) NULL,
+  "last_availability_state" character varying(16) NULL,
+  "last_notified_at" timestamptz NULL,
+  "reminder_sent_at" timestamptz NULL,
+  "total_checks" integer NOT NULL DEFAULT 0,
+  "available_checks" integer NOT NULL DEFAULT 0,
+  "window_count" integer NOT NULL DEFAULT 0,
+  "total_window_seconds" integer NOT NULL DEFAULT 0,
+  "became_available_at" timestamptz NULL,
+  PRIMARY KEY ("search_request_id"),
+  CONSTRAINT "fk_search_request_state_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests" ("id") ON DELETE CASCADE,
+  CONSTRAINT "chk_search_request_state_last_availability_state" CHECK (last_availability_state IN ('AVAILABLE', 'UNAVAILABLE'))
+);
 -- Create "shedlock" table
 CREATE TABLE "public"."shedlock" (
   "name" character varying(64) NOT NULL,

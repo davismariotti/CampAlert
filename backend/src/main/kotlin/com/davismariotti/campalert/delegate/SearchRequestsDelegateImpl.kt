@@ -8,9 +8,9 @@ import com.davismariotti.campalert.api.model.SearchRequestStats
 import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
-import com.davismariotti.campalert.repository.SearchRequestCheckRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.TimezoneResolutionService
@@ -25,7 +25,6 @@ class SearchRequestsDelegateImpl(
     private val searchRequestRepository: SearchRequestRepository,
     private val userRepository: UserRepository,
     private val phoneNumberRepository: PhoneNumberRepository,
-    private val searchRequestCheckRepository: SearchRequestCheckRepository,
     private val notificationOutboxRepository: NotificationOutboxRepository,
     private val timezoneResolutionService: TimezoneResolutionService,
 ) : SearchRequestsApiDelegate {
@@ -44,22 +43,19 @@ class SearchRequestsDelegateImpl(
         if (results.isEmpty()) return ResponseEntity.ok(emptyList())
 
         val ids = results.map { it.id!! }
-        val countStatsById = searchRequestCheckRepository.findCountStatsByRequestIds(ids).associateBy { it.getSearchRequestId() }
-        val avgWindowById = searchRequestCheckRepository.findAvgWindowByRequestIds(ids).associateBy { it.getSearchRequestId() }
         val missedById = notificationOutboxRepository.findMissedWindowCountsByRequestIds(ids).associateBy { it.getRequestId() }
 
         return ResponseEntity.ok(
             results.map { request ->
                 val id = request.id!!
-                val counts = countStatsById[id]
-                val total = counts?.getTotalChecks() ?: 0L
-                val available = counts?.getAvailableChecks() ?: 0L
-                val avgWindow = avgWindowById[id]?.getAvgWindowMinutes() ?: 0.0
+                val s = request.state
+                val total = s.totalChecks.toLong()
+                val available = s.availableChecks.toLong()
                 val missed = missedById[id]?.getMissedCount() ?: 0L
                 val stats = SearchRequestStats(
                     totalChecks = total,
                     availableChecks = available,
-                    avgAvailabilityWindowMinutes = avgWindow,
+                    avgAvailabilityWindowMinutes = if (s.windowCount > 0) (s.totalWindowSeconds / 60.0) / s.windowCount else 0.0,
                     missedQuietHoursWindows = missed,
                     availabilityRate = if (total > 0) available.toDouble() / total.toDouble() else null,
                 )
@@ -90,13 +86,15 @@ class SearchRequestsDelegateImpl(
             campgroundName = createSearchRequestBody.campgroundName,
             loops = createSearchRequestBody.loops,
             name = createSearchRequestBody.name,
-            completed = false,
             userId = userId,
         )
+        val state = SearchRequestState()
+        state.searchRequest = entity
+        entity.state = state
         val savedRequest = searchRequestRepository.save(entity)
         log.info("Search request created userId={} requestId={} campsiteId={} nights={}", userId, savedRequest.id, savedRequest.campsiteId, savedRequest.nights)
         timezoneResolutionService.resolveAndPersistAsync(savedRequest.id!!, createSearchRequestBody.campsiteId)
-        return ResponseEntity.status(201).body(savedRequest.toResponse(fetchStats(savedRequest.id!!)))
+        return ResponseEntity.status(201).body(savedRequest.toResponse(fetchStats(savedRequest)))
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -107,7 +105,7 @@ class SearchRequestsDelegateImpl(
             .orElse(null)
             ?.takeIf { it.userId == userId }
             ?: return ResponseEntity.notFound().build()
-        return ResponseEntity.ok(entity.toResponse(fetchStats(id)))
+        return ResponseEntity.ok(entity.toResponse(fetchStats(entity)))
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -128,10 +126,12 @@ class SearchRequestsDelegateImpl(
             campsiteId = updateSearchRequestBody.campsiteId,
             loops = updateSearchRequestBody.loops,
             name = updateSearchRequestBody.name,
-            completed = updateSearchRequestBody.completed,
         )
+        // state is a body property excluded from copy(); transfer reference and apply state mutation
+        updated.state = existing.state
+        updated.state.completed = updateSearchRequestBody.completed
         val saved = searchRequestRepository.save(updated)
-        return ResponseEntity.ok(saved.toResponse(fetchStats(id)))
+        return ResponseEntity.ok(saved.toResponse(fetchStats(saved)))
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -146,14 +146,15 @@ class SearchRequestsDelegateImpl(
         return ResponseEntity.noContent().build()
     }
 
-    private fun fetchStats(requestId: Long): SearchRequestStats {
-        val total = searchRequestCheckRepository.countBySearchRequestId(requestId)
-        val available = searchRequestCheckRepository.countAvailableBySearchRequestId(requestId)
+    private fun fetchStats(request: SearchRequest): SearchRequestStats {
+        val s = request.state
+        val total = s.totalChecks.toLong()
+        val available = s.availableChecks.toLong()
         return SearchRequestStats(
             totalChecks = total,
             availableChecks = available,
-            avgAvailabilityWindowMinutes = if (total > 0) searchRequestCheckRepository.computeAvgWindowMinutes(requestId) else 0.0,
-            missedQuietHoursWindows = notificationOutboxRepository.countMissedWindowsByRequestId(requestId),
+            avgAvailabilityWindowMinutes = if (s.windowCount > 0) (s.totalWindowSeconds / 60.0) / s.windowCount else 0.0,
+            missedQuietHoursWindows = notificationOutboxRepository.countMissedWindowsByRequestId(request.id!!),
             availabilityRate = if (total > 0) available.toDouble() / total.toDouble() else null,
         )
     }
@@ -168,8 +169,8 @@ class SearchRequestsDelegateImpl(
             campgroundName = this.campgroundName,
             loops = this.loops,
             name = this.name,
-            completed = this.completed,
-            pauseReason = this.pauseReason,
+            completed = this.state.completed,
+            pauseReason = this.state.pauseReason,
             stats = stats,
         )
 }

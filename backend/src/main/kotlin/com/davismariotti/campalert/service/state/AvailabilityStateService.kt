@@ -3,10 +3,8 @@ package com.davismariotti.campalert.service.state
 import com.davismariotti.campalert.model.AvailabilityState
 import com.davismariotti.campalert.model.NotificationOutbox
 import com.davismariotti.campalert.model.OutboxType
-import com.davismariotti.campalert.model.SearchRequestCheck
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
-import com.davismariotti.campalert.repository.SearchRequestCheckRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.service.availability.AvailabilityResult
 import com.newrelic.api.agent.NewRelic
@@ -20,7 +18,6 @@ import java.time.ZoneId
 @Service
 class AvailabilityStateService(
     private val searchRequestRepository: SearchRequestRepository,
-    private val searchRequestCheckRepository: SearchRequestCheckRepository,
     private val notificationOutboxRepository: NotificationOutboxRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -33,49 +30,49 @@ class AvailabilityStateService(
 
     private fun processResult(result: AvailabilityResult, user: User, now: Instant) {
         val request = result.searchRequest
+        val state = request.state
         val hasAvailable = result.hasAvailableSites
-        val currentState = request.lastAvailabilityState
+        val currentState = state.lastAvailabilityState
         val newState = if (hasAvailable) AvailabilityState.AVAILABLE else AvailabilityState.UNAVAILABLE
 
-        searchRequestCheckRepository.save(
-            SearchRequestCheck(
-                searchRequestId = request.id!!,
-                checkedAt = now,
-                available = hasAvailable,
-                availableSiteCount = result.campground.campsites.size,
-            ),
-        )
+        state.totalChecks++
+        if (hasAvailable) state.availableChecks++
+
+        if (!hasAvailable && currentState == AvailabilityState.AVAILABLE) {
+            val becameAt = state.becameAvailableAt
+            if (becameAt != null) {
+                state.windowCount++
+                state.totalWindowSeconds += Duration.between(becameAt, now).seconds.toInt()
+                state.becameAvailableAt = null
+            }
+        } else if (hasAvailable && (currentState == null || currentState == AvailabilityState.UNAVAILABLE)) {
+            state.becameAvailableAt = now
+        }
 
         val outboxType: OutboxType? = when {
-            // null → AVAILABLE or UNAVAILABLE → AVAILABLE: alert
             (currentState == null || currentState == AvailabilityState.UNAVAILABLE) && hasAvailable -> OutboxType.AVAILABLE
-
-            // AVAILABLE → UNAVAILABLE: gone alert; clears pause/reminder state
             currentState == AvailabilityState.AVAILABLE && !hasAvailable -> OutboxType.UNAVAILABLE
-
-            // AVAILABLE → AVAILABLE: reminder if eligible
             currentState == AvailabilityState.AVAILABLE && hasAvailable -> {
                 when {
-                    request.userPaused -> null
-                    request.reminderSentAt != null -> null
-                    request.lastNotifiedAt == null -> null
-                    Duration.between(request.lastNotifiedAt, now) > Duration.ofMinutes(30) -> OutboxType.REMINDER
+                    state.userPaused -> null
+                    state.reminderSentAt != null -> null
+                    state.lastNotifiedAt == null -> null
+                    Duration.between(state.lastNotifiedAt, now) > Duration.ofMinutes(30) -> OutboxType.REMINDER
                     else -> null
                 }
             }
-
-            // null → UNAVAILABLE or UNAVAILABLE → UNAVAILABLE: no notification
             else -> null
         }
 
-        var updated = request.copy(lastAvailabilityState = newState)
+        state.lastAvailabilityState = newState
         if (currentState == AvailabilityState.AVAILABLE && !hasAvailable) {
-            updated = updated.copy(userPaused = false, reminderSentAt = null)
+            state.userPaused = false
+            state.reminderSentAt = null
         }
         if (outboxType == OutboxType.REMINDER) {
-            updated = updated.copy(reminderSentAt = now)
+            state.reminderSentAt = now
         }
-        searchRequestRepository.save(updated)
+        searchRequestRepository.save(request)
 
         if (outboxType != null) {
             log.info(
@@ -104,7 +101,7 @@ class AvailabilityStateService(
             notificationOutboxRepository.save(
                 NotificationOutbox(
                     userId = user.id!!,
-                    requestId = request.id,
+                    requestId = request.id!!,
                     type = outboxType,
                     sendAfter = sendAfter,
                 ),

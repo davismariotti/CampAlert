@@ -3,11 +3,13 @@ package com.davismariotti.campalert.service.sms
 import com.davismariotti.campalert.model.PhoneNumber
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.service.PhoneNumberService
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -38,17 +40,22 @@ class SmsWebhookControllerTest {
         smsConsentAt = Instant.now(),
     )
 
-    private fun request(id: Long, campgroundName: String = "Upper Pines") =
-        SearchRequest(
+    private fun request(id: Long, campgroundName: String = "Upper Pines"): SearchRequest {
+        val req = SearchRequest(
             id = id,
             startDay = LocalDate.now().plusDays(5),
             nights = 2,
             groupSize = 2,
             campsiteId = 99,
             name = "Trip",
-            completed = false,
             campgroundName = campgroundName,
         )
+        val st = SearchRequestState()
+        st.searchRequest = req
+        st.searchRequestId = id
+        req.state = st
+        return req
+    }
 
     @Test
     fun `handleStop sets phone to OPTED_OUT and pauses requests`() {
@@ -97,7 +104,9 @@ class SmsWebhookControllerTest {
 
         val twiml = service.handlePause("+15005550006")
 
-        verify(searchRequestRepository).save(request(10L).copy(userPaused = true))
+        val captor = ArgumentCaptor.forClass(SearchRequest::class.java)
+        verify(searchRequestRepository).save(captor.capture())
+        assertTrue(captor.value.state.userPaused)
         assertTrue(twiml.contains("paused"))
     }
 
@@ -125,7 +134,9 @@ class SmsWebhookControllerTest {
 
         service.handleAwaitingReply("+15005550006", 1, awaiting)
 
-        verify(searchRequestRepository).save(request(10L).copy(userPaused = true))
+        val captor = ArgumentCaptor.forClass(SearchRequest::class.java)
+        verify(searchRequestRepository).save(captor.capture())
+        assertTrue(captor.value.state.userPaused)
         verify(conversationService).clearAwaiting("+15005550006")
     }
 

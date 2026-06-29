@@ -65,7 +65,7 @@ class CampsiteAlertOutboxProcessor(
                 return@forEach
             }
             if ((row.type == OutboxType.AVAILABLE || row.type == OutboxType.REMINDER) &&
-                request.lastAvailabilityState == AvailabilityState.UNAVAILABLE
+                request.state.lastAvailabilityState == AvailabilityState.UNAVAILABLE
             ) {
                 notificationOutboxRepository.save(row.copy(missedAt = now))
                 return@forEach
@@ -100,7 +100,8 @@ class CampsiteAlertOutboxProcessor(
             toSend.forEach { n ->
                 notificationOutboxRepository.save(rowById[n.outboxId]!!.copy(sentAt = now))
                 if (n.type == OutboxType.AVAILABLE || n.type == OutboxType.REMINDER) {
-                    searchRequestRepository.save(n.request.copy(lastNotifiedAt = now))
+                    n.request.state.lastNotifiedAt = now
+                    searchRequestRepository.save(n.request)
                 }
             }
             if (usedPhone != null) {

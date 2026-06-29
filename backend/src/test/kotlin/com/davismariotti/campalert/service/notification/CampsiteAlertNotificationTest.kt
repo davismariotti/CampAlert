@@ -2,6 +2,7 @@ package com.davismariotti.campalert.service.notification
 
 import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.notification.CampsiteAlertNotification
 import com.davismariotti.campalert.notification.PendingNotification
@@ -21,8 +22,12 @@ class CampsiteAlertNotificationTest {
         campsiteId = 99,
         name = "Test Trip",
         campgroundName = "Upper Pines",
-        completed = false,
-    )
+    ).also { req ->
+        val st = SearchRequestState()
+        st.searchRequest = req
+        st.searchRequestId = 1L
+        req.state = st
+    }
 
     @Test
     fun `getSmsContent includes campground name, date range, and URL for available alert`() {
