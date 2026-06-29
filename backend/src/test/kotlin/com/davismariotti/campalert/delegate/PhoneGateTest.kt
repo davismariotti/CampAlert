@@ -6,7 +6,6 @@ import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
-import com.davismariotti.campalert.repository.SearchRequestCheckRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.TimezoneResolutionService
@@ -22,7 +21,6 @@ class PhoneGateTest {
     private val searchRequestRepository = mock(SearchRequestRepository::class.java)
     private val userRepository = mock(UserRepository::class.java)
     private val phoneNumberRepository = mock(PhoneNumberRepository::class.java)
-    private val checkRepository = mock(SearchRequestCheckRepository::class.java)
     private val notificationOutboxRepository = mock(NotificationOutboxRepository::class.java)
     private val timezoneResolutionService = mock(TimezoneResolutionService::class.java)
     private val delegate =
@@ -30,7 +28,6 @@ class PhoneGateTest {
             searchRequestRepository,
             userRepository,
             phoneNumberRepository,
-            checkRepository,
             notificationOutboxRepository,
             timezoneResolutionService,
         )

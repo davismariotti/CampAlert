@@ -6,6 +6,7 @@ import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.PhoneNumber
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
@@ -68,18 +69,23 @@ class CampsiteAlertDispatcherTest {
         `when`(userRepo.findById(42L)).thenReturn(Optional.of(smsUser))
     }
 
-    private fun request(id: Long, state: AvailabilityState = AvailabilityState.AVAILABLE) =
-        SearchRequest(
+    private fun request(id: Long, state: AvailabilityState = AvailabilityState.AVAILABLE): SearchRequest {
+        val req = SearchRequest(
             id = id,
             startDay = LocalDate.now().plusDays(5),
             nights = 2,
             groupSize = 2,
             campsiteId = 99,
             name = "Camp",
-            completed = false,
             campgroundName = "Camp Ground",
-            lastAvailabilityState = state,
         )
+        val st = SearchRequestState()
+        st.searchRequest = req
+        st.searchRequestId = id
+        st.lastAvailabilityState = state
+        req.state = st
+        return req
+    }
 
     private fun outboxRow(
         id: Long,

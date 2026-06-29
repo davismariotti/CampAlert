@@ -77,7 +77,8 @@ class SmsWebhookService(
     @Transactional
     fun pauseRequest(from: String, requestId: Long): String {
         val request = searchRequestRepository.findById(requestId).orElse(null) ?: return emptyTwiml()
-        searchRequestRepository.save(request.copy(userPaused = true))
+        request.state.userPaused = true
+        searchRequestRepository.save(request)
         log.info("SMS pause from={} requestId={}", from, requestId)
         return twimlMessage("Alert paused. We'll notify you if ${request.campgroundName} opens a new window.")
     }

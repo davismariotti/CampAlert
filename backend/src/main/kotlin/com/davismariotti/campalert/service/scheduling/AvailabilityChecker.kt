@@ -33,14 +33,17 @@ class AvailabilityChecker(
 
     @SchedulerLock(name = "availabilityChecker", lockAtMostFor = "PT90S", lockAtLeastFor = "PT30S")
     fun processSearchRequests() {
-        val allRequests = searchRequestRepository.findByCompletedFalse()
+        val allRequests = searchRequestRepository.findAllIncomplete()
 
         // Auto-complete past-date requests first, using campground local midnight
         val toComplete = allRequests.filter { it.startDay < today(it.campgroundTimezone) }
-        toComplete.forEach { req -> searchRequestRepository.save(req.copy(completed = true)) }
+        toComplete.forEach { req ->
+            req.state.completed = true
+            searchRequestRepository.save(req)
+        }
 
         val active = allRequests.filter { req ->
-            req.startDay >= today(req.campgroundTimezone) && req.pauseReason == null && req.userId != null
+            req.startDay >= today(req.campgroundTimezone) && req.state.pauseReason == null && req.userId != null
         }
         log.info("Availability check started active={} autoCompleted={}", active.size, toComplete.size)
         if (active.isEmpty()) return

@@ -13,14 +13,20 @@ class PhoneNumberService(
     fun pauseRequestsIfNoVerifiedPhone(userId: Long) {
         val hasVerified = phoneNumberRepository.countByUserIdAndStatus(userId, PhoneNumberStatus.VERIFIED) > 0
         if (!hasVerified) {
-            val active = searchRequestRepository.findByUserIdAndCompletedFalseAndPauseReasonIsNull(userId)
-            active.forEach { searchRequestRepository.save(it.copy(pauseReason = NO_PHONE)) }
+            val active = searchRequestRepository.findActiveUnpausedByUserId(userId)
+            active.forEach {
+                it.state.pauseReason = NO_PHONE
+                searchRequestRepository.save(it)
+            }
         }
     }
 
     fun resumeRequestsIfVerifiedPhone(userId: Long) {
         val paused = searchRequestRepository.findByUserIdAndPauseReason(userId, NO_PHONE)
-        paused.forEach { searchRequestRepository.save(it.copy(pauseReason = null)) }
+        paused.forEach {
+            it.state.pauseReason = null
+            searchRequestRepository.save(it)
+        }
     }
 
     fun supersedePreviousVerifiedPhone(userId: Long, keepId: Long) {

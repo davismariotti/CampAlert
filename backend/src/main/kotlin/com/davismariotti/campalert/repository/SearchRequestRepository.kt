@@ -7,16 +7,21 @@ import org.springframework.data.repository.CrudRepository
 import org.springframework.transaction.annotation.Transactional
 
 interface SearchRequestRepository : CrudRepository<SearchRequest, Long> {
-    fun findByCompletedFalse(): List<SearchRequest>
+    @Query("SELECT r FROM SearchRequest r WHERE r.state.completed = false")
+    fun findAllIncomplete(): List<SearchRequest>
 
-    fun findByCompleted(completed: Boolean): List<SearchRequest>
+    @Query("SELECT r FROM SearchRequest r WHERE r.state.completed = :completed")
+    fun findAllByCompleted(completed: Boolean): List<SearchRequest>
 
     fun findByUserId(userId: Long): List<SearchRequest>
 
+    @Query("SELECT r FROM SearchRequest r WHERE r.state.completed = :completed AND r.userId = :userId")
     fun findByCompletedAndUserId(completed: Boolean, userId: Long): List<SearchRequest>
 
-    fun findByUserIdAndCompletedFalseAndPauseReasonIsNull(userId: Long): List<SearchRequest>
+    @Query("SELECT r FROM SearchRequest r WHERE r.userId = :userId AND r.state.completed = false AND r.state.pauseReason IS NULL")
+    fun findActiveUnpausedByUserId(userId: Long): List<SearchRequest>
 
+    @Query("SELECT r FROM SearchRequest r WHERE r.userId = :userId AND r.state.pauseReason = :pauseReason")
     fun findByUserIdAndPauseReason(userId: Long, pauseReason: String): List<SearchRequest>
 
     @Modifying

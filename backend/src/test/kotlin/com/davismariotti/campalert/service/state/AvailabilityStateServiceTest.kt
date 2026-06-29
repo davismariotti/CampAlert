@@ -4,11 +4,10 @@ import com.davismariotti.campalert.model.AvailabilityState
 import com.davismariotti.campalert.model.NotificationOutbox
 import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.SearchRequest
-import com.davismariotti.campalert.model.SearchRequestCheck
+import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.recreation.Campground
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
-import com.davismariotti.campalert.repository.SearchRequestCheckRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.service.availability.AvailabilityResult
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -25,9 +24,8 @@ import java.time.LocalDate
 
 class AvailabilityStateServiceTest {
     private val searchRequestRepository = mock(SearchRequestRepository::class.java)
-    private val checkRepository = mock(SearchRequestCheckRepository::class.java)
     private val outboxRepository = mock(NotificationOutboxRepository::class.java)
-    private val service = AvailabilityStateService(searchRequestRepository, checkRepository, outboxRepository)
+    private val service = AvailabilityStateService(searchRequestRepository, outboxRepository)
 
     private val user = User(id = 1L, email = "a@b.com", passwordHash = "x", timezone = "UTC")
 
@@ -36,19 +34,26 @@ class AvailabilityStateServiceTest {
         paused: Boolean = false,
         lastNotified: Instant? = null,
         reminderSent: Instant? = null,
-    ) = SearchRequest(
-        id = 10L,
-        startDay = LocalDate.now().plusDays(5),
-        nights = 2,
-        groupSize = 2,
-        campsiteId = 99,
-        name = "Test",
-        completed = false,
-        lastAvailabilityState = state,
-        userPaused = paused,
-        lastNotifiedAt = lastNotified,
-        reminderSentAt = reminderSent,
-    )
+    ): SearchRequest {
+        val req = SearchRequest(
+            id = 10L,
+            startDay = LocalDate.now().plusDays(5),
+            nights = 2,
+            groupSize = 2,
+            campsiteId = 99,
+            name = "Test",
+            userId = 1L,
+        )
+        val st = SearchRequestState()
+        st.searchRequest = req
+        st.searchRequestId = 10L
+        st.lastAvailabilityState = state
+        st.userPaused = paused
+        st.lastNotifiedAt = lastNotified
+        st.reminderSentAt = reminderSent
+        req.state = st
+        return req
+    }
 
     private fun result(request: SearchRequest, available: Boolean) =
         AvailabilityResult(
@@ -72,7 +77,6 @@ class AvailabilityStateServiceTest {
     @Test
     fun `null to AVAILABLE inserts AVAILABLE outbox row`() {
         val req = request(state = null)
-        `when`(checkRepository.save(any(SearchRequestCheck::class.java))).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
         `when`(outboxRepository.save(any(NotificationOutbox::class.java))).thenAnswer { it.arguments[0] }
 
@@ -86,7 +90,6 @@ class AvailabilityStateServiceTest {
     @Test
     fun `UNAVAILABLE to AVAILABLE inserts AVAILABLE outbox row`() {
         val req = request(state = AvailabilityState.UNAVAILABLE)
-        `when`(checkRepository.save(any(SearchRequestCheck::class.java))).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
         `when`(outboxRepository.save(any(NotificationOutbox::class.java))).thenAnswer { it.arguments[0] }
 
@@ -100,11 +103,8 @@ class AvailabilityStateServiceTest {
     @Test
     fun `AVAILABLE to UNAVAILABLE inserts UNAVAILABLE row and clears paused and reminderSentAt`() {
         val req = request(state = AvailabilityState.AVAILABLE, paused = true, reminderSent = Instant.now())
-        `when`(checkRepository.save(any(SearchRequestCheck::class.java))).thenAnswer { it.arguments[0] }
         `when`(outboxRepository.save(any(NotificationOutbox::class.java))).thenAnswer { it.arguments[0] }
-
-        val savedCaptor = ArgumentCaptor.forClass(SearchRequest::class.java)
-        `when`(searchRequestRepository.save(savedCaptor.capture())).thenAnswer { it.arguments[0] }
+        `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
 
         service.processUserResults(listOf(result(req, false)), user)
 
@@ -112,16 +112,14 @@ class AvailabilityStateServiceTest {
         verify(outboxRepository).save(outboxCaptor.capture())
         assertEquals(OutboxType.UNAVAILABLE, outboxCaptor.value.type)
 
-        val savedReq = savedCaptor.value
-        assertEquals(false, savedReq.userPaused)
-        assertNull(savedReq.reminderSentAt)
+        assertEquals(false, req.state.userPaused)
+        assertNull(req.state.reminderSentAt)
     }
 
     @Test
     fun `AVAILABLE to AVAILABLE with reminder eligibility inserts REMINDER row`() {
         val thirtyOneMinutesAgo = Instant.now().minus(Duration.ofMinutes(31))
         val req = request(state = AvailabilityState.AVAILABLE, lastNotified = thirtyOneMinutesAgo)
-        `when`(checkRepository.save(any(SearchRequestCheck::class.java))).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
         `when`(outboxRepository.save(any(NotificationOutbox::class.java))).thenAnswer { it.arguments[0] }
 
@@ -135,7 +133,6 @@ class AvailabilityStateServiceTest {
     @Test
     fun `AVAILABLE to AVAILABLE with user_paused inserts no outbox row`() {
         val req = request(state = AvailabilityState.AVAILABLE, paused = true)
-        `when`(checkRepository.save(any(SearchRequestCheck::class.java))).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
 
         service.processUserResults(listOf(result(req, true)), user)
@@ -148,7 +145,6 @@ class AvailabilityStateServiceTest {
     @Test
     fun `null to UNAVAILABLE inserts no outbox row`() {
         val req = request(state = null)
-        `when`(checkRepository.save(any(SearchRequestCheck::class.java))).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
 
         service.processUserResults(listOf(result(req, false)), user)

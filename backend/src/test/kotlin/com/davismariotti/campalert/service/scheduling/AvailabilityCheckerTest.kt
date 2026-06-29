@@ -1,6 +1,7 @@
 package com.davismariotti.campalert.service.scheduling
 
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.recreation.Campground
 import com.davismariotti.campalert.repository.SearchRequestRepository
@@ -62,17 +63,23 @@ class AvailabilityCheckerTest {
         userId: Long? = 1L,
         pauseReason: String? = null,
         startDay: LocalDate = futureDay,
-    ) = SearchRequest(
-        id = id,
-        startDay = startDay,
-        nights = 1,
-        groupSize = 2,
-        campsiteId = 233359,
-        name = "test",
-        completed = false,
-        userId = userId,
-        pauseReason = pauseReason,
-    )
+    ): SearchRequest {
+        val req = SearchRequest(
+            id = id,
+            startDay = startDay,
+            nights = 1,
+            groupSize = 2,
+            campsiteId = 233359,
+            name = "test",
+            userId = userId,
+        )
+        val st = SearchRequestState()
+        st.searchRequest = req
+        st.searchRequestId = id
+        st.pauseReason = pauseReason
+        req.state = st
+        return req
+    }
 
     private fun result(request: SearchRequest, hasAvailableSites: Boolean = false) =
         AvailabilityResult(
@@ -86,7 +93,7 @@ class AvailabilityCheckerTest {
     @Test
     fun `paused request is not processed`() {
         val req = request(pauseReason = "SYSTEM_PAUSED")
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
+        `when`(searchRequestRepository.findAllIncomplete()).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(emptyList<User>())
 
         checker.processSearchRequests()
@@ -97,7 +104,7 @@ class AvailabilityCheckerTest {
     @Test
     fun `request without userId is not processed`() {
         val req = request(userId = null)
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
+        `when`(searchRequestRepository.findAllIncomplete()).thenReturn(listOf(req))
 
         checker.processSearchRequests()
 
@@ -106,7 +113,7 @@ class AvailabilityCheckerTest {
 
     @Test
     fun `empty request list causes early return`() {
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(emptyList())
+        `when`(searchRequestRepository.findAllIncomplete()).thenReturn(emptyList())
 
         checker.processSearchRequests()
 
@@ -117,7 +124,7 @@ class AvailabilityCheckerTest {
     @Test
     fun `user not found in repository causes early return`() {
         val req = request()
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
+        `when`(searchRequestRepository.findAllIncomplete()).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(emptyList<User>())
 
         checker.processSearchRequests()
@@ -131,7 +138,7 @@ class AvailabilityCheckerTest {
     @Test
     fun `non-pushover result is passed to processUserResults`() {
         val req = request()
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
+        `when`(searchRequestRepository.findAllIncomplete()).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser))
         `when`(recreationService.checkAvailability(any(), any(), any())).thenReturn(result(req))
 
@@ -147,7 +154,7 @@ class AvailabilityCheckerTest {
     @Test
     fun `UserAvailabilityProcessedEvent published for non-pushover user`() {
         val req = request()
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
+        `when`(searchRequestRepository.findAllIncomplete()).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser))
         `when`(recreationService.checkAvailability(any(), any(), any())).thenReturn(result(req))
 
@@ -163,7 +170,7 @@ class AvailabilityCheckerTest {
     fun `multi-request user processUserResults called once with all results`() {
         val req1 = request(id = 1)
         val req2 = request(id = 2)
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req1, req2))
+        `when`(searchRequestRepository.findAllIncomplete()).thenReturn(listOf(req1, req2))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser))
         `when`(recreationService.checkAvailability(any(), any(), any()))
             .thenReturn(result(req1))
@@ -182,7 +189,7 @@ class AvailabilityCheckerTest {
     @Test
     fun `pushover user result is passed to processUserResults`() {
         val req = request(userId = 2L)
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
+        `when`(searchRequestRepository.findAllIncomplete()).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(pushoverUser))
         `when`(recreationService.checkAvailability(any(), any(), any()))
             .thenReturn(result(req, hasAvailableSites = true))
@@ -198,7 +205,7 @@ class AvailabilityCheckerTest {
     @Test
     fun `UserAvailabilityProcessedEvent published for pushover user`() {
         val req = request(userId = 2L)
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
+        `when`(searchRequestRepository.findAllIncomplete()).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(pushoverUser))
         `when`(recreationService.checkAvailability(any(), any(), any()))
             .thenReturn(result(req, hasAvailableSites = true))
@@ -216,7 +223,7 @@ class AvailabilityCheckerTest {
     @Test
     fun `exception in checkAvailability - processUserResults called with empty list and event published`() {
         val req = request()
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
+        `when`(searchRequestRepository.findAllIncomplete()).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser))
         `when`(recreationService.checkAvailability(any(), any(), any()))
             .thenThrow(RuntimeException("RIDB unavailable"))
@@ -236,7 +243,7 @@ class AvailabilityCheckerTest {
     @Test
     fun `exception in processUserResults - event still published`() {
         val req = request()
-        `when`(searchRequestRepository.findByCompletedFalse()).thenReturn(listOf(req))
+        `when`(searchRequestRepository.findAllIncomplete()).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser))
         `when`(recreationService.checkAvailability(any(), any(), any())).thenReturn(result(req))
         doThrow(RuntimeException("DB failure"))
