@@ -25,32 +25,14 @@ CREATE TABLE "public"."search_requests" (
   "campsite_id" integer NOT NULL,
   "loops" json NULL,
   "name" character varying(255) NOT NULL,
-  "completed" boolean NOT NULL DEFAULT false,
   "user_id" bigint NULL,
-  "pause_reason" character varying(64) NULL,
   "campground_name" character varying(255) NOT NULL DEFAULT '',
-  "last_availability_state" character varying(16) NULL,
-  "user_paused" boolean NOT NULL DEFAULT false,
-  "last_notified_at" timestamptz NULL,
-  "reminder_sent_at" timestamptz NULL,
   "campground_timezone" character varying(64) NULL,
   PRIMARY KEY ("id"),
   -- atlas:renamed_from fk_search_requests_v2_user
-  CONSTRAINT "fk_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
-  CONSTRAINT "chk_search_requests_last_availability_state" CHECK (last_availability_state IN ('AVAILABLE', 'UNAVAILABLE'))
+  CONSTRAINT "fk_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id")
 );
 CREATE INDEX ON "public"."search_requests" ("user_id");
--- Create "search_request_checks" table
-CREATE TABLE "public"."search_request_checks" (
-  "id" bigserial NOT NULL,
-  "search_request_id" bigint NOT NULL,
-  "checked_at" timestamptz NOT NULL,
-  "available" boolean NOT NULL,
-  "available_site_count" integer NOT NULL,
-  PRIMARY KEY ("id"),
-  CONSTRAINT "fk_src_search_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests" ("id") ON DELETE CASCADE
-);
-CREATE INDEX ON "public"."search_request_checks" ("search_request_id");
 -- Create "notification_outbox" table
 CREATE TABLE "public"."notification_outbox" (
   "id" bigserial NOT NULL,
