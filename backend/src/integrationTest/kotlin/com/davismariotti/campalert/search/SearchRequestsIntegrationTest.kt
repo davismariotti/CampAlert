@@ -5,6 +5,7 @@ import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
 import com.davismariotti.campalert.model.PhoneNumber
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.recreation.RidbFacility
 import com.davismariotti.campalert.recreation.RidbFacilityResponse
 import com.davismariotti.campalert.repository.PhoneNumberRepository
@@ -90,20 +91,23 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
             )
         )
 
-    private fun seedRequest(userId: Long, completed: Boolean = false, pauseReason: String? = null): SearchRequest =
-        searchRequestRepository.save(
-            SearchRequest(
-                userId = userId,
-                startDay = LocalDate.now().plusDays(30),
-                nights = 2,
-                groupSize = 4,
-                campsiteId = 10,
-                name = "Weekend Trip",
-                campgroundName = "Pine Valley",
-                completed = completed,
-                pauseReason = pauseReason,
-            )
+    private fun seedRequest(userId: Long, completed: Boolean = false, pauseReason: String? = null): SearchRequest {
+        val req = SearchRequest(
+            userId = userId,
+            startDay = LocalDate.now().plusDays(30),
+            nights = 2,
+            groupSize = 4,
+            campsiteId = 10,
+            name = "Weekend Trip",
+            campgroundName = "Pine Valley",
         )
+        val st = SearchRequestState()
+        st.searchRequest = req
+        st.completed = completed
+        st.pauseReason = pauseReason
+        req.state = st
+        return searchRequestRepository.save(req)
+    }
 
     // --- 3.3 Unauthenticated 401 ---
 

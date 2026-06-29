@@ -1,6 +1,7 @@
 package com.davismariotti.campalert.repository
 
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.support.IntegrationTestBase
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -21,8 +22,9 @@ class SearchRequestRepositoryTest : IntegrationTestBase() {
     @Test
     fun `update does not throw SQL grammar exception`() {
         val saved = repository.save(searchRequest(loops = listOf("wildcat")))
-        val updated = repository.save(saved.copy(completed = true))
-        assertThat(updated.completed).isTrue()
+        saved.state.completed = true
+        val updated = repository.save(saved)
+        assertThat(updated.state.completed).isTrue()
         assertThat(updated.loops).containsExactly("wildcat")
     }
 
@@ -33,21 +35,26 @@ class SearchRequestRepositoryTest : IntegrationTestBase() {
     }
 
     @Test
-    fun `findByCompleted filters correctly`() {
+    fun `findAllByCompleted filters correctly`() {
         repository.save(searchRequest(completed = false))
         repository.save(searchRequest(completed = true))
-        assertThat(repository.findByCompleted(false)).hasSize(1)
-        assertThat(repository.findByCompleted(true)).hasSize(1)
+        assertThat(repository.findAllByCompleted(false)).hasSize(1)
+        assertThat(repository.findAllByCompleted(true)).hasSize(1)
     }
 
-    private fun searchRequest(loops: List<String>? = listOf("wildcat"), completed: Boolean = false) =
-        SearchRequest(
+    private fun searchRequest(loops: List<String>? = listOf("wildcat"), completed: Boolean = false): SearchRequest {
+        val req = SearchRequest(
             startDay = LocalDate.of(2026, 7, 4),
             nights = 2,
             groupSize = 4,
             campsiteId = 233359,
             loops = loops,
             name = "Test",
-            completed = completed
         )
+        val st = SearchRequestState()
+        st.searchRequest = req
+        st.completed = completed
+        req.state = st
+        return req
+    }
 }

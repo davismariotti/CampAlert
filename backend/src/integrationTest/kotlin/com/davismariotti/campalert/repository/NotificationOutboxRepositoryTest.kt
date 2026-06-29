@@ -4,6 +4,7 @@ import com.davismariotti.campalert.model.AvailabilityState
 import com.davismariotti.campalert.model.NotificationOutbox
 import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.support.IntegrationTestBase
 import org.assertj.core.api.Assertions.assertThat
@@ -35,19 +36,20 @@ class NotificationOutboxRepositoryTest : IntegrationTestBase() {
     fun seedUserAndRequest() {
         val user = userRepository.save(User(email = "outbox@test.com", passwordHash = "hash"))
         userId = user.id!!
-        val request = searchRequestRepository.save(
-            SearchRequest(
-                userId = userId,
-                startDay = LocalDate.of(2027, 8, 1),
-                nights = 2,
-                groupSize = 4,
-                campsiteId = 42,
-                name = "Pine Camp",
-                campgroundName = "Pine Valley",
-                completed = false,
-                lastAvailabilityState = AvailabilityState.AVAILABLE,
-            )
+        val req = SearchRequest(
+            userId = userId,
+            startDay = LocalDate.of(2027, 8, 1),
+            nights = 2,
+            groupSize = 4,
+            campsiteId = 42,
+            name = "Pine Camp",
+            campgroundName = "Pine Valley",
         )
+        val st = SearchRequestState()
+        st.searchRequest = req
+        st.lastAvailabilityState = AvailabilityState.AVAILABLE
+        req.state = st
+        val request = searchRequestRepository.save(req)
         requestId = request.id!!
     }
 

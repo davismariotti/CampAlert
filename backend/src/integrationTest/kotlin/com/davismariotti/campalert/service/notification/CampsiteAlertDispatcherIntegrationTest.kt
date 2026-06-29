@@ -6,6 +6,7 @@ import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.PhoneNumber
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
@@ -56,20 +57,22 @@ class CampsiteAlertDispatcherIntegrationTest : IntegrationTestBase() {
             )
         )
 
-    private fun seedRequest(availabilityState: AvailabilityState = AvailabilityState.AVAILABLE): SearchRequest =
-        searchRequestRepository.save(
-            SearchRequest(
-                userId = userId,
-                startDay = LocalDate.of(2027, 8, 1),
-                nights = 2,
-                groupSize = 4,
-                campsiteId = 42,
-                name = "Pine Camp",
-                campgroundName = "Pine Valley",
-                completed = false,
-                lastAvailabilityState = availabilityState,
-            )
+    private fun seedRequest(availabilityState: AvailabilityState = AvailabilityState.AVAILABLE): SearchRequest {
+        val req = SearchRequest(
+            userId = userId,
+            startDay = LocalDate.of(2027, 8, 1),
+            nights = 2,
+            groupSize = 4,
+            campsiteId = 42,
+            name = "Pine Camp",
+            campgroundName = "Pine Valley",
         )
+        val st = SearchRequestState()
+        st.searchRequest = req
+        st.lastAvailabilityState = availabilityState
+        req.state = st
+        return searchRequestRepository.save(req)
+    }
 
     private fun seedClaimableRow(
         request: SearchRequest,
