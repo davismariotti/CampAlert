@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { useAuth } from '../auth/useAuth'
 import { DEFAULT_TIMEZONE, getTimezoneOptions } from '../../utils/timezones'
+import { ChangePasswordForm } from './ChangePasswordForm'
 
 export function AccountSettingsPage() {
   const { user, login } = useAuth()
@@ -73,6 +74,14 @@ export function AccountSettingsPage() {
             </Button>
           </div>
         </form>
+      </section>
+
+      <section className="mt-6 rounded-2xl bg-white p-6 shadow-sm">
+        <h2 className="text-base font-semibold text-forest-900">Security</h2>
+        <p className="mt-1 text-sm text-forest-600">
+          Update your password. You'll need your current password to make changes.
+        </p>
+        <ChangePasswordForm />
       </section>
     </div>
   )

@@ -12,4 +12,12 @@ class SessionRevocationService(
             sessionRepository.deleteById(sessionId)
         }
     }
+
+    fun revokeOtherSessionsFor(username: String, currentSessionId: String) {
+        sessionRepository
+            .findByPrincipalName(username)
+            .keys
+            .filter { it != currentSessionId }
+            .forEach { sessionId -> sessionRepository.deleteById(sessionId) }
+    }
 }

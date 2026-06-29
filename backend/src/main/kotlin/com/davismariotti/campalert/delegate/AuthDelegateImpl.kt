@@ -2,6 +2,7 @@ package com.davismariotti.campalert.delegate
 
 import com.davismariotti.campalert.api.AuthApiDelegate
 import com.davismariotti.campalert.api.model.AuthResponse
+import com.davismariotti.campalert.api.model.ChangePasswordBody
 import com.davismariotti.campalert.api.model.ErrorResponse
 import com.davismariotti.campalert.api.model.ForgotPasswordBody
 import com.davismariotti.campalert.api.model.LoginBody
@@ -15,6 +16,7 @@ import com.davismariotti.campalert.api.model.VerifyEmailBody
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.security.RememberMeServices
 import com.davismariotti.campalert.security.UserDetailsServiceImpl
+import com.davismariotti.campalert.service.SessionRevocationService
 import com.davismariotti.campalert.service.email.EmailVerificationService
 import com.davismariotti.campalert.service.email.EmailVerificationService.VerifyResult
 import com.davismariotti.campalert.service.email.PasswordResetService
@@ -46,6 +48,7 @@ class AuthDelegateImpl(
     private val emailVerificationService: EmailVerificationService,
     private val passwordResetService: PasswordResetService,
     private val userDetailsService: UserDetailsServiceImpl,
+    private val sessionRevocationService: SessionRevocationService,
 ) : AuthApiDelegate {
     override fun register(registerBody: RegisterBody): ResponseEntity<RegisterResponse> {
         if (userRepository.findByEmail(registerBody.email) != null) {
@@ -166,6 +169,37 @@ class AuthDelegateImpl(
         SecurityContextHolder.setContext(context)
         val session = request.getSession(true)
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    @PreAuthorize("isAuthenticated()")
+    override fun changePassword(changePasswordBody: ChangePasswordBody): ResponseEntity<Unit> {
+        val auth = SecurityContextHolder.getContext().authentication!!
+        val user = userRepository.findByEmail(auth.name)!!
+
+        if (!passwordEncoder.matches(changePasswordBody.currentPassword, user.passwordHash)) {
+            return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse(message = "Current password is incorrect"))
+                as ResponseEntity<Unit>
+        }
+        if (changePasswordBody.newPassword == changePasswordBody.currentPassword) {
+            return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse(message = "New password must differ from current password"))
+                as ResponseEntity<Unit>
+        }
+
+        userRepository.save(user.copy(passwordHash = passwordEncoder.encode(changePasswordBody.newPassword)!!))
+
+        val currentSessionId = request.getSession(false)?.id
+        if (currentSessionId != null) {
+            sessionRevocationService.revokeOtherSessionsFor(auth.name, currentSessionId)
+        } else {
+            sessionRevocationService.revokeAllSessionsFor(auth.name)
+        }
+
+        return ResponseEntity.noContent().build()
     }
 
     override fun forgotPassword(forgotPasswordBody: ForgotPasswordBody): ResponseEntity<Unit> {
