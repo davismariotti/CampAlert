@@ -50,6 +50,15 @@ dependencies {
     compileOnly 'com.newrelic.agent.java:newrelic-api:8.18.0'
     testRuntimeOnly 'com.newrelic.agent.java:newrelic-api:8.18.0'
 
+    // Notifications library (extracted transport + message model), consumed from Maven Central.
+    // Provider modules are added explicitly because the starter declares them compileOnly.
+    // The old in-repo senders + direct twilio/postmark/pushover/newrelic deps above are removed
+    // in the message-model/dispatch step once they are no longer referenced.
+    implementation 'com.davismariotti:notifications-spring-boot-starter:1.0.0'
+    implementation 'com.davismariotti:notifications-twilio:1.0.0'
+    implementation 'com.davismariotti:notifications-postmark:1.0.0'
+    implementation 'com.davismariotti:notifications-pushover:1.0.0'
+
     implementation 'io.swagger.core.v3:swagger-annotations:2.2.51'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-session-data-redis'
