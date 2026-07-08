@@ -3,13 +3,14 @@ package com.davismariotti.campalert.service.email
 import com.davismariotti.campalert.config.PasswordResetProperties
 import com.davismariotti.campalert.model.PasswordReset
 import com.davismariotti.campalert.model.User
-import com.davismariotti.campalert.notification.Notification
 import com.davismariotti.campalert.notification.ResetPasswordNotification
 import com.davismariotti.campalert.repository.PasswordResetRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.SessionRevocationService
 import com.davismariotti.campalert.service.email.PasswordResetService.ResetResult
 import com.davismariotti.campalert.service.notification.NotificationService
+import com.davismariotti.notifications.EmailContent
+import com.davismariotti.notifications.Notification
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -74,7 +75,7 @@ class PasswordResetServiceTest {
         doAnswer {
             sent.add(it.getArgument(0))
             null
-        }.`when`(notificationService).sendAsync(anyKt())
+        }.`when`(notificationService).sendAsync(anyKt(), anyKt())
         val user = verifiedUser()
         `when`(userRepository.findByEmail("user@example.com")).thenReturn(user)
         `when`(passwordResetRepository.findLatestByUserId(anyLong())).thenReturn(null)
@@ -82,7 +83,7 @@ class PasswordResetServiceTest {
         service.forgotPassword("user@example.com")
 
         assertEquals(1, sent.size)
-        assertEquals("email/reset-password", (sent[0] as ResetPasswordNotification).getEmailTemplate().get())
+        assertEquals("email/reset-password", ((sent[0] as ResetPasswordNotification).email() as EmailContent.Templated).template)
     }
 
     @Test
@@ -92,7 +93,7 @@ class PasswordResetServiceTest {
         service.forgotPassword("ghost@example.com")
 
         verify(passwordResetRepository, never()).save(anyKt())
-        verify(notificationService, never()).sendAsync(anyKt())
+        verify(notificationService, never()).sendAsync(anyKt(), anyKt())
     }
 
     @Test
@@ -103,7 +104,7 @@ class PasswordResetServiceTest {
         service.forgotPassword("user@example.com")
 
         verify(passwordResetRepository, never()).save(anyKt())
-        verify(notificationService, never()).sendAsync(anyKt())
+        verify(notificationService, never()).sendAsync(anyKt(), anyKt())
     }
 
     @Test
@@ -116,7 +117,7 @@ class PasswordResetServiceTest {
 
         service.forgotPassword("user@example.com")
 
-        verify(notificationService, never()).sendAsync(anyKt())
+        verify(notificationService, never()).sendAsync(anyKt(), anyKt())
     }
 
     @Test
@@ -129,7 +130,7 @@ class PasswordResetServiceTest {
 
         service.forgotPassword("user@example.com")
 
-        verify(notificationService).sendAsync(anyKt<ResetPasswordNotification>())
+        verify(notificationService).sendAsync(anyKt<ResetPasswordNotification>(), anyKt())
         verify(passwordResetRepository).consumeAllPendingByUserId(anyLong(), anyKt())
     }
 
@@ -141,7 +142,7 @@ class PasswordResetServiceTest {
 
         service.forgotPassword("user@example.com")
 
-        verify(notificationService).sendAsync(anyKt<ResetPasswordNotification>())
+        verify(notificationService).sendAsync(anyKt<ResetPasswordNotification>(), anyKt())
         assertEquals(1, savedPasswordResets.size)
     }
 
@@ -153,12 +154,12 @@ class PasswordResetServiceTest {
         doAnswer {
             sent.add(it.getArgument(0))
             null
-        }.`when`(notificationService).sendAsync(anyKt())
+        }.`when`(notificationService).sendAsync(anyKt(), anyKt())
 
         service.issueReset(1L, "user@example.com")
 
         assertEquals(1, sent.size)
-        val resetUrl = (sent[0] as ResetPasswordNotification).getEmailParameters()["resetUrl"] as String
+        val resetUrl = ((sent[0] as ResetPasswordNotification).email() as EmailContent.Templated).params["resetUrl"] as String
         assertTrue(resetUrl.startsWith("http://localhost:5173/reset-password?resetId="), "resetUrl must include resetId")
         assertTrue(resetUrl.contains("&token="), "resetUrl must include token")
     }
@@ -169,11 +170,11 @@ class PasswordResetServiceTest {
         doAnswer {
             sent.add(it.getArgument(0))
             null
-        }.`when`(notificationService).sendAsync(anyKt())
+        }.`when`(notificationService).sendAsync(anyKt(), anyKt())
 
         service.issueReset(1L, "user@example.com")
 
-        val resetUrl = (sent[0] as ResetPasswordNotification).getEmailParameters()["resetUrl"] as String
+        val resetUrl = ((sent[0] as ResetPasswordNotification).email() as EmailContent.Templated).params["resetUrl"] as String
         val token = resetUrl.substringAfter("&token=")
         assertEquals(1, savedPasswordResets.size)
         assertEquals(service.sha256(token), savedPasswordResets[0].tokenHash)

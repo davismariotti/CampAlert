@@ -9,6 +9,7 @@ import com.davismariotti.campalert.repository.EmailVerificationRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.notification.NotificationService
 import com.davismariotti.campalert.util.CryptoUtils
+import com.davismariotti.notifications.SimpleRecipient
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Lazy
@@ -55,15 +56,14 @@ class EmailVerificationService(
             ),
         )
 
-        val notificationUser = User(id = userId, email = email, passwordHash = "")
         notificationService.sendAsync(
             VerifyEmailNotification(
-                user = notificationUser,
                 code = code,
                 verifyUrl = "$frontendBaseUrl/verify-email?verificationId=$id&code=$code",
                 expiryMinutes = props.expiresIn.toMinutes().toString(),
                 frontendBaseUrl = frontendBaseUrl,
             ),
+            SimpleRecipient(email = email),
         )
 
         return id
@@ -133,7 +133,7 @@ class EmailVerificationService(
         val now = Instant.now()
         emailVerificationRepository.save(row.copy(consumedAt = now))
         val verifiedUser = userRepository.save(user.copy(emailVerifiedAt = now))
-        notificationService.sendAsync(WelcomeNotification(verifiedUser, frontendBaseUrl))
+        notificationService.sendAsync(WelcomeNotification(frontendBaseUrl), SimpleRecipient(email = verifiedUser.email))
         return VerifyOutcome(VerifyResult.SUCCESS, verifiedUser)
     }
 

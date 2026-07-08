@@ -5,15 +5,18 @@ import com.davismariotti.campalert.api.model.RegisterBody
 import com.davismariotti.campalert.api.model.VerifyEmailBody
 import com.davismariotti.campalert.recreation.RecreationApi
 import com.davismariotti.campalert.recreation.RidbApi
-import com.davismariotti.campalert.service.email.EmailSender
-import com.davismariotti.campalert.service.email.MailSender
-import com.davismariotti.campalert.service.notification.SmsSender
 import com.davismariotti.campalert.service.sms.TwilioVerifyService
+import com.davismariotti.notifications.EmailSender
+import com.davismariotti.notifications.PushoverSender
+import com.davismariotti.notifications.SendResult
+import com.davismariotti.notifications.SmsSender
+import com.davismariotti.notifications.TemplateRenderer
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.BeforeEach
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.doAnswer
+import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -80,14 +83,19 @@ open class IntegrationTestBase {
     @MockitoBean
     protected lateinit var recreationApi: RecreationApi
 
-    // Satisfies TemplatedMailSender's constructor so the context loads; never called directly.
+    // Replaces the library's real EmailSender so no real email is sent during tests.
     @MockitoBean
     protected lateinit var emailSender: EmailSender
 
-    // Replaces TemplatedMailSender so no real email is sent during tests.
-    // Calls are captured in sentEmailVarsList so helpers can extract codes and tokens.
+    // Replaces the library's real PushoverSender so no real Pushover call is made during tests.
     @MockitoBean
-    protected lateinit var mailSender: MailSender
+    protected lateinit var pushoverSender: PushoverSender
+
+    // Replaces the library's real TemplateRenderer so no template is actually rendered.
+    // Calls are captured in sentEmailVarsList so helpers can extract codes and tokens from the
+    // template params (the pre-render variables), not the rendered HTML.
+    @MockitoBean
+    protected lateinit var templateRenderer: TemplateRenderer
 
     @Autowired
     protected lateinit var mockMvc: MockMvc
@@ -104,7 +112,7 @@ open class IntegrationTestBase {
     @Autowired
     protected lateinit var mapper: ObjectMapper
 
-    /** All variables maps passed to mailSender.send() during this test, in the order they were sent. */
+    /** All params maps passed to templateRenderer.render() during this test, in the order rendered. */
     protected val sentEmailVarsList = CopyOnWriteArrayList<Map<String, Any>>()
 
     @BeforeEach
@@ -118,12 +126,16 @@ open class IntegrationTestBase {
             circuitBreakerRegistry.circuitBreaker(name).reset()
         }
 
+        `when`(smsSender.send(anyString(), anyString())).thenReturn(SendResult.success())
+        `when`(emailSender.send(anyString(), anyString(), anyString())).thenReturn(SendResult.success())
+        `when`(pushoverSender.send(anyKt(), anyKt())).thenReturn(SendResult.success())
+
         sentEmailVarsList.clear()
         @Suppress("UNCHECKED_CAST")
         doAnswer { invocation ->
-            sentEmailVarsList.add(invocation.arguments[3] as Map<String, Any>)
-            null
-        }.`when`(mailSender).send(anyString(), anyString(), anyString(), anyKt())
+            sentEmailVarsList.add(invocation.arguments[1] as Map<String, Any>)
+            ""
+        }.`when`(templateRenderer).render(anyString(), anyKt())
     }
 
     protected fun getCsrfToken(): String {

@@ -3,13 +3,14 @@ package com.davismariotti.campalert.service.email
 import com.davismariotti.campalert.config.EmailVerificationProperties
 import com.davismariotti.campalert.model.EmailVerification
 import com.davismariotti.campalert.model.User
-import com.davismariotti.campalert.notification.Notification
 import com.davismariotti.campalert.notification.VerifyEmailNotification
 import com.davismariotti.campalert.notification.WelcomeNotification
 import com.davismariotti.campalert.repository.EmailVerificationRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.email.EmailVerificationService.VerifyResult
 import com.davismariotti.campalert.service.notification.NotificationService
+import com.davismariotti.notifications.EmailContent
+import com.davismariotti.notifications.Notification
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -71,12 +72,12 @@ class EmailVerificationServiceTest {
         doAnswer {
             sent.add(it.getArgument(0))
             null
-        }.`when`(notificationService).sendAsync(anyKt())
+        }.`when`(notificationService).sendAsync(anyKt(), anyKt())
 
         service.issueVerification(1L, "user@example.com")
 
         assertEquals(1, sent.size)
-        val params = (sent[0] as VerifyEmailNotification).getEmailParameters()
+        val params = ((sent[0] as VerifyEmailNotification).email() as EmailContent.Templated).params
         val code = params["code"] as String
         assertTrue(code.matches(Regex("\\d{6}")), "code must be 6 digits, was: $code")
         val verifyUrl = params["verifyUrl"] as String
@@ -92,11 +93,11 @@ class EmailVerificationServiceTest {
         doAnswer {
             sent.add(it.getArgument(0))
             null
-        }.`when`(notificationService).sendAsync(anyKt())
+        }.`when`(notificationService).sendAsync(anyKt(), anyKt())
 
         service.issueVerification(1L, "user@example.com")
 
-        val sentCode = (sent[0] as VerifyEmailNotification).getEmailParameters()["code"] as String
+        val sentCode = ((sent[0] as VerifyEmailNotification).email() as EmailContent.Templated).params["code"] as String
         assertEquals(1, savedEmailVerifications.size)
         assertEquals(service.sha256(sentCode), savedEmailVerifications[0].codeHash)
     }
@@ -179,7 +180,7 @@ class EmailVerificationServiceTest {
 
         assertEquals(row.id, result)
         verify(emailVerificationRepository, never()).consumeAllPendingByUserId(anyLong(), anyKt())
-        verify(notificationService, never()).sendAsync(anyKt())
+        verify(notificationService, never()).sendAsync(anyKt(), anyKt())
     }
 
     @Test
@@ -189,7 +190,7 @@ class EmailVerificationServiceTest {
         val result = service.ensureVerificationForLogin(1L, "user@example.com")
 
         assertNotNull(result)
-        verify(notificationService).sendAsync(anyKt<VerifyEmailNotification>())
+        verify(notificationService).sendAsync(anyKt<VerifyEmailNotification>(), anyKt())
         verify(emailVerificationRepository).consumeAllPendingByUserId(anyLong(), anyKt())
     }
 
@@ -218,7 +219,7 @@ class EmailVerificationServiceTest {
 
         service.consumeVerification(row.id, code)
 
-        verify(notificationService).sendAsync(anyKt<WelcomeNotification>())
+        verify(notificationService).sendAsync(anyKt<WelcomeNotification>(), anyKt())
     }
 
     @Test
@@ -229,7 +230,7 @@ class EmailVerificationServiceTest {
 
         service.consumeVerification(row.id, "123456")
 
-        verify(notificationService, never()).sendAsync(anyKt())
+        verify(notificationService, never()).sendAsync(anyKt(), anyKt())
     }
 
     @Test

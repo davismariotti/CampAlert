@@ -1,61 +1,44 @@
 package com.davismariotti.campalert.service.notification
 
-import com.davismariotti.campalert.model.PhoneNumber
-import com.davismariotti.campalert.model.PhoneNumberStatus
-import com.davismariotti.campalert.model.User
-import com.davismariotti.campalert.notification.Notification
-import com.davismariotti.campalert.repository.PhoneNumberRepository
-import com.davismariotti.campalert.service.email.MailSender
+import com.davismariotti.notifications.DispatchResult
+import com.davismariotti.notifications.Notification
+import com.davismariotti.notifications.NotificationDispatcher
+import com.davismariotti.notifications.Recipient
+import com.davismariotti.notifications.SendResult
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Service
 
+/**
+ * Thin CampAlert-side wrapper around the notifications library's dispatcher. Recipient resolution
+ * (verified phone, Pushover targets) is the caller's job — see [RecipientResolver] — this class only
+ * dispatches and logs per-channel failures.
+ */
 @Service
 class NotificationService(
-    private val mailSender: MailSender,
-    private val smsSender: SmsSender,
-    private val pushoverNotificationService: PushoverNotificationService,
-    private val phoneNumberRepository: PhoneNumberRepository,
+    private val dispatcher: NotificationDispatcher,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
+    /** Fire-and-forget: any channel failure is logged; the outcome is not returned to the caller. */
     @Async
-    fun sendAsync(notification: Notification) {
-        try {
-            send(notification)
-        } catch (e: Exception) {
-            log.warn("Notification delivery failed for {}", notification::class.simpleName, e)
-        }
+    fun sendAsync(notification: Notification, recipient: Recipient) {
+        send(notification, recipient)
     }
 
-    /** Sends the notification and returns the PhoneNumber used for SMS, or null if Pushover or no SMS was sent. */
-    fun send(notification: Notification): PhoneNumber? {
-        notification.getEmailTemplate().ifPresent { template ->
-            mailSender.send(
-                notification.user.email,
-                notification.getEmailSubject(),
-                template,
-                notification.getEmailParameters(),
-            )
+    /** Synchronous send, returning the per-channel outcome (e.g. for a caller that persists it). */
+    fun send(notification: Notification, recipient: Recipient): DispatchResult {
+        val result = dispatcher.send(notification, recipient)
+        result.byChannel.forEach { (channel, sendResult) ->
+            if (sendResult is SendResult.Failure) {
+                log.warn(
+                    "Notification delivery failed channel={} type={}",
+                    channel,
+                    notification::class.simpleName,
+                    sendResult.cause,
+                )
+            }
         }
-        return notification
-            .getSmsContent()
-            .map { content ->
-                dispatchSms(notification.user, content)
-            }.orElse(null)
-    }
-
-    private fun dispatchSms(user: User, content: String): PhoneNumber? {
-        if (user.pushoverOverrideEnabled && user.pushoverApiToken != null && user.pushoverUserKey != null) {
-            pushoverNotificationService.notify(user, content)
-            return null
-        }
-        val phone = phoneNumberRepository.findByUserIdAndStatus(user.id!!, PhoneNumberStatus.VERIFIED).firstOrNull()
-        if (phone == null) {
-            log.warn("No verified phone for userId={}, skipping SMS", user.id)
-            return null
-        }
-        smsSender.send(phone.phone, content)
-        return phone
+        return result
     }
 }

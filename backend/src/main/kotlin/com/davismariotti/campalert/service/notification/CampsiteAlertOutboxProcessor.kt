@@ -3,14 +3,17 @@ package com.davismariotti.campalert.service.notification
 import com.davismariotti.campalert.model.AvailabilityState
 import com.davismariotti.campalert.model.NotificationOutbox
 import com.davismariotti.campalert.model.OutboxType
-import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.notification.CampsiteAlertNotification
 import com.davismariotti.campalert.notification.PendingNotification
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
-import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.sms.SmsConversationService
+import com.davismariotti.notifications.Channel
+import com.davismariotti.notifications.PushContent
+import com.davismariotti.notifications.PushoverSender
+import com.davismariotti.notifications.PushoverTarget
+import com.davismariotti.notifications.SendResult
 import com.newrelic.api.agent.NewRelic
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -20,10 +23,11 @@ import java.time.Instant
 @Service
 class CampsiteAlertOutboxProcessor(
     private val notificationService: NotificationService,
+    private val recipientResolver: RecipientResolver,
+    private val pushoverSender: PushoverSender,
     private val notificationOutboxRepository: NotificationOutboxRepository,
     private val searchRequestRepository: SearchRequestRepository,
     private val userRepository: UserRepository,
-    private val phoneNumberRepository: PhoneNumberRepository,
     private val smsConversationService: SmsConversationService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -36,16 +40,12 @@ class CampsiteAlertOutboxProcessor(
 
         val user = userRepository.findById(userId).orElse(null) ?: return
 
-        val usePushover = user.pushoverOverrideEnabled && user.pushoverApiToken != null && user.pushoverUserKey != null
-        val smsPhone = if (usePushover) {
-            null
-        } else {
-            val phones = phoneNumberRepository.findByUserIdAndStatus(userId, PhoneNumberStatus.VERIFIED)
-            if (phones.isEmpty()) {
-                rows.forEach { row -> notificationOutboxRepository.save(row.copy(missedAt = now)) }
-                return
-            }
-            phones.first()
+        val recipient = recipientResolver.resolve(user)
+        val pushoverTarget = recipient.pushTargets.filterIsInstance<PushoverTarget>().firstOrNull()
+
+        if (pushoverTarget == null && recipient.phone == null) {
+            rows.forEach { row -> notificationOutboxRepository.save(row.copy(missedAt = now)) }
+            return
         }
 
         val requestById = searchRequestRepository.findAllById(rows.map { it.requestId }).associateBy { it.id!! }
@@ -81,38 +81,56 @@ class CampsiteAlertOutboxProcessor(
 
         val available = toSend.filter { it.type == OutboxType.AVAILABLE || it.type == OutboxType.REMINDER }
         val gone = toSend.filter { it.type == OutboxType.UNAVAILABLE }
-        val notification = CampsiteAlertNotification(user, available, gone)
+        val notification = CampsiteAlertNotification(available, gone)
 
-        val channel = if (usePushover) "PUSHOVER" else "SMS"
+        val channel = if (pushoverTarget != null) "PUSHOVER" else "SMS"
 
         try {
-            val usedPhone = notificationService.send(notification)
-            log.info("Notification sent userId={} channel={} available={} gone={}", userId, channel, available.size, gone.size)
-            NewRelic.getAgent().insights.recordCustomEvent(
-                "NotificationSent",
-                mapOf(
-                    "userId" to userId,
-                    "channel" to channel,
-                    "availableCount" to available.size,
-                    "goneCount" to gone.size,
-                ),
-            )
-            toSend.forEach { n ->
-                notificationOutboxRepository.save(rowById[n.outboxId]!!.copy(sentAt = now))
-                if (n.type == OutboxType.AVAILABLE || n.type == OutboxType.REMINDER) {
-                    n.request.state.lastNotifiedAt = now
-                    searchRequestRepository.save(n.request)
-                }
+            // Pushover admin override: reuse the SMS-intended text via the free-form Pushover sender,
+            // bypassing the structured SMS channel entirely (mutually exclusive with SMS, not additive).
+            val result = if (pushoverTarget != null) {
+                val smsContent = notification.sms()
+                if (smsContent != null) pushoverSender.send(pushoverTarget, PushContent(body = smsContent.text)) else null
+            } else {
+                notificationService.send(notification, recipient)[Channel.SMS]
             }
-            if (usedPhone != null) {
-                val contextIds = toSend
-                    .filter { it.type == OutboxType.AVAILABLE || it.type == OutboxType.REMINDER }
-                    .map { it.request.id!! }
-                if (contextIds.isNotEmpty()) {
-                    smsConversationService.setContext(usedPhone.phone, contextIds)
+
+            if (result?.isSuccess == true) {
+                log.info("Notification sent userId={} channel={} available={} gone={}", userId, channel, available.size, gone.size)
+                NewRelic.getAgent().insights.recordCustomEvent(
+                    "NotificationSent",
+                    mapOf(
+                        "userId" to userId,
+                        "channel" to channel,
+                        "availableCount" to available.size,
+                        "goneCount" to gone.size,
+                    ),
+                )
+                toSend.forEach { n ->
+                    notificationOutboxRepository.save(rowById[n.outboxId]!!.copy(sentAt = now))
+                    if (n.type == OutboxType.AVAILABLE || n.type == OutboxType.REMINDER) {
+                        n.request.state.lastNotifiedAt = now
+                        searchRequestRepository.save(n.request)
+                    }
+                }
+                if (pushoverTarget == null) {
+                    val contextIds = toSend
+                        .filter { it.type == OutboxType.AVAILABLE || it.type == OutboxType.REMINDER }
+                        .map { it.request.id!! }
+                    if (contextIds.isNotEmpty()) {
+                        smsConversationService.setContext(recipient.phone!!, contextIds)
+                    }
+                }
+            } else {
+                val cause = (result as? SendResult.Failure)?.cause
+                log.error("Failed to send campsite alert to userId={}", userId, cause)
+                rows.forEach { row ->
+                    notificationOutboxRepository.save(row.copy(claimedAt = null, attemptCount = row.attemptCount + 1))
                 }
             }
         } catch (e: Exception) {
+            // Backstop for an exception escaping the SendResult contract (senders are expected to
+            // return SendResult.Failure, never throw, for expected delivery failures).
             log.error("Failed to send campsite alert to userId={}", userId, e)
             rows.forEach { row ->
                 notificationOutboxRepository.save(row.copy(claimedAt = null, attemptCount = row.attemptCount + 1))

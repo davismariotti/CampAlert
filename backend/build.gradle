@@ -34,7 +34,6 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-security'
-    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'com.fasterxml.jackson.module:jackson-module-kotlin'
@@ -44,16 +43,17 @@ dependencies {
     implementation 'com.squareup.retrofit2:retrofit:3.0.0'
     implementation 'com.squareup.retrofit2:converter-jackson:3.0.0'
 
-    implementation 'com.github.sps.pushover.net:pushover-client:1.0.0'
+    // Twilio SDK stays a direct dependency: TwilioConfiguration's Twilio.init (static client),
+    // TwilioVerifyService, TwilioHealthIndicator, and SmsWebhookController's signature validation
+    // all use it directly — none of that is part of the notifications extraction.
     implementation 'com.twilio.sdk:twilio:12.1.1'
-    implementation 'com.postmarkapp:postmark:1.13.0'
     compileOnly 'com.newrelic.agent.java:newrelic-api:8.18.0'
     testRuntimeOnly 'com.newrelic.agent.java:newrelic-api:8.18.0'
 
     // Notifications library (extracted transport + message model), consumed from Maven Central.
     // Provider modules are added explicitly because the starter declares them compileOnly.
-    // The old in-repo senders + direct twilio/postmark/pushover/newrelic deps above are removed
-    // in the message-model/dispatch step once they are no longer referenced.
+    // pushover-client/postmark/spring-boot-starter-thymeleaf are no longer needed directly — the
+    // library's provider modules bring their own.
     implementation 'com.davismariotti:notifications-spring-boot-starter:1.0.0'
     implementation 'com.davismariotti:notifications-twilio:1.0.0'
     implementation 'com.davismariotti:notifications-postmark:1.0.0'

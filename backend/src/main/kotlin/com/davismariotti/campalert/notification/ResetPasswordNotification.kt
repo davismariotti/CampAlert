@@ -1,22 +1,21 @@
 package com.davismariotti.campalert.notification
 
-import com.davismariotti.campalert.model.User
-import java.util.Optional
+import com.davismariotti.notifications.EmailContent
+import com.davismariotti.notifications.Notification
 
 class ResetPasswordNotification(
-    user: User,
     private val resetUrl: String,
     private val expiryMinutes: String,
     private val frontendBaseUrl: String,
-) : Notification(user) {
-    override fun getEmailSubject() = "Reset your CampAlert password"
-
-    override fun getEmailTemplate(): Optional<String> = Optional.of("email/reset-password")
-
-    override fun getEmailParameters(): Map<String, Any> =
-        mapOf(
-            "resetUrl" to resetUrl,
-            "expiryMinutes" to expiryMinutes,
-            "frontendBaseUrl" to frontendBaseUrl,
+) : Notification() {
+    override fun email(): EmailContent =
+        EmailContent.Templated(
+            subject = "Reset your CampAlert password",
+            template = "email/reset-password",
+            params = mapOf(
+                "resetUrl" to resetUrl,
+                "expiryMinutes" to expiryMinutes,
+                "frontendBaseUrl" to frontendBaseUrl,
+            ),
         )
 }
