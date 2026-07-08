@@ -13,12 +13,13 @@ import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.support.IntegrationTestBase
+import com.davismariotti.notifications.SendResult
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import java.time.Instant
 import java.time.LocalDate
@@ -131,7 +132,7 @@ class CampsiteAlertDispatcherIntegrationTest : IntegrationTestBase() {
         seedVerifiedPhone()
         val request = seedRequest()
         val row = seedClaimableRow(request)
-        doThrow(RuntimeException("SMS down")).`when`(smsSender).send(anyKt(), anyKt())
+        `when`(smsSender.send(anyKt(), anyKt())).thenReturn(SendResult.failure(RuntimeException("SMS down"), retryable = true))
 
         runSafetyNet()
 

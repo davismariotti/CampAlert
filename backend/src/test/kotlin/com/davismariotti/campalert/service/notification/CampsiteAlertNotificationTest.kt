@@ -3,17 +3,14 @@ package com.davismariotti.campalert.service.notification
 import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
-import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.notification.CampsiteAlertNotification
 import com.davismariotti.campalert.notification.PendingNotification
-import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
 
 class CampsiteAlertNotificationTest {
-    private val user = User(id = 1L, email = "user@example.com", passwordHash = "hash")
-
     private val request = SearchRequest(
         id = 1L,
         startDay = LocalDate.now().plusDays(10),
@@ -30,14 +27,14 @@ class CampsiteAlertNotificationTest {
     }
 
     @Test
-    fun `getSmsContent includes campground name, date range, and URL for available alert`() {
+    fun `sms includes campground name, date range, and URL for available alert`() {
         val notifications = listOf(PendingNotification(request = request, type = OutboxType.AVAILABLE, outboxId = 1L))
-        val notification = CampsiteAlertNotification(user, available = notifications, gone = emptyList())
+        val notification = CampsiteAlertNotification(available = notifications, gone = emptyList())
 
-        val content = notification.getSmsContent()
+        val content = notification.sms()
 
-        assertTrue(content.isPresent)
-        val body = content.get()
+        assertTrue(content != null)
+        val body = content!!.text
         assertTrue(body.contains("Upper Pines"))
         assertTrue(body.contains("recreation.gov/camping/campgrounds/99"))
         assertTrue(body.contains("Reply PAUSE to snooze"))
@@ -45,15 +42,15 @@ class CampsiteAlertNotificationTest {
     }
 
     @Test
-    fun `getSmsContent includes count header for multiple available alerts`() {
+    fun `sms includes count header for multiple available alerts`() {
         val req2 = request.copy(id = 2, campsiteId = 100, campgroundName = "Yosemite Valley")
         val notifications = listOf(
             PendingNotification(request = request, type = OutboxType.AVAILABLE, outboxId = 1L),
             PendingNotification(request = req2, type = OutboxType.AVAILABLE, outboxId = 2L),
         )
-        val notification = CampsiteAlertNotification(user, available = notifications, gone = emptyList())
+        val notification = CampsiteAlertNotification(available = notifications, gone = emptyList())
 
-        val body = notification.getSmsContent().get()
+        val body = notification.sms()!!.text
 
         assertTrue(body.contains("Upper Pines"))
         assertTrue(body.contains("Yosemite Valley"))
@@ -61,11 +58,11 @@ class CampsiteAlertNotificationTest {
     }
 
     @Test
-    fun `getSmsContent includes unavailability message for gone alerts`() {
+    fun `sms includes unavailability message for gone alerts`() {
         val notifications = listOf(PendingNotification(request = request, type = OutboxType.UNAVAILABLE, outboxId = 1L))
-        val notification = CampsiteAlertNotification(user, available = emptyList(), gone = notifications)
+        val notification = CampsiteAlertNotification(available = emptyList(), gone = notifications)
 
-        val body = notification.getSmsContent().get()
+        val body = notification.sms()!!.text
 
         assertTrue(body.contains("Upper Pines"))
         assertTrue(body.contains("no longer available"))
@@ -73,23 +70,22 @@ class CampsiteAlertNotificationTest {
     }
 
     @Test
-    fun `getSmsContent returns empty for empty available and gone lists`() {
-        val notification = CampsiteAlertNotification(user, available = emptyList(), gone = emptyList())
+    fun `sms returns null for empty available and gone lists`() {
+        val notification = CampsiteAlertNotification(available = emptyList(), gone = emptyList())
 
-        assertFalse(notification.getSmsContent().isPresent)
+        assertNull(notification.sms())
     }
 
     @Test
-    fun `getSmsContent combines available and gone sections with double newline`() {
+    fun `sms combines available and gone sections with double newline`() {
         val availableReq = request.copy(id = 1, campgroundName = "Upper Pines")
         val goneReq = request.copy(id = 2, campgroundName = "Lower Pines")
         val notification = CampsiteAlertNotification(
-            user,
             available = listOf(PendingNotification(request = availableReq, type = OutboxType.AVAILABLE, outboxId = 1L)),
             gone = listOf(PendingNotification(request = goneReq, type = OutboxType.UNAVAILABLE, outboxId = 2L)),
         )
 
-        val body = notification.getSmsContent().get()
+        val body = notification.sms()!!.text
 
         assertTrue(body.contains("Upper Pines"))
         assertTrue(body.contains("Lower Pines"))

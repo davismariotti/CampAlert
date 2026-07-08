@@ -2,8 +2,8 @@ package com.davismariotti.campalert.notification
 
 import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.SearchRequest
-import com.davismariotti.campalert.model.User
-import java.util.Optional
+import com.davismariotti.notifications.Notification
+import com.davismariotti.notifications.SmsContent
 
 data class PendingNotification(
     val request: SearchRequest,
@@ -11,16 +11,16 @@ data class PendingNotification(
     val outboxId: Long,
 )
 
+/** Push content is intentionally not implemented yet — see design D1/D2 (push() defaults to absent). */
 class CampsiteAlertNotification(
-    user: User,
     private val available: List<PendingNotification>,
     private val gone: List<PendingNotification>,
-) : Notification(user) {
-    override fun getSmsContent(): Optional<String> {
+) : Notification() {
+    override fun sms(): SmsContent? {
         val parts = mutableListOf<String>()
         if (available.isNotEmpty()) parts.add(buildAggregatedMessage(available))
         if (gone.isNotEmpty()) parts.add(buildGoneMessage(gone))
-        return if (parts.isEmpty()) Optional.empty() else Optional.of(parts.joinToString("\n\n"))
+        return if (parts.isEmpty()) null else SmsContent(parts.joinToString("\n\n"))
     }
 
     private fun buildAggregatedMessage(notifications: List<PendingNotification>): String {

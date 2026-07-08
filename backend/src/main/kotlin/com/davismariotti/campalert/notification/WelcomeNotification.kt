@@ -1,15 +1,15 @@
 package com.davismariotti.campalert.notification
 
-import com.davismariotti.campalert.model.User
-import java.util.Optional
+import com.davismariotti.notifications.EmailContent
+import com.davismariotti.notifications.Notification
 
 class WelcomeNotification(
-    user: User,
     private val frontendBaseUrl: String,
-) : Notification(user) {
-    override fun getEmailSubject() = "Welcome to CampAlert"
-
-    override fun getEmailTemplate(): Optional<String> = Optional.of("email/welcome")
-
-    override fun getEmailParameters(): Map<String, Any> = mapOf("frontendBaseUrl" to frontendBaseUrl)
+) : Notification() {
+    override fun email(): EmailContent =
+        EmailContent.Templated(
+            subject = "Welcome to CampAlert",
+            template = "email/welcome",
+            params = mapOf("frontendBaseUrl" to frontendBaseUrl),
+        )
 }

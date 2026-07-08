@@ -2,13 +2,13 @@ package com.davismariotti.campalert.service.email
 
 import com.davismariotti.campalert.config.PasswordResetProperties
 import com.davismariotti.campalert.model.PasswordReset
-import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.notification.ResetPasswordNotification
 import com.davismariotti.campalert.repository.PasswordResetRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.SessionRevocationService
 import com.davismariotti.campalert.service.notification.NotificationService
 import com.davismariotti.campalert.util.CryptoUtils
+import com.davismariotti.notifications.SimpleRecipient
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
@@ -54,14 +54,13 @@ class PasswordResetService(
             ),
         )
 
-        val notificationUser = User(id = userId, email = email, passwordHash = "")
         notificationService.sendAsync(
             ResetPasswordNotification(
-                user = notificationUser,
                 resetUrl = "$frontendBaseUrl/reset-password?resetId=$id&token=$token",
                 expiryMinutes = props.expiresIn.toMinutes().toString(),
                 frontendBaseUrl = frontendBaseUrl,
             ),
+            SimpleRecipient(email = email),
         )
 
         return id

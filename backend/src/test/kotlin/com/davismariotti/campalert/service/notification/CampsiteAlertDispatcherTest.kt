@@ -3,23 +3,24 @@ package com.davismariotti.campalert.service.notification
 import com.davismariotti.campalert.model.AvailabilityState
 import com.davismariotti.campalert.model.NotificationOutbox
 import com.davismariotti.campalert.model.OutboxType
-import com.davismariotti.campalert.model.PhoneNumber
-import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
-import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.sms.SmsConversationService
+import com.davismariotti.notifications.Channel
+import com.davismariotti.notifications.DispatchResult
+import com.davismariotti.notifications.PushoverSender
+import com.davismariotti.notifications.Recipient
+import com.davismariotti.notifications.SendResult
+import com.davismariotti.notifications.SimpleRecipient
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
-import org.mockito.Mockito.anyLong
-import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -39,34 +40,43 @@ class CampsiteAlertDispatcherTest {
     }
 
     private val notificationService = mock(NotificationService::class.java)
+    private val recipientResolver = mock(RecipientResolver::class.java)
+    private val pushoverSender = mock(PushoverSender::class.java)
     private val outboxRepo = mock(NotificationOutboxRepository::class.java)
     private val searchRequestRepo = mock(SearchRequestRepository::class.java)
     private val userRepo = mock(UserRepository::class.java)
-    private val phoneRepo = mock(PhoneNumberRepository::class.java)
     private val conversationSvc = mock(SmsConversationService::class.java)
 
     private val processor = CampsiteAlertOutboxProcessor(
         notificationService = notificationService,
+        recipientResolver = recipientResolver,
+        pushoverSender = pushoverSender,
         notificationOutboxRepository = outboxRepo,
         searchRequestRepository = searchRequestRepo,
         userRepository = userRepo,
-        phoneNumberRepository = phoneRepo,
         smsConversationService = conversationSvc,
     )
 
     private val smsUser = User(id = 42L, email = "user@example.com", passwordHash = "hash")
+    private val recipientWithPhone: Recipient = SimpleRecipient(email = smsUser.email, phone = "+15005550006")
 
-    private val phone = PhoneNumber(
-        id = 1L,
-        userId = 42L,
-        phone = "+15005550006",
-        status = PhoneNumberStatus.VERIFIED,
-        smsConsentAt = Instant.now(),
-    )
+    private fun dispatchResult(success: Boolean): DispatchResult =
+        DispatchResult(
+            mapOf(
+                Channel.SMS to
+                    if (success) {
+                        SendResult.success()
+                    } else {
+                        SendResult.failure(RuntimeException("Send failed"), retryable = true)
+                    },
+            ),
+        )
 
     @BeforeEach
     fun setUp() {
         `when`(userRepo.findById(42L)).thenReturn(Optional.of(smsUser))
+        `when`(recipientResolver.resolve(smsUser)).thenReturn(recipientWithPhone)
+        `when`(notificationService.send(anyK(), anyK())).thenReturn(dispatchResult(success = true))
     }
 
     private fun request(id: Long, state: AvailabilityState = AvailabilityState.AVAILABLE): SearchRequest {
@@ -107,7 +117,7 @@ class CampsiteAlertDispatcherTest {
 
         processor.processUser(42L, rows, Instant.now())
 
-        verify(notificationService, never()).send(anyK())
+        verify(notificationService, never()).send(anyK(), anyK())
     }
 
     @Test
@@ -115,13 +125,12 @@ class CampsiteAlertDispatcherTest {
         val req = request(10L, state = AvailabilityState.UNAVAILABLE)
         val row = outboxRow(1L, 10L, OutboxType.AVAILABLE)
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(1)
-        `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
         `when`(searchRequestRepo.findAllById(anyK())).thenReturn(listOf(req))
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
         processor.processUser(42L, listOf(row), Instant.now())
 
-        verify(notificationService, never()).send(anyK())
+        verify(notificationService, never()).send(anyK(), anyK())
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
         verify(outboxRepo).save(captureK(captor))
         assertNull(captor.value?.sentAt, "sentAt should not be set on stale row")
@@ -135,14 +144,13 @@ class CampsiteAlertDispatcherTest {
         val row1 = outboxRow(1L, 10L, OutboxType.AVAILABLE)
         val row2 = outboxRow(2L, 11L, OutboxType.AVAILABLE)
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(2)
-        `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
         `when`(searchRequestRepo.findAllById(anyK())).thenReturn(listOf(req1, req2))
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
         processor.processUser(42L, listOf(row1, row2), Instant.now())
 
-        verify(notificationService).send(anyK())
+        verify(notificationService).send(anyK(), anyK())
     }
 
     @Test
@@ -150,7 +158,6 @@ class CampsiteAlertDispatcherTest {
         val req = request(10L)
         val row = outboxRow(1L, 10L, OutboxType.AVAILABLE)
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(1)
-        `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
         `when`(searchRequestRepo.findAllById(anyK())).thenReturn(listOf(req))
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
         `when`(searchRequestRepo.save(anyK())).thenAnswer { it.arguments[0] }
@@ -167,9 +174,8 @@ class CampsiteAlertDispatcherTest {
         val req = request(10L)
         val row = outboxRow(1L, 10L, OutboxType.AVAILABLE)
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(1)
-        `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
         `when`(searchRequestRepo.findAllById(anyK())).thenReturn(listOf(req))
-        doThrow(RuntimeException("Send failed")).`when`(notificationService).send(anyK())
+        `when`(notificationService.send(anyK(), anyK())).thenReturn(dispatchResult(success = false))
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
         processor.processUser(42L, listOf(row), Instant.now())
@@ -187,13 +193,12 @@ class CampsiteAlertDispatcherTest {
         val older = outboxRow(1L, 10L, OutboxType.UNAVAILABLE, sendAfter = now.minusSeconds(60))
         val latest = outboxRow(2L, 10L, OutboxType.UNAVAILABLE, sendAfter = now.minusSeconds(10))
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(2)
-        `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
         `when`(searchRequestRepo.findAllById(anyK())).thenReturn(listOf(req))
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
         processor.processUser(42L, listOf(older, latest), now)
 
-        verify(notificationService).send(anyK())
+        verify(notificationService).send(anyK(), anyK())
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
         verify(outboxRepo, Mockito.times(2)).save(captureK(captor))
         val byId = captor.allValues.associateBy { it.id }
@@ -210,13 +215,12 @@ class CampsiteAlertDispatcherTest {
         val row1 = outboxRow(1L, 10L, OutboxType.UNAVAILABLE)
         val row2 = outboxRow(2L, 11L, OutboxType.UNAVAILABLE)
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(2)
-        `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(listOf(phone))
         `when`(searchRequestRepo.findAllById(anyK())).thenReturn(listOf(req1, req2))
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
         processor.processUser(42L, listOf(row1, row2), Instant.now())
 
-        verify(notificationService).send(anyK())
+        verify(notificationService).send(anyK(), anyK())
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
         verify(outboxRepo, Mockito.times(2)).save(captureK(captor))
         assert(captor.allValues.all { it.sentAt != null }) { "both UNAVAILABLE rows for distinct requests should be sent" }
@@ -224,14 +228,14 @@ class CampsiteAlertDispatcherTest {
 
     @Test
     fun `no verified phone marks rows missedAt`() {
+        `when`(recipientResolver.resolve(smsUser)).thenReturn(SimpleRecipient(email = smsUser.email))
         val row = outboxRow(1L, 10L, OutboxType.AVAILABLE)
         `when`(outboxRepo.claimRows(anyK(), anyK())).thenReturn(1)
-        `when`(phoneRepo.findByUserIdAndStatus(anyLong(), anyK())).thenReturn(emptyList())
         `when`(outboxRepo.save(anyK())).thenAnswer { it.arguments[0] }
 
         processor.processUser(42L, listOf(row), Instant.now())
 
-        verify(notificationService, never()).send(anyK())
+        verify(notificationService, never()).send(anyK(), anyK())
         val captor = ArgumentCaptor.forClass(NotificationOutbox::class.java)
         verify(outboxRepo).save(captureK(captor))
         assert(captor.value?.missedAt != null) { "missedAt should be set when no phone" }
