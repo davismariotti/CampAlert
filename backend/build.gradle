@@ -54,10 +54,10 @@ dependencies {
     // Provider modules are added explicitly because the starter declares them compileOnly.
     // pushover-client/postmark/spring-boot-starter-thymeleaf are no longer needed directly — the
     // library's provider modules bring their own.
-    implementation 'com.davismariotti:notifications-spring-boot-starter:1.0.0'
-    implementation 'com.davismariotti:notifications-twilio:1.0.0'
-    implementation 'com.davismariotti:notifications-postmark:1.0.0'
-    implementation 'com.davismariotti:notifications-pushover:1.0.0'
+    implementation 'com.davismariotti:notifications-spring-boot-starter:1.0.1'
+    implementation 'com.davismariotti:notifications-twilio:1.0.1'
+    implementation 'com.davismariotti:notifications-postmark:1.0.1'
+    implementation 'com.davismariotti:notifications-pushover:1.0.1'
 
     implementation 'io.swagger.core.v3:swagger-annotations:2.2.51'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
