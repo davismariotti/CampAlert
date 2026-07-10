@@ -1,14 +1,26 @@
 import { useRef, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { deleteSearchRequest } from '../../api/generated/sdk.gen'
+import { deleteSearchRequest, deletePermitSearchRequest } from '../../api/generated/sdk.gen'
 import { Button } from '../../components/ui/Button'
 import { RequestEditModal } from './RequestEditModal'
+import { PermitRequestEditModal } from '../permit/PermitRequestEditModal'
+import { usePermit } from '../permit/usePermit'
 import { useApiMutation } from '../../hooks/useApiMutation'
-import type { SearchRequestResponse, SearchRequestStats } from '../../api/generated/types.gen'
+import type {
+  SearchRequestResponse,
+  SearchRequestStats,
+  PermitSearchRequestResponse
+} from '../../api/generated/types.gen'
+
+type AnyRequest = SearchRequestResponse | PermitSearchRequestResponse
 
 interface Props {
-  request: SearchRequestResponse
+  request: AnyRequest
+}
+
+function isPermitRequest(request: AnyRequest): request is PermitSearchRequestResponse {
+  return 'searchType' in request
 }
 
 function formatDate(dateStr: string) {
@@ -92,7 +104,7 @@ function StatsModal({
   stats,
   onClose
 }: {
-  request: SearchRequestResponse
+  request: AnyRequest
   stats: SearchRequestStats
   onClose: () => void
 }) {
@@ -156,21 +168,49 @@ export function RequestCard({ request }: Props) {
   const [showConfirm, setShowConfirm] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const queryClient = useQueryClient()
+  const isPermit = isPermitRequest(request)
+
+  const { data: permitDetail } = usePermit(isPermit ? request.permitId : undefined)
+
+  function divisionName(divisionId: string) {
+    return permitDetail?.divisions.find((d) => d.id === divisionId)?.name ?? divisionId
+  }
 
   const deleteMutation = useApiMutation({
     mutationFn: async () => {
-      const result = await deleteSearchRequest({ path: { id: request.id } })
-      if (result.error) throw result
+      if (isPermit) {
+        const result = await deletePermitSearchRequest({ path: { id: request.id } })
+        if (result.error) throw result
+      } else {
+        const result = await deleteSearchRequest({ path: { id: request.id } })
+        if (result.error) throw result
+      }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['search-requests'] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: isPermit ? ['permit-search-requests'] : ['search-requests'] }),
     errorMessage: 'Failed to delete alert. Please try again.'
   })
 
-  const meta = [
-    formatDate(request.startDay),
-    `${request.nights} night${request.nights !== 1 ? 's' : ''}`,
-    `${request.groupSize} ${request.groupSize !== 1 ? 'people' : 'person'}`
-  ].join(' · ')
+  const meta = isPermit
+    ? request.searchType === 'ZONE' && request.zoneTarget
+      ? [
+          `${request.zoneTarget.divisionIds.length} zone${request.zoneTarget.divisionIds.length !== 1 ? 's' : ''}`,
+          request.zoneTarget.startDay === request.zoneTarget.endDay
+            ? formatDate(request.zoneTarget.startDay)
+            : `${formatDate(request.zoneTarget.startDay)} – ${formatDate(request.zoneTarget.endDay)}`,
+          `${request.groupSize} ${request.groupSize !== 1 ? 'people' : 'person'}`
+        ].join(' · ')
+      : request.itineraryTarget
+        ? [
+            `${request.itineraryTarget.legs.length} night${request.itineraryTarget.legs.length !== 1 ? 's' : ''}`,
+            `${request.groupSize} ${request.groupSize !== 1 ? 'people' : 'person'}`
+          ].join(' · ')
+        : ''
+    : [
+        formatDate(request.startDay),
+        `${request.nights} night${request.nights !== 1 ? 's' : ''}`,
+        `${request.groupSize} ${request.groupSize !== 1 ? 'people' : 'person'}`
+      ].join(' · ')
 
   const watching = !request.completed
 
@@ -199,13 +239,16 @@ export function RequestCard({ request }: Props) {
 
         {/* Names */}
         <h3 className="font-semibold text-forest-900">{request.name}</h3>
-        {request.campgroundName && <p className="mt-0.5 text-sm text-forest-500">{request.campgroundName}</p>}
+        {!isPermit && request.campgroundName && (
+          <p className="mt-0.5 text-sm text-forest-500">{request.campgroundName}</p>
+        )}
+        {isPermit && <p className="mt-0.5 text-sm text-forest-500">{request.permitName}</p>}
 
         {/* Meta */}
         <p className="mt-2 text-sm text-forest-600">{meta}</p>
 
-        {/* Loops */}
-        {request.loops && request.loops.length > 0 && (
+        {/* Loops (campground only) */}
+        {!isPermit && request.loops && request.loops.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {request.loops.map((loop) => (
               <span key={loop} className="rounded-full bg-forest-100 px-2 py-0.5 text-xs font-medium text-forest-600">
@@ -213,6 +256,20 @@ export function RequestCard({ request }: Props) {
               </span>
             ))}
           </div>
+        )}
+
+        {/* Permit match/blocking state */}
+        {isPermit && request.searchType === 'ZONE' && request.zoneTarget?.matchedDivisionId && (
+          <p className="mt-2 text-xs text-forest-600">
+            Matches <span className="font-medium">{divisionName(request.zoneTarget.matchedDivisionId)}</span>
+            {request.zoneTarget.matchedDate && ` on ${formatDate(request.zoneTarget.matchedDate)}`}
+          </p>
+        )}
+        {isPermit && request.searchType === 'ITINERARY' && request.itineraryTarget?.blockingDivisionId && (
+          <p className="mt-2 text-xs text-amber-700">
+            Blocked at <span className="font-medium">{divisionName(request.itineraryTarget.blockingDivisionId)}</span>
+            {request.itineraryTarget.blockingDate && ` on ${formatDate(request.itineraryTarget.blockingDate)}`}
+          </p>
         )}
 
         {/* Pause warning */}
@@ -227,7 +284,12 @@ export function RequestCard({ request }: Props) {
         )}
       </div>
 
-      {showEdit && <RequestEditModal request={request} onClose={() => setShowEdit(false)} />}
+      {showEdit &&
+        (isPermit ? (
+          <PermitRequestEditModal request={request} onClose={() => setShowEdit(false)} />
+        ) : (
+          <RequestEditModal request={request} onClose={() => setShowEdit(false)} />
+        ))}
 
       {showStats && <StatsModal request={request} stats={request.stats} onClose={() => setShowStats(false)} />}
 
