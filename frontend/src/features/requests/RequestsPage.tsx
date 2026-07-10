@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { listSearchRequests, listPhoneNumbers } from '../../api/generated/sdk.gen'
+import { listSearchRequests, listPermitSearchRequests, listPhoneNumbers } from '../../api/generated/sdk.gen'
 import { RequestCard } from './RequestCard'
 import { AddAlertModal } from './AddAlertModal'
 
@@ -23,9 +23,24 @@ export function RequestsPage() {
 
   const completed = filter === 'all' ? undefined : filter === 'done'
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const {
+    data: campgroundRequests,
+    isLoading: isLoadingCampgrounds,
+    isError: isErrorCampgrounds,
+    refetch: refetchCampgrounds
+  } = useQuery({
     queryKey: ['search-requests', filter],
     queryFn: () => listSearchRequests({ query: { completed } }).then((r) => r.data ?? [])
+  })
+
+  const {
+    data: permitRequests,
+    isLoading: isLoadingPermits,
+    isError: isErrorPermits,
+    refetch: refetchPermits
+  } = useQuery({
+    queryKey: ['permit-search-requests', filter],
+    queryFn: () => listPermitSearchRequests({ query: { completed } }).then((r) => r.data ?? [])
   })
 
   const { data: phones } = useQuery({
@@ -35,9 +50,17 @@ export function RequestsPage() {
 
   const hasVerifiedPhone = (phones ?? []).some((p) => p.status === 'VERIFIED')
 
-  const all = data ?? []
+  const isLoading = isLoadingCampgrounds || isLoadingPermits
+  const isError = isErrorCampgrounds || isErrorPermits
+
+  const all = [...(campgroundRequests ?? []), ...(permitRequests ?? [])]
   const watchingCount = all.filter((r) => !r.completed).length
   const doneCount = all.filter((r) => r.completed).length
+
+  function refetch() {
+    refetchCampgrounds()
+    refetchPermits()
+  }
 
   const tabs: { key: Filter; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -130,8 +153,11 @@ export function RequestsPage() {
 
       {!isLoading && !isError && all.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {all.map((request) => (
-            <RequestCard key={request.id} request={request} />
+          {(campgroundRequests ?? []).map((request) => (
+            <RequestCard key={`campground-${request.id}`} request={request} />
+          ))}
+          {(permitRequests ?? []).map((request) => (
+            <RequestCard key={`permit-${request.id}`} request={request} />
           ))}
         </div>
       )}
