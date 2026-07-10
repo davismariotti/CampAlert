@@ -71,6 +71,59 @@ CREATE TABLE "public"."search_request_state" (
   CONSTRAINT "fk_search_request_state_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests" ("id") ON DELETE CASCADE,
   CONSTRAINT "chk_search_request_state_last_availability_state" CHECK (last_availability_state IN ('AVAILABLE', 'UNAVAILABLE'))
 );
+-- Create "permit_search_requests" table
+CREATE TABLE "public"."permit_search_requests" (
+  "id" bigserial NOT NULL,
+  "permit_id" character varying(32) NOT NULL,
+  "permit_name" character varying(255) NOT NULL,
+  "permit_timezone" character varying(64) NULL,
+  "group_size" integer NOT NULL,
+  "name" character varying(255) NOT NULL,
+  "user_id" bigint NULL,
+  "search_type" character varying(16) NOT NULL,
+  PRIMARY KEY ("id"),
+  CONSTRAINT "fk_permit_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
+  CONSTRAINT "chk_permit_search_requests_search_type" CHECK (search_type IN ('ZONE', 'ITINERARY'))
+);
+CREATE INDEX ON "public"."permit_search_requests" ("user_id");
+-- Create "permit_zone_target" table
+CREATE TABLE "public"."permit_zone_target" (
+  "permit_search_request_id" bigint NOT NULL,
+  "division_ids" json NOT NULL,
+  "start_day" date NOT NULL,
+  "end_day" date NOT NULL,
+  PRIMARY KEY ("permit_search_request_id"),
+  CONSTRAINT "fk_permit_zone_target_request" FOREIGN KEY ("permit_search_request_id") REFERENCES "public"."permit_search_requests" ("id") ON DELETE CASCADE
+);
+-- Create "permit_itinerary_target" table
+CREATE TABLE "public"."permit_itinerary_target" (
+  "permit_search_request_id" bigint NOT NULL,
+  "legs" json NOT NULL,
+  PRIMARY KEY ("permit_search_request_id"),
+  CONSTRAINT "fk_permit_itinerary_target_request" FOREIGN KEY ("permit_search_request_id") REFERENCES "public"."permit_search_requests" ("id") ON DELETE CASCADE
+);
+-- Create "permit_search_request_state" table
+CREATE TABLE "public"."permit_search_request_state" (
+  "permit_search_request_id" bigint NOT NULL,
+  "completed" boolean NOT NULL DEFAULT false,
+  "user_paused" boolean NOT NULL DEFAULT false,
+  "pause_reason" character varying(64) NULL,
+  "last_availability_state" character varying(16) NULL,
+  "last_notified_at" timestamptz NULL,
+  "reminder_sent_at" timestamptz NULL,
+  "total_checks" integer NOT NULL DEFAULT 0,
+  "available_checks" integer NOT NULL DEFAULT 0,
+  "window_count" integer NOT NULL DEFAULT 0,
+  "total_window_seconds" integer NOT NULL DEFAULT 0,
+  "became_available_at" timestamptz NULL,
+  "matched_division_id" character varying(32) NULL,
+  "matched_date" date NULL,
+  "blocking_division_id" character varying(32) NULL,
+  "blocking_date" date NULL,
+  PRIMARY KEY ("permit_search_request_id"),
+  CONSTRAINT "fk_permit_search_request_state_request" FOREIGN KEY ("permit_search_request_id") REFERENCES "public"."permit_search_requests" ("id") ON DELETE CASCADE,
+  CONSTRAINT "chk_permit_search_request_state_last_availability_state" CHECK (last_availability_state IN ('AVAILABLE', 'UNAVAILABLE'))
+);
 -- Create "shedlock" table
 CREATE TABLE "public"."shedlock" (
   "name" character varying(64) NOT NULL,
