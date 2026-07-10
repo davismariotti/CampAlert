@@ -64,7 +64,7 @@ interface NotificationOutboxRepository : JpaRepository<NotificationOutbox, Long>
         @Param("ids") ids: List<Long>,
     ): List<MissedWindowsProjection>
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("DELETE FROM NotificationOutbox n WHERE n.requestType = :requestType AND n.requestId = :requestId")
     fun deleteByRequestTypeAndRequestId(
         @Param("requestType") requestType: RequestType,
