@@ -119,6 +119,7 @@ open class IntegrationTestBase {
     fun resetState() {
         jdbcTemplate.execute(
             "TRUNCATE TABLE notification_outbox, search_request_state, search_requests, " +
+                "permit_search_request_state, permit_zone_target, permit_itinerary_target, permit_search_requests, " +
                 "persistent_logins, phone_numbers, email_verifications, password_resets, users, shedlock CASCADE"
         )
         redisConnectionFactory.connection.use { it.serverCommands().flushAll() }
