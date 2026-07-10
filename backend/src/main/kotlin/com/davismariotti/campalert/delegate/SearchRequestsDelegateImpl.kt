@@ -7,6 +7,7 @@ import com.davismariotti.campalert.api.model.SearchRequestResponse
 import com.davismariotti.campalert.api.model.SearchRequestStats
 import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
 import com.davismariotti.campalert.model.PhoneNumberStatus
+import com.davismariotti.campalert.model.RequestType
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
@@ -19,6 +20,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
 class SearchRequestsDelegateImpl(
@@ -43,7 +45,9 @@ class SearchRequestsDelegateImpl(
         if (results.isEmpty()) return ResponseEntity.ok(emptyList())
 
         val ids = results.map { it.id!! }
-        val missedById = notificationOutboxRepository.findMissedWindowCountsByRequestIds(ids).associateBy { it.getRequestId() }
+        val missedById = notificationOutboxRepository
+            .findMissedWindowCountsByRequestTypeAndRequestIds(RequestType.CAMPGROUND, ids)
+            .associateBy { it.getRequestId() }
 
         return ResponseEntity.ok(
             results.map { request ->
@@ -134,6 +138,7 @@ class SearchRequestsDelegateImpl(
         return ResponseEntity.ok(saved.toResponse(fetchStats(saved)))
     }
 
+    @Transactional
     @PreAuthorize("isAuthenticated()")
     override fun deleteSearchRequest(id: Long): ResponseEntity<Unit> {
         val userId = currentUserId()
@@ -142,6 +147,7 @@ class SearchRequestsDelegateImpl(
             .orElse(null)
             ?.takeIf { it.userId == userId }
             ?: return ResponseEntity.notFound().build()
+        notificationOutboxRepository.deleteByRequestTypeAndRequestId(RequestType.CAMPGROUND, id)
         searchRequestRepository.deleteById(id)
         return ResponseEntity.noContent().build()
     }
@@ -154,7 +160,7 @@ class SearchRequestsDelegateImpl(
             totalChecks = total,
             availableChecks = available,
             avgAvailabilityWindowMinutes = if (s.windowCount > 0) (s.totalWindowSeconds / 60.0) / s.windowCount else 0.0,
-            missedQuietHoursWindows = notificationOutboxRepository.countMissedWindowsByRequestId(request.id!!),
+            missedQuietHoursWindows = notificationOutboxRepository.countMissedWindowsByRequestTypeAndRequestId(RequestType.CAMPGROUND, request.id!!),
             availabilityRate = if (total > 0) available.toDouble() / total.toDouble() else null,
         )
     }

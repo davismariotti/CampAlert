@@ -1,6 +1,7 @@
 package com.davismariotti.campalert.repository
 
 import com.davismariotti.campalert.model.NotificationOutbox
+import com.davismariotti.campalert.model.RequestType
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
@@ -37,12 +38,13 @@ interface NotificationOutboxRepository : JpaRepository<NotificationOutbox, Long>
         @Param("claimedAt") claimedAt: Instant,
     ): Int
 
-    fun findByRequestId(requestId: Long): List<NotificationOutbox>
+    fun findByRequestTypeAndRequestId(requestType: RequestType, requestId: Long): List<NotificationOutbox>
 
     @Query(
-        "SELECT COUNT(n) FROM NotificationOutbox n WHERE n.requestId = :id AND n.type = 'AVAILABLE' AND n.missedAt IS NOT NULL",
+        "SELECT COUNT(n) FROM NotificationOutbox n WHERE n.requestType = :requestType AND n.requestId = :id AND n.type = 'AVAILABLE' AND n.missedAt IS NOT NULL",
     )
-    fun countMissedWindowsByRequestId(
+    fun countMissedWindowsByRequestTypeAndRequestId(
+        @Param("requestType") requestType: RequestType,
         @Param("id") id: Long,
     ): Long
 
@@ -50,13 +52,22 @@ interface NotificationOutboxRepository : JpaRepository<NotificationOutbox, Long>
         """
         SELECT n.requestId AS requestId, COUNT(n) AS missedCount
         FROM NotificationOutbox n
-        WHERE n.requestId IN :ids
+        WHERE n.requestType = :requestType
+          AND n.requestId IN :ids
           AND n.type = 'AVAILABLE'
           AND n.missedAt IS NOT NULL
         GROUP BY n.requestId
         """,
     )
-    fun findMissedWindowCountsByRequestIds(
+    fun findMissedWindowCountsByRequestTypeAndRequestIds(
+        @Param("requestType") requestType: RequestType,
         @Param("ids") ids: List<Long>,
     ): List<MissedWindowsProjection>
+
+    @Modifying
+    @Query("DELETE FROM NotificationOutbox n WHERE n.requestType = :requestType AND n.requestId = :requestId")
+    fun deleteByRequestTypeAndRequestId(
+        @Param("requestType") requestType: RequestType,
+        @Param("requestId") requestId: Long,
+    ): Int
 }

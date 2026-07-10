@@ -24,6 +24,10 @@ data class NotificationOutbox(
     val requestId: Long,
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "request_type", nullable = false)
+    val requestType: RequestType = RequestType.CAMPGROUND,
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false)
     val type: OutboxType,
 

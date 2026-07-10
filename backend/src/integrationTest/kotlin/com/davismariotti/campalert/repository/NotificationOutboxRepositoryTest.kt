@@ -3,6 +3,7 @@ package com.davismariotti.campalert.repository
 import com.davismariotti.campalert.model.AvailabilityState
 import com.davismariotti.campalert.model.NotificationOutbox
 import com.davismariotti.campalert.model.OutboxType
+import com.davismariotti.campalert.model.RequestType
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
@@ -124,14 +125,40 @@ class NotificationOutboxRepositoryTest : IntegrationTestBase() {
         assertThat(results.map { it.id }).contains(row.id)
     }
 
-    // --- countMissedWindowsByRequestId ---
+    // --- countMissedWindowsByRequestTypeAndRequestId ---
 
     @Test
-    fun `countMissedWindowsByRequestId counts only AVAILABLE rows with missedAt`() {
+    fun `countMissedWindowsByRequestTypeAndRequestId counts only AVAILABLE rows with missedAt`() {
         outboxRow(type = OutboxType.AVAILABLE, missedAt = now.minusSeconds(60)) // counted
         outboxRow(type = OutboxType.AVAILABLE, missedAt = now.minusSeconds(60)) // counted
         outboxRow(type = OutboxType.AVAILABLE, missedAt = null) // not counted (no missedAt)
         outboxRow(type = OutboxType.UNAVAILABLE, missedAt = now.minusSeconds(60)) // not counted (wrong type)
-        assertThat(outboxRepository.countMissedWindowsByRequestId(requestId)).isEqualTo(2)
+        assertThat(outboxRepository.countMissedWindowsByRequestTypeAndRequestId(RequestType.CAMPGROUND, requestId)).isEqualTo(2)
+    }
+
+    @Test
+    fun `countMissedWindowsByRequestTypeAndRequestId ignores rows of a different request type`() {
+        outboxRow(type = OutboxType.AVAILABLE, missedAt = now.minusSeconds(60))
+        assertThat(outboxRepository.countMissedWindowsByRequestTypeAndRequestId(RequestType.PERMIT, requestId)).isEqualTo(0)
+    }
+
+    // --- deleteByRequestTypeAndRequestId ---
+
+    @Test
+    @Transactional
+    fun `deleteByRequestTypeAndRequestId removes only matching rows`() {
+        val row = outboxRow(type = OutboxType.AVAILABLE)
+        val deleted = outboxRepository.deleteByRequestTypeAndRequestId(RequestType.CAMPGROUND, requestId)
+        assertThat(deleted).isEqualTo(1)
+        assertThat(outboxRepository.findById(row.id!!)).isEmpty()
+    }
+
+    @Test
+    @Transactional
+    fun `deleteByRequestTypeAndRequestId leaves rows of a different request type untouched`() {
+        val row = outboxRow(type = OutboxType.AVAILABLE)
+        val deleted = outboxRepository.deleteByRequestTypeAndRequestId(RequestType.PERMIT, requestId)
+        assertThat(deleted).isEqualTo(0)
+        assertThat(outboxRepository.findById(row.id!!)).isPresent()
     }
 }
