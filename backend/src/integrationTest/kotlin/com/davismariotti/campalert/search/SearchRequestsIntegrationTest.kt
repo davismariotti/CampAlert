@@ -2,12 +2,16 @@ package com.davismariotti.campalert.search
 
 import com.davismariotti.campalert.api.model.CreateSearchRequestBody
 import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
+import com.davismariotti.campalert.model.NotificationOutbox
+import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.PhoneNumber
 import com.davismariotti.campalert.model.PhoneNumberStatus
+import com.davismariotti.campalert.model.RequestType
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.recreation.RidbFacility
 import com.davismariotti.campalert.recreation.RidbFacilityResponse
+import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
@@ -35,6 +39,9 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
 
     @Autowired
     private lateinit var searchRequestRepository: SearchRequestRepository
+
+    @Autowired
+    private lateinit var notificationOutboxRepository: NotificationOutboxRepository
 
     @BeforeEach
     fun stubRidb() {
@@ -377,5 +384,25 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
                 .andReturn()
                 .response.status
         ).isEqualTo(404)
+    }
+
+    @Test
+    fun `delete search request removes its outbox rows`() {
+        val session = registerAndLogin()
+        val userId = userRepository.findByEmail("user@test.com")!!.id!!
+        val request = seedRequest(userId)
+        val outboxRow = notificationOutboxRepository.save(
+            NotificationOutbox(
+                userId = userId,
+                requestId = request.id!!,
+                requestType = RequestType.CAMPGROUND,
+                type = OutboxType.AVAILABLE,
+                sendAfter = Instant.now(),
+            )
+        )
+
+        assertThat(doDelete("/api/search-requests/${request.id}", session).response.status).isEqualTo(204)
+
+        assertThat(notificationOutboxRepository.findById(outboxRow.id!!)).isEmpty()
     }
 }

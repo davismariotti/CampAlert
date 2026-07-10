@@ -11,6 +11,7 @@ import jakarta.persistence.OneToOne
 import jakarta.persistence.Table
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
+import java.time.Instant
 import java.time.LocalDate
 
 @Entity
@@ -18,7 +19,7 @@ import java.time.LocalDate
 data class SearchRequest(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
 
     @Column(name = "start_day")
     val startDay: LocalDate,
@@ -40,15 +41,27 @@ data class SearchRequest(
     val name: String,
 
     @Column(name = "user_id")
-    val userId: Long? = null,
+    override val userId: Long? = null,
 
     @Column(name = "campground_name")
     val campgroundName: String = "",
 
     @Column(name = "campground_timezone")
     val campgroundTimezone: String? = null,
-) {
+) : AlertableRequest {
     // Body property: excluded from equals/hashCode/copy/toString to prevent circular reference.
     @OneToOne(mappedBy = "searchRequest", cascade = [CascadeType.ALL], fetch = FetchType.EAGER, orphanRemoval = true)
     lateinit var state: SearchRequestState
+
+    override var lastAvailabilityState: AvailabilityState?
+        get() = state.lastAvailabilityState
+        set(value) {
+            state.lastAvailabilityState = value
+        }
+
+    override var lastNotifiedAt: Instant?
+        get() = state.lastNotifiedAt
+        set(value) {
+            state.lastNotifiedAt = value
+        }
 }

@@ -38,6 +38,7 @@ CREATE TABLE "public"."notification_outbox" (
   "id" bigserial NOT NULL,
   "user_id" bigint NOT NULL,
   "request_id" bigint NOT NULL,
+  "request_type" character varying(16) NOT NULL DEFAULT 'CAMPGROUND',
   "type" character varying(16) NOT NULL,
   "send_after" timestamptz NOT NULL,
   "sent_at" timestamptz NULL,
@@ -46,11 +47,11 @@ CREATE TABLE "public"."notification_outbox" (
   "attempt_count" integer NOT NULL DEFAULT 0,
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_outbox_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
-  CONSTRAINT "fk_outbox_request" FOREIGN KEY ("request_id") REFERENCES "public"."search_requests" ("id") ON DELETE CASCADE,
-  CONSTRAINT "chk_outbox_type" CHECK (type IN ('AVAILABLE', 'UNAVAILABLE', 'REMINDER'))
+  CONSTRAINT "chk_outbox_type" CHECK (type IN ('AVAILABLE', 'UNAVAILABLE', 'REMINDER')),
+  CONSTRAINT "chk_outbox_request_type" CHECK (request_type IN ('CAMPGROUND', 'PERMIT'))
 );
 CREATE INDEX ON "public"."notification_outbox" ("send_after") WHERE sent_at IS NULL AND missed_at IS NULL;
-CREATE INDEX ON "public"."notification_outbox" ("request_id");
+CREATE INDEX ON "public"."notification_outbox" ("request_type", "request_id");
 CREATE INDEX ON "public"."notification_outbox" ("user_id");
 -- Create "search_request_state" table
 CREATE TABLE "public"."search_request_state" (

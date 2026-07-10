@@ -3,6 +3,7 @@ package com.davismariotti.campalert.service.notification
 import com.davismariotti.campalert.model.AvailabilityState
 import com.davismariotti.campalert.model.NotificationOutbox
 import com.davismariotti.campalert.model.OutboxType
+import com.davismariotti.campalert.model.RequestType
 import com.davismariotti.campalert.notification.CampsiteAlertNotification
 import com.davismariotti.campalert.notification.PendingNotification
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
@@ -48,29 +49,35 @@ class CampsiteAlertOutboxProcessor(
             return
         }
 
-        val requestById = searchRequestRepository.findAllById(rows.map { it.requestId }).associateBy { it.id!! }
+        // Only CAMPGROUND rows are resolvable today; PERMIT rows fall through to the
+        // "request == null" branch below until section 7 wires a permit repository/builder in.
+        val campgroundIds = rows.filter { it.requestType == RequestType.CAMPGROUND }.map { it.requestId }
+        val requestByKey = searchRequestRepository
+            .findAllById(campgroundIds)
+            .associateBy { RequestKey(RequestType.CAMPGROUND, it.id!!) }
         val rowById = rows.associateBy { it.id!! }
 
-        // For UNAVAILABLE type, only keep the latest entry per request; miss superseded ones.
+        // For UNAVAILABLE type, only keep the latest entry per (requestType, requestId); miss superseded ones.
         val latestUnavailableIdByRequest = rows
             .filter { it.type == OutboxType.UNAVAILABLE }
-            .groupBy { it.requestId }
+            .groupBy { RequestKey(it.requestType, it.requestId) }
             .mapValues { (_, entries) -> entries.maxBy { it.sendAfter }.id!! }
 
         val toSend = mutableListOf<PendingNotification>()
         rows.forEach { row ->
-            val request = requestById[row.requestId]
+            val key = RequestKey(row.requestType, row.requestId)
+            val request = requestByKey[key]
             if (request == null) {
                 notificationOutboxRepository.save(row.copy(missedAt = now))
                 return@forEach
             }
             if ((row.type == OutboxType.AVAILABLE || row.type == OutboxType.REMINDER) &&
-                request.state.lastAvailabilityState == AvailabilityState.UNAVAILABLE
+                request.lastAvailabilityState == AvailabilityState.UNAVAILABLE
             ) {
                 notificationOutboxRepository.save(row.copy(missedAt = now))
                 return@forEach
             }
-            if (row.type == OutboxType.UNAVAILABLE && row.id != latestUnavailableIdByRequest[row.requestId]) {
+            if (row.type == OutboxType.UNAVAILABLE && row.id != latestUnavailableIdByRequest[key]) {
                 notificationOutboxRepository.save(row.copy(missedAt = now))
                 return@forEach
             }
@@ -109,7 +116,7 @@ class CampsiteAlertOutboxProcessor(
                 toSend.forEach { n ->
                     notificationOutboxRepository.save(rowById[n.outboxId]!!.copy(sentAt = now))
                     if (n.type == OutboxType.AVAILABLE || n.type == OutboxType.REMINDER) {
-                        n.request.state.lastNotifiedAt = now
+                        n.request.lastNotifiedAt = now
                         searchRequestRepository.save(n.request)
                     }
                 }
@@ -137,4 +144,9 @@ class CampsiteAlertOutboxProcessor(
             }
         }
     }
+
+    private data class RequestKey(
+        val requestType: RequestType,
+        val requestId: Long
+    )
 }
