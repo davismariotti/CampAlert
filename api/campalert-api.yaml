@@ -11,6 +11,8 @@ tags:
   - name: Auth
   - name: Campgrounds
   - name: SearchRequests
+  - name: Permits
+  - name: PermitSearchRequests
   - name: PhoneNumbers
 
 paths:
@@ -478,6 +480,256 @@ paths:
       tags: [SearchRequests]
       operationId: deleteSearchRequest
       summary: Delete a search request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /permit-search:
+    get:
+      tags: [Permits]
+      operationId: searchPermits
+      summary: Search Recreation.gov permits by name
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of matching permits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PermitSearchResult'
+        "400":
+          description: Missing or blank query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "502":
+          description: Recreation.gov upstream error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /permits/{id}:
+    get:
+      tags: [Permits]
+      operationId: getPermit
+      summary: Get a supported permit's divisions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Permit detail with divisions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermitResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Permit not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "422":
+          description: Permit reservation mechanism is not supported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "502":
+          description: Recreation.gov upstream error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /permit-search-requests:
+    get:
+      tags: [PermitSearchRequests]
+      operationId: listPermitSearchRequests
+      summary: List all permit search requests
+      parameters:
+        - name: completed
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of permit search requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PermitSearchRequestResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [PermitSearchRequests]
+      operationId: createPermitSearchRequest
+      summary: Create a new permit search request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePermitSearchRequestBody'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermitSearchRequestResponse'
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "422":
+          description: No verified phone number, unsupported permit type, searchType/permit mismatch, or illegal itinerary leg sequence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /permit-search-requests/{id}:
+    get:
+      tags: [PermitSearchRequests]
+      operationId: getPermitSearchRequest
+      summary: Get a permit search request by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Permit search request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermitSearchRequestResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [PermitSearchRequests]
+      operationId: updatePermitSearchRequest
+      summary: Update a permit search request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePermitSearchRequestBody'
+      responses:
+        "200":
+          description: Updated permit search request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermitSearchRequestResponse'
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "422":
+          description: SearchType/permit mismatch or illegal itinerary leg sequence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [PermitSearchRequests]
+      operationId: deletePermitSearchRequest
+      summary: Delete a permit search request
       parameters:
         - name: id
           in: path
@@ -974,6 +1226,260 @@ components:
           type: integer
         name:
           type: string
+
+    PermitType:
+      type: string
+      enum: [ZONE, ITINERARY]
+
+    PermitSearchResult:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        recareaName:
+          type: string
+          nullable: true
+        type:
+          allOf:
+            - $ref: '#/components/schemas/PermitType'
+          nullable: true
+          description: Null when the permit's reservation mechanism isn't supported.
+
+    PermitDivision:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        childDivisionIds:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Legal next-night division ids; populated only for ITINERARY permits.
+
+    PermitResponse:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - divisions
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        recareaName:
+          type: string
+          nullable: true
+        type:
+          $ref: '#/components/schemas/PermitType'
+        divisions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermitDivision'
+
+    PermitZoneTargetBody:
+      type: object
+      required:
+        - divisionIds
+        - startDay
+        - endDay
+      properties:
+        divisionIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        startDay:
+          type: string
+          format: date
+        endDay:
+          type: string
+          format: date
+
+    PermitItineraryLegBody:
+      type: object
+      required:
+        - divisionId
+        - date
+      properties:
+        divisionId:
+          type: string
+        date:
+          type: string
+          format: date
+
+    PermitItineraryTargetBody:
+      type: object
+      required:
+        - legs
+      properties:
+        legs:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermitItineraryLegBody'
+          minItems: 1
+
+    PermitZoneTargetResponse:
+      type: object
+      required:
+        - divisionIds
+        - startDay
+        - endDay
+      properties:
+        divisionIds:
+          type: array
+          items:
+            type: string
+        startDay:
+          type: string
+          format: date
+        endDay:
+          type: string
+          format: date
+        matchedDivisionId:
+          type: string
+          nullable: true
+        matchedDate:
+          type: string
+          format: date
+          nullable: true
+
+    PermitItineraryTargetResponse:
+      type: object
+      required:
+        - legs
+      properties:
+        legs:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermitItineraryLegBody'
+        blockingDivisionId:
+          type: string
+          nullable: true
+        blockingDate:
+          type: string
+          format: date
+          nullable: true
+
+    CreatePermitSearchRequestBody:
+      type: object
+      required:
+        - permitId
+        - permitName
+        - groupSize
+        - name
+        - searchType
+      properties:
+        permitId:
+          type: string
+        permitName:
+          type: string
+        groupSize:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+        searchType:
+          $ref: '#/components/schemas/PermitType'
+        zoneTarget:
+          allOf:
+            - $ref: '#/components/schemas/PermitZoneTargetBody'
+          nullable: true
+        itineraryTarget:
+          allOf:
+            - $ref: '#/components/schemas/PermitItineraryTargetBody'
+          nullable: true
+
+    UpdatePermitSearchRequestBody:
+      type: object
+      required:
+        - permitId
+        - permitName
+        - groupSize
+        - name
+        - searchType
+        - completed
+      properties:
+        permitId:
+          type: string
+        permitName:
+          type: string
+        groupSize:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+        searchType:
+          $ref: '#/components/schemas/PermitType'
+        zoneTarget:
+          allOf:
+            - $ref: '#/components/schemas/PermitZoneTargetBody'
+          nullable: true
+        itineraryTarget:
+          allOf:
+            - $ref: '#/components/schemas/PermitItineraryTargetBody'
+          nullable: true
+        completed:
+          type: boolean
+
+    PermitSearchRequestResponse:
+      type: object
+      required:
+        - id
+        - permitId
+        - permitName
+        - groupSize
+        - name
+        - searchType
+        - completed
+        - stats
+      properties:
+        id:
+          type: integer
+          format: int64
+        permitId:
+          type: string
+        permitName:
+          type: string
+        permitTimezone:
+          type: string
+          nullable: true
+        groupSize:
+          type: integer
+        name:
+          type: string
+        searchType:
+          $ref: '#/components/schemas/PermitType'
+        zoneTarget:
+          allOf:
+            - $ref: '#/components/schemas/PermitZoneTargetResponse'
+          nullable: true
+        itineraryTarget:
+          allOf:
+            - $ref: '#/components/schemas/PermitItineraryTargetResponse'
+          nullable: true
+        completed:
+          type: boolean
+        pauseReason:
+          type: string
+          nullable: true
+        stats:
+          $ref: '#/components/schemas/SearchRequestStats'
 
     ErrorResponse:
       type: object
