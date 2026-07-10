@@ -44,6 +44,7 @@ class CampsiteAlertDispatcherTest {
     private val pushoverSender = mock(PushoverSender::class.java)
     private val outboxRepo = mock(NotificationOutboxRepository::class.java)
     private val searchRequestRepo = mock(SearchRequestRepository::class.java)
+    private val permitSearchRequestRepo = mock(com.davismariotti.campalert.repository.PermitSearchRequestRepository::class.java)
     private val userRepo = mock(UserRepository::class.java)
     private val conversationSvc = mock(SmsConversationService::class.java)
 
@@ -53,6 +54,7 @@ class CampsiteAlertDispatcherTest {
         pushoverSender = pushoverSender,
         notificationOutboxRepository = outboxRepo,
         searchRequestRepository = searchRequestRepo,
+        permitSearchRequestRepository = permitSearchRequestRepo,
         userRepository = userRepo,
         smsConversationService = conversationSvc,
     )
