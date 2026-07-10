@@ -41,8 +41,8 @@ class PermitContentCache(
         return fetched
     }
 
-    private fun fetch(permitId: String): PermitContentPayload? =
-        try {
+    private fun fetch(permitId: String): PermitContentPayload? {
+        val primary = try {
             retry.executeSupplier {
                 cb.executeSupplier {
                     recreationApi
@@ -55,7 +55,33 @@ class PermitContentCache(
         } catch (e: Exception) {
             log.warn("Failed to fetch permit content permitId={}", permitId, e)
             null
+        } ?: return null
+
+        if (primary.rules.isNotEmpty()) return primary
+
+        // permitcontent/{id} returns an empty rules array for some permits (confirmed live for
+        // Desolation, 233261) even though its divisions are populated correctly — permits/{id}/details
+        // is the endpoint that actually carries rules for those permits. Without this fallback,
+        // PermitClassificationService's structural check fails closed on data that was never fetched,
+        // misclassifying every such zone permit as unsupported.
+        val fallbackRules = try {
+            retry.executeSupplier {
+                cb.executeSupplier {
+                    recreationApi
+                        .getPermitDetails(permitId)
+                        .execute()
+                        .body()
+                        ?.payload
+                        ?.rules
+                }
+            }
+        } catch (e: Exception) {
+            log.warn("Failed to fetch permit details fallback rules permitId={}", permitId, e)
+            null
         }
+
+        return if (fallbackRules.isNullOrEmpty()) primary else primary.copy(rules = fallbackRules)
+    }
 
     private fun cacheKey(permitId: String) = "permit:content:$permitId"
 }

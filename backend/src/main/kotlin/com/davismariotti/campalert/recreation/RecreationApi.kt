@@ -40,6 +40,17 @@ interface RecreationApi {
         @Path("id") id: String
     ): Call<PermitContentResponse>
 
+    /**
+     * Same payload shape as [getPermitContent], but for some permits (confirmed live for Desolation,
+     * 233261) `permitcontent/{id}` returns an empty `rules` array while this endpoint has the real
+     * rules — [com.davismariotti.campalert.service.permit.PermitContentCache] falls back to this call
+     * only when that happens, rather than switching every permit over to it.
+     */
+    @GET("permits/{id}/details")
+    fun getPermitDetails(
+        @Path("id") id: String
+    ): Call<PermitContentResponse>
+
     /** One call covers every division on a zone permit for the given month. */
     @GET("permits/{id}/availability/month")
     fun getZonePermitAvailability(
