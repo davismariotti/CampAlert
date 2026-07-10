@@ -585,6 +585,115 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /permits/{id}/availability:
+    get:
+      tags: [Permits]
+      operationId: getPermitAvailability
+      summary: Get a zone permit's month availability across all divisions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Zone permit availability grid for the month containing startDate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermitZoneAvailabilityPreviewResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Permit not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "422":
+          description: Permit reservation mechanism is not supported, or is not a zone permit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "502":
+          description: Recreation.gov upstream error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /permits/{id}/divisions/{divisionId}/availability:
+    get:
+      tags: [Permits]
+      operationId: getPermitDivisionAvailability
+      summary: Get an itinerary permit division's month availability
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: divisionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Itinerary division availability for the given month
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermitDivisionAvailabilityPreviewResponse'
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Permit not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "422":
+          description: Permit reservation mechanism is not supported, or is not an itinerary permit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "502":
+          description: Recreation.gov upstream error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /permit-search-requests:
     get:
       tags: [PermitSearchRequests]
@@ -1263,6 +1372,14 @@ components:
         description:
           type: string
           nullable: true
+        district:
+          type: string
+          nullable: true
+          description: Named sub-region grouping used to browse large division lists (e.g. Yellowstone's "Old Faithful"). Not a hierarchy — a division's childDivisionIds may belong to a different district.
+        maxGroupSize:
+          type: integer
+          nullable: true
+          description: This division's own MaxGroupSize rule value, when Recreation.gov scopes the rule per-division (typically ITINERARY permits). Null when not present.
         childDivisionIds:
           type: array
           items:
@@ -1287,10 +1404,49 @@ components:
           nullable: true
         type:
           $ref: '#/components/schemas/PermitType'
+        maxGroupSize:
+          type: integer
+          nullable: true
+          description: The permit-wide MaxGroupSize rule value, when Recreation.gov scopes the rule to the whole permit rather than per-division (typically ZONE permits). Null when not present.
         divisions:
           type: array
           items:
             $ref: '#/components/schemas/PermitDivision'
+
+    PermitAvailabilityCell:
+      type: object
+      required:
+        - total
+        - remaining
+      properties:
+        total:
+          type: integer
+        remaining:
+          type: integer
+
+    PermitZoneAvailabilityPreviewResponse:
+      type: object
+      required:
+        - divisions
+      properties:
+        divisions:
+          type: object
+          description: Division id -> date (YYYY-MM-DD) -> availability cell.
+          additionalProperties:
+            type: object
+            additionalProperties:
+              $ref: '#/components/schemas/PermitAvailabilityCell'
+
+    PermitDivisionAvailabilityPreviewResponse:
+      type: object
+      required:
+        - dates
+      properties:
+        dates:
+          type: object
+          description: Date (YYYY-MM-DD) -> availability cell, collapsed across every quota type Recreation.gov enforces concurrently for this division.
+          additionalProperties:
+            $ref: '#/components/schemas/PermitAvailabilityCell'
 
     PermitZoneTargetBody:
       type: object
