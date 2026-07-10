@@ -29,11 +29,13 @@ export function ChangePasswordForm() {
         body: { currentPassword, newPassword }
       })
 
-      if (result.response.status === 403) {
-        setServerError('Request could not be completed — please refresh and try again.')
-      } else if (result.error) {
-        const err = result.error as { message?: string }
-        setServerError(err.message ?? 'Something went wrong. Please try again.')
+      if (result.error) {
+        if (result.response?.status === 403) {
+          setServerError('Request could not be completed — please refresh and try again.')
+        } else {
+          const err = result.error as { message?: string }
+          setServerError(err.message ?? 'Something went wrong. Please try again.')
+        }
       } else {
         setSuccess(true)
         setCurrentPassword('')
