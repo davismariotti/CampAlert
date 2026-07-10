@@ -3,12 +3,17 @@ package com.davismariotti.campalert.service.notification
 import com.davismariotti.campalert.model.AvailabilityState
 import com.davismariotti.campalert.model.NotificationOutbox
 import com.davismariotti.campalert.model.OutboxType
+import com.davismariotti.campalert.model.PermitSearchRequest
+import com.davismariotti.campalert.model.PermitSearchRequestState
 import com.davismariotti.campalert.model.PhoneNumber
 import com.davismariotti.campalert.model.PhoneNumberStatus
+import com.davismariotti.campalert.model.RequestType
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
+import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
+import com.davismariotti.campalert.repository.PermitSearchRequestRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
@@ -39,6 +44,9 @@ class CampsiteAlertDispatcherIntegrationTest : IntegrationTestBase() {
 
     @Autowired
     private lateinit var outboxRepository: NotificationOutboxRepository
+
+    @Autowired
+    private lateinit var permitSearchRequestRepository: PermitSearchRequestRepository
 
     private var userId: Long = 0L
 
@@ -84,6 +92,38 @@ class CampsiteAlertDispatcherIntegrationTest : IntegrationTestBase() {
             NotificationOutbox(
                 userId = userId,
                 requestId = request.id!!,
+                requestType = RequestType.CAMPGROUND,
+                type = type,
+                sendAfter = sendAfter,
+            )
+        )
+
+    private fun seedPermitRequest(availabilityState: AvailabilityState = AvailabilityState.AVAILABLE): PermitSearchRequest {
+        val req = PermitSearchRequest(
+            userId = userId,
+            permitId = "233261",
+            permitName = "Desolation Wilderness",
+            groupSize = 4,
+            name = "Aloha Zone",
+            searchType = SearchType.ZONE,
+        )
+        val st = PermitSearchRequestState()
+        st.permitSearchRequest = req
+        st.lastAvailabilityState = availabilityState
+        req.state = st
+        return permitSearchRequestRepository.save(req)
+    }
+
+    private fun seedClaimablePermitRow(
+        request: PermitSearchRequest,
+        type: OutboxType = OutboxType.AVAILABLE,
+        sendAfter: Instant = Instant.now().minusSeconds(60),
+    ): NotificationOutbox =
+        outboxRepository.save(
+            NotificationOutbox(
+                userId = userId,
+                requestId = request.id!!,
+                requestType = RequestType.PERMIT,
                 type = type,
                 sendAfter = sendAfter,
             )
@@ -170,5 +210,23 @@ class CampsiteAlertDispatcherIntegrationTest : IntegrationTestBase() {
         assertThat(reload(row).missedAt).isNotNull()
         assertThat(reload(row).sentAt).isNull()
         verify(smsSender, never()).send(anyKt(), anyKt())
+    }
+
+    // --- mixed campground + permit rows for one user (spec: processed together in one dispatch cycle) ---
+
+    @Test
+    fun `mixed campground and permit rows for one user are both sent in one dispatch cycle`() {
+        seedVerifiedPhone()
+        val campgroundRequest = seedRequest()
+        val permitRequest = seedPermitRequest()
+        val campgroundRow = seedClaimableRow(campgroundRequest)
+        val permitRow = seedClaimablePermitRow(permitRequest)
+
+        runSafetyNet()
+
+        assertThat(reload(campgroundRow).sentAt).isNotNull()
+        assertThat(reload(permitRow).sentAt).isNotNull()
+        // Two separate sends: one CampsiteAlertNotification, one PermitAlertNotification.
+        verify(smsSender, org.mockito.Mockito.times(2)).send(anyKt(), anyKt())
     }
 }
