@@ -21,4 +21,10 @@ interface RidbApi {
     fun getCampsites(
         @Path("id") id: Int
     ): Call<RidbCampsitesResponse>
+
+    /** Zone-permit static metadata (entrances + destination zones); RIDB has no coverage for itinerary permits. */
+    @GET("facilities/{id}/permitentrances")
+    fun getFacilityPermitEntrances(
+        @Path("id") id: String
+    ): Call<RidbPermitEntrancesResponse>
 }
