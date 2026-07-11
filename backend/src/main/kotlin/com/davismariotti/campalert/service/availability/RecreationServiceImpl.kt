@@ -7,9 +7,11 @@ import com.davismariotti.campalert.recreation.Campground
 import com.davismariotti.campalert.recreation.Campsite
 import com.davismariotti.campalert.recreation.Campsite.Companion.mergeWith
 import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.util.sleepJitter
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.github.resilience4j.retry.RetryRegistry
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.YearMonth
@@ -24,6 +26,7 @@ class RecreationServiceImpl(
     val recreationApi: RecreationApi,
     private val circuitBreakerRegistry: CircuitBreakerRegistry,
     private val retryRegistry: RetryRegistry,
+    @param:Value($$"${campfinder.polling.request-jitter-ms:0}") private val requestJitterMs: Long = 0,
 ) : RecreationService {
     private val log = LoggerFactory.getLogger(javaClass)
     private val cb by lazy { circuitBreakerRegistry.circuitBreaker("recreation-gov") }
@@ -97,6 +100,7 @@ class RecreationServiceImpl(
         }
 
     private fun fetchMonthDirect(campsiteId: Int, monthStart: LocalDate): Campground {
+        sleepJitter(requestJitterMs)
         val body = recreationApi
             .getCampgroundAvailability(
                 campsiteId,

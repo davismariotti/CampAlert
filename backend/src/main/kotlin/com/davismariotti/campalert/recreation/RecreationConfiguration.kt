@@ -31,6 +31,8 @@ class RecreationConfiguration(
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         val okHttpClient = OkHttpClient
             .Builder()
+            .cookieJar(InMemoryCookieJar())
+            .addInterceptor(BrowserHeadersInterceptor())
             .addInterceptor(MetricsInterceptor("Custom/RecreationGov/AvailabilityFetch"))
             .addInterceptor(RawBodyCapturingInterceptor())
             .build()
