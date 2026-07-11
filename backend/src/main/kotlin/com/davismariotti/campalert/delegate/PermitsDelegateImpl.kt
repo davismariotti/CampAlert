@@ -13,6 +13,7 @@ import com.davismariotti.campalert.recreation.PermitRuleContent
 import com.davismariotti.campalert.recreation.RecreationApi
 import com.davismariotti.campalert.service.permit.PermitClassificationService
 import com.davismariotti.campalert.service.permit.PermitContentCache
+import com.davismariotti.campalert.util.naturalOrder
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import org.slf4j.LoggerFactory
@@ -79,16 +80,18 @@ class PermitsDelegateImpl(
         val content = permitContentCache.get(id)
             ?: throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Recreation.gov upstream error")
 
-        val divisions = content.divisions.values.map { division ->
-            PermitDivision(
-                id = division.id,
-                name = division.name ?: division.id,
-                description = division.description,
-                district = division.district,
-                maxGroupSize = maxGroupSizeFor(content.rules, division.id),
-                childDivisionIds = if (type == SearchType.ITINERARY) division.children else null,
-            )
-        }
+        val divisions = content.divisions.values
+            .sortedWith(compareBy(naturalOrder) { it.name ?: it.id })
+            .map { division ->
+                PermitDivision(
+                    id = division.id,
+                    name = division.name ?: division.id,
+                    description = division.description,
+                    district = division.district,
+                    maxGroupSize = maxGroupSizeFor(content.rules, division.id),
+                    childDivisionIds = if (type == SearchType.ITINERARY) division.children else null,
+                )
+            }
 
         return ResponseEntity.ok(
             PermitResponse(
