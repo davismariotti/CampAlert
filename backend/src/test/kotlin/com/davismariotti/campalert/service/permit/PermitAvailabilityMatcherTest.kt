@@ -39,7 +39,11 @@ class PermitAvailabilityMatcherTest {
     private val recreationApi = mock(RecreationApi::class.java)
     private val circuitBreakerRegistry = CircuitBreakerRegistry.of(CircuitBreakerConfig.ofDefaults())
     private val retryRegistry = RetryRegistry.of(RetryConfig.ofDefaults())
-    private val matcher = PermitAvailabilityMatcher(recreationApi, circuitBreakerRegistry, retryRegistry)
+
+    // Unstubbed Boolean-returning methods default to false in Mockito, so every existing test here
+    // sees "not suspicious" unless a test explicitly stubs looksSuspicious to return true.
+    private val zoneAvailabilityBaselineService = mock(ZoneAvailabilityBaselineService::class.java)
+    private val matcher = PermitAvailabilityMatcher(recreationApi, circuitBreakerRegistry, retryRegistry, zoneAvailabilityBaselineService)
 
     private val zoneCache: ZoneAvailabilityCache = ConcurrentHashMap()
     private val itineraryCache: ItineraryAvailabilityCache = ConcurrentHashMap()
@@ -54,6 +58,9 @@ class PermitAvailabilityMatcherTest {
     // The unchecked cast sidesteps that (same trick as the anyK() helper elsewhere in this codebase).
     @Suppress("UNCHECKED_CAST")
     private fun <T> eqK(value: T): T = eq(value) as T
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> anyK(): T = org.mockito.ArgumentMatchers.any<T>() as T
 
     // Builds the Call *before* the caller opens its own when(...) stub — mockCall() itself calls
     // when(...) internally, so nesting it inside another when(...).thenReturn(...) would corrupt
@@ -93,8 +100,16 @@ class PermitAvailabilityMatcherTest {
 
     private fun zoneCell(remaining: Int) = PermitZoneAvailabilityCell(total = 10, remaining = remaining)
 
-    private fun stubZoneAvailability(permitId: String, availability: Map<String, PermitZoneDivisionAvailability>) {
-        val call = mockCall(PermitZoneAvailabilityResponse(PermitZoneAvailabilityPayload(permitId = permitId, availability = availability)))
+    private fun stubZoneAvailability(
+        permitId: String,
+        availability: Map<String, PermitZoneDivisionAvailability>,
+        nextAvailableDate: java.time.ZonedDateTime? = null,
+    ) {
+        val call = mockCall(
+            PermitZoneAvailabilityResponse(
+                PermitZoneAvailabilityPayload(permitId = permitId, availability = availability, nextAvailableDate = nextAvailableDate),
+            ),
+        )
         // getZonePermitAvailability has trailing default params; Kotlin substitutes literal defaults
         // for any not given a matcher, so all four args need matchers here (Mockito's all-or-none rule).
         `when`(recreationApi.getZonePermitAvailability(eqK(permitId), anyString(), anyBoolean(), anyBoolean())).thenReturn(call)
@@ -154,6 +169,70 @@ class PermitAvailabilityMatcherTest {
             // outside window, has quota but shouldn't count
             mapOf("290" to PermitZoneDivisionAvailability("290", mapOf(LocalDate.of(2026, 7, 20).atStartOfDay(ZoneOffset.UTC) to zoneCell(5)))),
         )
+
+        val result = matcher.check(request, zoneCache, itineraryCache)
+
+        assertFalse(result.hasAvailability)
+    }
+
+    @Test
+    fun `zone matcher rejects a division whose data contradicts next_available_date`() {
+        val request = zoneRequest(divisionIds = listOf("343"), LocalDate.of(2026, 7, 10), LocalDate.of(2026, 7, 20))
+        stubZoneAvailability(
+            "233261",
+            // 343 claims July 10 was open, but next_available_date says nothing opened before July 11 —
+            // a logical contradiction, so 343's numbers (including the July 15 "match") are distrusted.
+            mapOf(
+                "343" to PermitZoneDivisionAvailability(
+                    "343",
+                    mapOf(
+                        LocalDate.of(2026, 7, 10).atStartOfDay(ZoneOffset.UTC) to zoneCell(5),
+                        LocalDate.of(2026, 7, 15).atStartOfDay(ZoneOffset.UTC) to zoneCell(3),
+                    ),
+                ),
+            ),
+            nextAvailableDate = LocalDate.of(2026, 7, 11).atStartOfDay(ZoneOffset.UTC),
+        )
+
+        val result = matcher.check(request, zoneCache, itineraryCache)
+
+        assertFalse(result.hasAvailability)
+    }
+
+    @Test
+    fun `zone matcher still matches a date after next_available_date even if an earlier date is open`() {
+        val request = zoneRequest(divisionIds = listOf("343"), LocalDate.of(2026, 7, 10), LocalDate.of(2026, 7, 20))
+        stubZoneAvailability(
+            "233261",
+            // July 11 is legitimately open (matches next_available_date) and July 12 is what we need —
+            // neither date is before the cutoff, so there's no contradiction and the July 12 match stands.
+            mapOf(
+                "343" to PermitZoneDivisionAvailability(
+                    "343",
+                    mapOf(
+                        LocalDate.of(2026, 7, 11).atStartOfDay(ZoneOffset.UTC) to zoneCell(5),
+                        LocalDate.of(2026, 7, 12).atStartOfDay(ZoneOffset.UTC) to zoneCell(3),
+                    ),
+                ),
+            ),
+            nextAvailableDate = LocalDate.of(2026, 7, 11).atStartOfDay(ZoneOffset.UTC),
+        )
+
+        val result = matcher.check(request, zoneCache, itineraryCache)
+
+        assertTrue(result.hasAvailability)
+        assertEquals("343", result.matchedDivisionId)
+        assertEquals(LocalDate.of(2026, 7, 11), result.matchedDate)
+    }
+
+    @Test
+    fun `zone matcher rejects a division that looks suspicious versus its own recorded baseline`() {
+        val request = zoneRequest(divisionIds = listOf("343"), LocalDate.of(2026, 7, 10), LocalDate.of(2026, 7, 15))
+        stubZoneAvailability(
+            "233261",
+            mapOf("343" to PermitZoneDivisionAvailability("343", mapOf(LocalDate.of(2026, 7, 13).atStartOfDay(ZoneOffset.UTC) to zoneCell(3)))),
+        )
+        `when`(zoneAvailabilityBaselineService.looksSuspicious(eqK("233261"), eqK("343"), anyK(), anyK())).thenReturn(true)
 
         val result = matcher.check(request, zoneCache, itineraryCache)
 
