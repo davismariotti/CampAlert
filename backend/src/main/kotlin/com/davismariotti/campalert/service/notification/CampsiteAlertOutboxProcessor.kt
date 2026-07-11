@@ -7,6 +7,7 @@ import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.PermitSearchRequest
 import com.davismariotti.campalert.model.RequestType
 import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.notification.CampsiteAlertNotification
 import com.davismariotti.campalert.notification.PendingNotification
 import com.davismariotti.campalert.notification.PendingPermitNotification
@@ -15,6 +16,7 @@ import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PermitSearchRequestRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
+import com.davismariotti.campalert.service.permit.PermitContentCache
 import com.davismariotti.campalert.service.sms.SmsConversationService
 import com.davismariotti.notifications.Channel
 import com.davismariotti.notifications.Notification
@@ -39,6 +41,7 @@ class CampsiteAlertOutboxProcessor(
     private val permitSearchRequestRepository: PermitSearchRequestRepository,
     private val userRepository: UserRepository,
     private val smsConversationService: SmsConversationService,
+    private val permitContentCache: PermitContentCache,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -96,7 +99,19 @@ class CampsiteAlertOutboxProcessor(
             }
             when (row.requestType) {
                 RequestType.CAMPGROUND -> campgroundToSend.add(PendingNotification(request as SearchRequest, row.type, row.id!!))
-                RequestType.PERMIT -> permitToSend.add(PendingPermitNotification(request as PermitSearchRequest, row.type, row.id!!))
+                RequestType.PERMIT -> {
+                    val permitRequest = request as PermitSearchRequest
+                    val divisionName = permitRequest.state.matchedDivisionId
+                        ?.takeIf { permitRequest.searchType == SearchType.ZONE }
+                        ?.let { divisionId ->
+                            permitContentCache
+                                .get(permitRequest.permitId)
+                                ?.divisions
+                                ?.get(divisionId)
+                                ?.name
+                        }
+                    permitToSend.add(PendingPermitNotification(permitRequest, row.type, row.id!!, divisionName))
+                }
             }
         }
 
