@@ -32,6 +32,7 @@ class RecreationConfiguration(
         val okHttpClient = OkHttpClient
             .Builder()
             .addInterceptor(MetricsInterceptor("Custom/RecreationGov/AvailabilityFetch"))
+            .addInterceptor(RawBodyCapturingInterceptor())
             .build()
         val retrofit = Retrofit
             .Builder()

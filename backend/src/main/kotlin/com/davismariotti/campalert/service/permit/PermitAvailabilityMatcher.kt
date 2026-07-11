@@ -4,6 +4,7 @@ import com.davismariotti.campalert.model.PermitSearchRequest
 import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.recreation.PermitItineraryAvailabilityPayload
 import com.davismariotti.campalert.recreation.PermitZoneAvailabilityPayload
+import com.davismariotti.campalert.recreation.RawResponseCapture
 import com.davismariotti.campalert.recreation.RecreationApi
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.github.resilience4j.retry.RetryRegistry
@@ -15,7 +16,13 @@ import java.time.format.DateTimeFormatter
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 
-typealias ZoneAvailabilityCache = ConcurrentHashMap<Pair<String, YearMonth>, CompletableFuture<PermitZoneAvailabilityPayload?>>
+/** [rawJson] is the literal Recreation.gov response body, captured alongside the parsed [payload] for debugging. */
+data class ZoneMonthFetch(
+    val payload: PermitZoneAvailabilityPayload?,
+    val rawJson: String?
+)
+
+typealias ZoneAvailabilityCache = ConcurrentHashMap<Pair<String, YearMonth>, CompletableFuture<ZoneMonthFetch>>
 typealias ItineraryAvailabilityCache = ConcurrentHashMap<Triple<String, String, YearMonth>, CompletableFuture<PermitItineraryAvailabilityPayload?>>
 
 /**
@@ -55,7 +62,8 @@ class PermitAvailabilityMatcher(
         val endMonth = YearMonth.from(target.endDay)
         while (!YearMonth.from(monthStart).isAfter(endMonth)) {
             val month = YearMonth.from(monthStart)
-            val payload = fetchZoneMonth(request.permitId, month, cache)
+            val fetch = fetchZoneMonth(request.permitId, month, cache)
+            val payload = fetch.payload
             if (payload != null) {
                 for (divisionId in target.divisionIds) {
                     val division = payload.availability[divisionId] ?: continue
@@ -66,6 +74,13 @@ class PermitAvailabilityMatcher(
                         }.sortedBy { it.key }
                         .firstOrNull { it.value.remaining > 0 }
                     if (match != null) {
+                        log.info(
+                            "Zone permit availability match permitId={} divisionId={} matchedDate={} response={}",
+                            request.permitId,
+                            divisionId,
+                            match.key.toLocalDate(),
+                            fetch.rawJson,
+                        )
                         return PermitAvailabilityResult(
                             request,
                             hasAvailability = true,
@@ -80,13 +95,13 @@ class PermitAvailabilityMatcher(
         return PermitAvailabilityResult(request, hasAvailability = false)
     }
 
-    private fun fetchZoneMonth(permitId: String, month: YearMonth, cache: ZoneAvailabilityCache): PermitZoneAvailabilityPayload? =
+    private fun fetchZoneMonth(permitId: String, month: YearMonth, cache: ZoneAvailabilityCache): ZoneMonthFetch =
         cache
             .computeIfAbsent(Pair(permitId, month)) {
                 CompletableFuture.supplyAsync { fetchZoneMonthDirect(permitId, month) }
             }.get()
 
-    private fun fetchZoneMonthDirect(permitId: String, month: YearMonth): PermitZoneAvailabilityPayload? =
+    private fun fetchZoneMonthDirect(permitId: String, month: YearMonth): ZoneMonthFetch =
         try {
             retry.executeSupplier {
                 cb.executeSupplier {
@@ -95,16 +110,14 @@ class PermitAvailabilityMatcher(
                         .atStartOfDay()
                         .atZone(ZoneOffset.UTC)
                         .format(dateFormatter)
-                    recreationApi
-                        .getZonePermitAvailability(permitId, startDate)
-                        .execute()
-                        .body()
-                        ?.payload
+                    val response = recreationApi.getZonePermitAvailability(permitId, startDate).execute()
+                    val rawJson = RawResponseCapture.takeAndClear()
+                    ZoneMonthFetch(payload = response.body()?.payload, rawJson = rawJson)
                 }
             }
         } catch (e: Exception) {
             log.warn("Failed to fetch zone permit availability permitId={} month={}", permitId, month, e)
-            null
+            ZoneMonthFetch(payload = null, rawJson = null)
         }
 
     private fun checkItinerary(request: PermitSearchRequest, cache: ItineraryAvailabilityCache): PermitAvailabilityResult {
