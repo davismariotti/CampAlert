@@ -5,7 +5,7 @@ import { listSearchRequests, listPermitSearchRequests, listPhoneNumbers } from '
 import { RequestCard } from './RequestCard'
 import { AddAlertModal } from './AddAlertModal'
 
-type Filter = 'all' | 'watching' | 'done'
+type Filter = 'watching' | 'done'
 
 function SkeletonCard() {
   return (
@@ -18,10 +18,10 @@ function SkeletonCard() {
 }
 
 export function RequestsPage() {
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useState<Filter>('watching')
   const [showAddModal, setShowAddModal] = useState(false)
 
-  const completed = filter === 'all' ? undefined : filter === 'done'
+  const completed = filter === 'done'
 
   const {
     data: campgroundRequests,
@@ -63,9 +63,8 @@ export function RequestsPage() {
   }
 
   const tabs: { key: Filter; label: string }[] = [
-    { key: 'all', label: 'All' },
     { key: 'watching', label: 'Watching' },
-    { key: 'done', label: 'Done' }
+    { key: 'done', label: 'History' }
   ]
 
   return (

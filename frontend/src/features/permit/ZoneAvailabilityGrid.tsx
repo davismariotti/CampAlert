@@ -21,6 +21,11 @@ function daysInMonth(startDate: string): string[] {
   return Array.from({ length: count }, (_, i) => `${startDate.slice(0, 8)}${String(i + 1).padStart(2, '0')}`)
 }
 
+function isWeekend(date: string): boolean {
+  const day = new Date(`${date}T12:00:00`).getDay()
+  return day === 0 || day === 6
+}
+
 export function ZoneAvailabilityGrid({ permitId, divisionIds }: Props) {
   const [monthOffset, setMonthOffset] = useState(0)
   const startDate = useMemo(() => firstOfMonth(monthOffset), [monthOffset])
@@ -69,9 +74,12 @@ export function ZoneAvailabilityGrid({ permitId, divisionIds }: Props) {
           <table className="min-w-full border-collapse text-xs">
             <thead>
               <tr>
-                <th className="sticky left-0 z-10 bg-white px-2 py-1.5 text-left font-medium text-forest-500">Zone</th>
+                <th className="sticky left-0 z-10 bg-white px-2 py-1.5 text-left font-medium text-forest-500">Day</th>
                 {dates.map((date) => (
-                  <th key={date} className="px-1.5 py-1.5 text-center font-medium text-forest-400">
+                  <th
+                    key={date}
+                    className={`px-1.5 py-1.5 text-center font-medium text-forest-400 ${isWeekend(date) ? 'bg-forest-50' : ''}`}
+                  >
                     {Number(date.slice(8, 10))}
                   </th>
                 ))}
@@ -92,7 +100,7 @@ export function ZoneAvailabilityGrid({ permitId, divisionIds }: Props) {
                       return (
                         <td
                           key={date}
-                          className={`px-1.5 py-1 text-center ${remaining > 0 ? 'text-forest-700' : 'text-forest-300'}`}
+                          className={`px-1.5 py-1 text-center ${remaining > 0 ? 'text-forest-700' : 'text-forest-300'} ${isWeekend(date) ? 'bg-forest-50' : ''}`}
                         >
                           {cell ? remaining : '—'}
                         </td>
