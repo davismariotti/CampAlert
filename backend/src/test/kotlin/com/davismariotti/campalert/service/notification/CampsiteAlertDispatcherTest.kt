@@ -47,6 +47,7 @@ class CampsiteAlertDispatcherTest {
     private val permitSearchRequestRepo = mock(com.davismariotti.campalert.repository.PermitSearchRequestRepository::class.java)
     private val userRepo = mock(UserRepository::class.java)
     private val conversationSvc = mock(SmsConversationService::class.java)
+    private val permitContentCache = mock(com.davismariotti.campalert.service.permit.PermitContentCache::class.java)
 
     private val processor = CampsiteAlertOutboxProcessor(
         notificationService = notificationService,
@@ -57,6 +58,7 @@ class CampsiteAlertDispatcherTest {
         permitSearchRequestRepository = permitSearchRequestRepo,
         userRepository = userRepo,
         smsConversationService = conversationSvc,
+        permitContentCache = permitContentCache,
     )
 
     private val smsUser = User(id = 42L, email = "user@example.com", passwordHash = "hash")

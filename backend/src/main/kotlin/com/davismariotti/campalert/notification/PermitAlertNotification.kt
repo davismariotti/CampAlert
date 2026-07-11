@@ -10,6 +10,8 @@ data class PendingPermitNotification(
     val request: PermitSearchRequest,
     val type: OutboxType,
     val outboxId: Long,
+    /** Human-readable division name (e.g. "33 Aloha"), resolved via PermitContentCache; falls back to the raw id in the SMS when unavailable. */
+    val matchedDivisionName: String? = null,
 )
 
 /** Permit analogue of [CampsiteAlertNotification] — built from permit name plus matched zone/date or leg count. */
@@ -29,7 +31,7 @@ class PermitAlertNotification(
         val count = notifications.size
         if (count > 1) sb.appendLine("$count permits available").appendLine()
         notifications.forEach { n ->
-            val summary = matchSummary(n.request)
+            val summary = matchSummary(n)
             sb.appendLine(n.request.permitName + (summary?.let { " — $it" } ?: ""))
             sb.appendLine("recreation.gov/permits/${n.request.permitId}")
             sb.appendLine()
@@ -45,12 +47,14 @@ class PermitAlertNotification(
         return sb.toString().trimEnd()
     }
 
-    private fun matchSummary(request: PermitSearchRequest): String? =
-        when (request.searchType) {
+    private fun matchSummary(n: PendingPermitNotification): String? {
+        val request = n.request
+        return when (request.searchType) {
             SearchType.ZONE -> {
                 val divisionId = request.state.matchedDivisionId
                 val date = request.state.matchedDate
-                if (divisionId != null && date != null) "zone $divisionId on $date" else null
+                val divisionLabel = n.matchedDivisionName ?: divisionId
+                if (divisionLabel != null && date != null) "zone $divisionLabel on $date" else null
             }
             SearchType.ITINERARY ->
                 request.itineraryTarget
@@ -58,4 +62,5 @@ class PermitAlertNotification(
                     ?.size
                     ?.let { "$it-night itinerary" }
         }
+    }
 }
