@@ -10,6 +10,8 @@ data class PermitZoneAvailabilityResponse(
 
 data class PermitZoneAvailabilityPayload(
     @JsonProperty("permit_id") val permitId: String? = null,
+    /** Earliest date, across every division on the permit, that Recreation.gov currently considers bookable. */
+    @JsonProperty("next_available_date") val nextAvailableDate: ZonedDateTime? = null,
     @JsonProperty("availability") val availability: Map<String, PermitZoneDivisionAvailability> = emptyMap(),
 )
 

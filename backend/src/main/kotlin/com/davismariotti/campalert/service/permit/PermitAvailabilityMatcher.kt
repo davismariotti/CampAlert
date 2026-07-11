@@ -6,9 +6,11 @@ import com.davismariotti.campalert.recreation.PermitItineraryAvailabilityPayload
 import com.davismariotti.campalert.recreation.PermitZoneAvailabilityPayload
 import com.davismariotti.campalert.recreation.RawResponseCapture
 import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.util.sleepJitter
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.github.resilience4j.retry.RetryRegistry
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.time.YearMonth
 import java.time.ZoneOffset
@@ -37,6 +39,8 @@ class PermitAvailabilityMatcher(
     private val recreationApi: RecreationApi,
     private val circuitBreakerRegistry: CircuitBreakerRegistry,
     private val retryRegistry: RetryRegistry,
+    private val zoneAvailabilityBaselineService: ZoneAvailabilityBaselineService,
+    @param:Value($$"${campfinder.polling.request-jitter-ms:0}") private val requestJitterMs: Long = 0,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val cb by lazy { circuitBreakerRegistry.circuitBreaker("recreation-gov") }
@@ -67,6 +71,33 @@ class PermitAvailabilityMatcher(
             if (payload != null) {
                 for (divisionId in target.divisionIds) {
                     val division = payload.availability[divisionId] ?: continue
+
+                    // Always evaluated (and always records this tick as the new baseline) regardless
+                    // of the contradiction check below, so the baseline stays fresh every tick even
+                    // for divisions skipped via next_available_date.
+                    val looksSuspiciousVsBaseline = zoneAvailabilityBaselineService.looksSuspicious(
+                        request.permitId,
+                        divisionId,
+                        month,
+                        division.dateAvailability,
+                    )
+
+                    val cutoff = payload.nextAvailableDate
+                    val isContradictory = cutoff != null &&
+                        division.dateAvailability.any { (dateTime, cell) -> dateTime.isBefore(cutoff) && cell.remaining > 0 }
+
+                    if (isContradictory || looksSuspiciousVsBaseline) {
+                        log.warn(
+                            "Skipping zone permit division with untrustworthy availability permitId={} divisionId={} contradictory={} suspiciousVsBaseline={} nextAvailableDate={}",
+                            request.permitId,
+                            divisionId,
+                            isContradictory,
+                            looksSuspiciousVsBaseline,
+                            cutoff,
+                        )
+                        continue
+                    }
+
                     val match = division.dateAvailability.entries
                         .filter { (dateTime, _) ->
                             val date = dateTime.toLocalDate()
@@ -101,8 +132,9 @@ class PermitAvailabilityMatcher(
                 CompletableFuture.supplyAsync { fetchZoneMonthDirect(permitId, month) }
             }.get()
 
-    private fun fetchZoneMonthDirect(permitId: String, month: YearMonth): ZoneMonthFetch =
-        try {
+    private fun fetchZoneMonthDirect(permitId: String, month: YearMonth): ZoneMonthFetch {
+        sleepJitter(requestJitterMs)
+        return try {
             retry.executeSupplier {
                 cb.executeSupplier {
                     val startDate = month
@@ -119,6 +151,7 @@ class PermitAvailabilityMatcher(
             log.warn("Failed to fetch zone permit availability permitId={} month={}", permitId, month, e)
             ZoneMonthFetch(payload = null, rawJson = null)
         }
+    }
 
     private fun checkItinerary(request: PermitSearchRequest, cache: ItineraryAvailabilityCache): PermitAvailabilityResult {
         val legs = request.itineraryTarget?.legs
@@ -156,8 +189,9 @@ class PermitAvailabilityMatcher(
                 CompletableFuture.supplyAsync { fetchItineraryMonthDirect(permitId, divisionId, month) }
             }.get()
 
-    private fun fetchItineraryMonthDirect(permitId: String, divisionId: String, month: YearMonth): PermitItineraryAvailabilityPayload? =
-        try {
+    private fun fetchItineraryMonthDirect(permitId: String, divisionId: String, month: YearMonth): PermitItineraryAvailabilityPayload? {
+        sleepJitter(requestJitterMs)
+        return try {
             retry.executeSupplier {
                 cb.executeSupplier {
                     recreationApi
@@ -171,6 +205,7 @@ class PermitAvailabilityMatcher(
             log.warn("Failed to fetch itinerary permit availability permitId={} divisionId={} month={}", permitId, divisionId, month, e)
             null
         }
+    }
 
     companion object {
         private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
