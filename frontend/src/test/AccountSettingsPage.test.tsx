@@ -110,4 +110,38 @@ describe('AccountSettingsPage', () => {
     expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true')
     expect(screen.getAllByRole('button', { name: /save settings/i })[1]).toBeDisabled()
   })
+
+  it('blocks saving when enabling Pushover without both keys set', async () => {
+    const updateSpy = vi.spyOn(sdk, 'updateMe')
+
+    render(<Wrapper />)
+
+    await userEvent.click(screen.getByRole('switch'))
+
+    expect(screen.getByText('App token and user key are both required to enable Pushover.')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /save settings/i })[1]).toBeDisabled()
+    expect(updateSpy).not.toHaveBeenCalled()
+  })
+
+  it('allows turning Pushover off without re-entering keys', async () => {
+    localStorage.setItem(
+      AUTH_STORAGE_KEY,
+      JSON.stringify({
+        id: 1,
+        email: 'user@test.com',
+        timezone: 'America/Los_Angeles',
+        verificationStatus: 'VERIFIED',
+        pushoverApiToken: 'existing-token',
+        pushoverUserKey: 'existing-key',
+        pushoverOverrideEnabled: true
+      })
+    )
+
+    render(<Wrapper />)
+
+    await userEvent.click(screen.getByRole('switch'))
+
+    expect(screen.queryByText('App token and user key are both required to enable Pushover.')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /save settings/i })[1]).not.toBeDisabled()
+  })
 })

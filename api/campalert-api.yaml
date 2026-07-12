@@ -198,6 +198,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthResponse'
+        "400":
+          description: Validation error (e.g. enabling the Pushover override without both keys set)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         "401":
           description: Not authenticated
           content:
