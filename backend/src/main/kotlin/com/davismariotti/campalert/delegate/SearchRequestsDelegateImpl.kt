@@ -15,6 +15,7 @@ import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.TimezoneResolutionService
+import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
 import com.davismariotti.campalert.util.currentUserId
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
@@ -29,6 +30,7 @@ class SearchRequestsDelegateImpl(
     private val phoneNumberRepository: PhoneNumberRepository,
     private val notificationOutboxRepository: NotificationOutboxRepository,
     private val timezoneResolutionService: TimezoneResolutionService,
+    private val pollTargetRegistrationService: PollTargetRegistrationService,
 ) : SearchRequestsApiDelegate {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -97,6 +99,7 @@ class SearchRequestsDelegateImpl(
         entity.state = state
         val savedRequest = searchRequestRepository.save(entity)
         log.info("Search request created userId={} requestId={} campsiteId={} nights={}", userId, savedRequest.id, savedRequest.campsiteId, savedRequest.nights)
+        pollTargetRegistrationService.ensureCampgroundTarget(savedRequest.campsiteId)
         timezoneResolutionService.resolveAndPersistAsync(savedRequest.id!!, createSearchRequestBody.campsiteId)
         return ResponseEntity.status(201).body(savedRequest.toResponse(fetchStats(savedRequest)))
     }
@@ -135,6 +138,7 @@ class SearchRequestsDelegateImpl(
         updated.state = existing.state
         updated.state.completed = updateSearchRequestBody.completed
         val saved = searchRequestRepository.save(updated)
+        pollTargetRegistrationService.ensureCampgroundTarget(saved.campsiteId)
         return ResponseEntity.ok(saved.toResponse(fetchStats(saved)))
     }
 

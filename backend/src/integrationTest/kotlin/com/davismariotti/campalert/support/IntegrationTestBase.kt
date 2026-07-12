@@ -123,7 +123,8 @@ open class IntegrationTestBase {
         jdbcTemplate.execute(
             "TRUNCATE TABLE notification_outbox, search_request_state, search_requests, " +
                 "permit_search_request_state, permit_zone_target, permit_itinerary_target, permit_search_requests, " +
-                "persistent_logins, phone_numbers, email_verifications, password_resets, users, shedlock CASCADE"
+                "persistent_logins, phone_numbers, email_verifications, password_resets, users, shedlock, " +
+                "poll_target_state CASCADE"
         )
         redisConnectionFactory.connection.use { it.serverCommands().flushAll() }
         listOf("ridb", "recreation-gov", "twilio").forEach { name ->

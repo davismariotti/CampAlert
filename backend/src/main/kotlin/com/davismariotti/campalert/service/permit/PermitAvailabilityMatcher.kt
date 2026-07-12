@@ -7,9 +7,8 @@ import com.davismariotti.campalert.recreation.PermitQuotaType
 import com.davismariotti.campalert.recreation.PermitZoneAvailabilityPayload
 import com.davismariotti.campalert.recreation.RawResponseCapture
 import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.recreation.RecreationGovCallProtection
 import com.davismariotti.campalert.util.sleepJitter
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
-import io.github.resilience4j.retry.RetryRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -30,22 +29,20 @@ typealias ItineraryAvailabilityCache = ConcurrentHashMap<Triple<String, String, 
 
 /**
  * Implements the two permit matching semantics from design decision 3: zone is OR-across-accepted-
- * divisions-and-dates-in-window; itinerary is AND-across-every-ordered-leg. Both caches are tick-scoped
- * and passed in by the caller (see [PermitAvailabilityChecker]), mirroring [com.davismariotti.campalert.service.availability.RecreationServiceImpl]'s
- * `(campsiteId, YearMonth)` dedup cache — one fetch per (permit, month) or (permit, division, month)
- * across every request being processed in a tick, not one per request.
+ * divisions-and-dates-in-window; itinerary is AND-across-every-ordered-leg. Both caches are scoped to
+ * one check cycle and passed in by the caller (see [PermitPollCheckService]), mirroring
+ * [com.davismariotti.campalert.service.availability.RecreationServiceImpl]'s `(campsiteId, YearMonth)`
+ * dedup cache — one fetch per (permit, month) or (permit, division, month) across every request being
+ * processed in a cycle, not one per request.
  */
 @Service
 class PermitAvailabilityMatcher(
     private val recreationApi: RecreationApi,
-    private val circuitBreakerRegistry: CircuitBreakerRegistry,
-    private val retryRegistry: RetryRegistry,
+    private val callProtection: RecreationGovCallProtection,
     private val zoneAvailabilityBaselineService: ZoneAvailabilityBaselineService,
     @param:Value($$"${campfinder.polling.request-jitter-ms:0}") private val requestJitterMs: Long = 0,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
-    private val cb by lazy { circuitBreakerRegistry.circuitBreaker("recreation-gov") }
-    private val retry by lazy { retryRegistry.retry("recreation-gov") }
 
     fun check(
         request: PermitSearchRequest,
@@ -138,17 +135,15 @@ class PermitAvailabilityMatcher(
     private fun fetchZoneMonthDirect(permitId: String, month: YearMonth): ZoneMonthFetch {
         sleepJitter(requestJitterMs)
         return try {
-            retry.executeSupplier {
-                cb.executeSupplier {
-                    val startDate = month
-                        .atDay(1)
-                        .atStartOfDay()
-                        .atZone(ZoneOffset.UTC)
-                        .format(dateFormatter)
-                    val response = recreationApi.getZonePermitAvailability(permitId, startDate).execute()
-                    val rawJson = RawResponseCapture.takeAndClear()
-                    ZoneMonthFetch(payload = response.body()?.payload, rawJson = rawJson)
-                }
+            callProtection.execute {
+                val startDate = month
+                    .atDay(1)
+                    .atStartOfDay()
+                    .atZone(ZoneOffset.UTC)
+                    .format(dateFormatter)
+                val response = recreationApi.getZonePermitAvailability(permitId, startDate).execute()
+                val rawJson = RawResponseCapture.takeAndClear()
+                ZoneMonthFetch(payload = response.body()?.payload, rawJson = rawJson)
             }
         } catch (e: Exception) {
             log.warn("Failed to fetch zone permit availability permitId={} month={}", permitId, month, e)
@@ -203,14 +198,12 @@ class PermitAvailabilityMatcher(
     private fun fetchItineraryMonthDirect(permitId: String, divisionId: String, month: YearMonth): PermitItineraryAvailabilityPayload? {
         sleepJitter(requestJitterMs)
         return try {
-            retry.executeSupplier {
-                cb.executeSupplier {
-                    recreationApi
-                        .getItineraryDivisionAvailability(permitId, divisionId, month.monthValue, month.year)
-                        .execute()
-                        .body()
-                        ?.payload
-                }
+            callProtection.execute {
+                recreationApi
+                    .getItineraryDivisionAvailability(permitId, divisionId, month.monthValue, month.year)
+                    .execute()
+                    .body()
+                    ?.payload
             }
         } catch (e: Exception) {
             log.warn("Failed to fetch itinerary permit availability permitId={} divisionId={} month={}", permitId, divisionId, month, e)

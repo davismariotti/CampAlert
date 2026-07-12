@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.core.task.TaskExecutor
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.scheduling.annotation.EnableAsync
+import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import java.util.concurrent.ThreadPoolExecutor
 import javax.sql.DataSource
@@ -19,6 +20,7 @@ import javax.sql.DataSource
 @ConfigurationPropertiesScan
 @EnableSchedulerLock(defaultLockAtMostFor = "PT90S")
 @EnableAsync
+@EnableScheduling
 class CampFinderApplication {
     @Bean
     fun lockProvider(dataSource: DataSource): LockProvider =

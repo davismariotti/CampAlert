@@ -9,6 +9,7 @@ import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.TimezoneResolutionService
+import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -23,6 +24,7 @@ class PhoneGateTest {
     private val phoneNumberRepository = mock(PhoneNumberRepository::class.java)
     private val notificationOutboxRepository = mock(NotificationOutboxRepository::class.java)
     private val timezoneResolutionService = mock(TimezoneResolutionService::class.java)
+    private val pollTargetRegistrationService = mock(PollTargetRegistrationService::class.java)
     private val delegate =
         SearchRequestsDelegateImpl(
             searchRequestRepository,
@@ -30,6 +32,7 @@ class PhoneGateTest {
             phoneNumberRepository,
             notificationOutboxRepository,
             timezoneResolutionService,
+            pollTargetRegistrationService,
         )
 
     private val testUser = User(id = 1L, email = "test@example.com", passwordHash = "hash")
