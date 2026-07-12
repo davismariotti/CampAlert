@@ -23,6 +23,11 @@ export function ChangePasswordForm() {
       return
     }
 
+    if (newPassword === currentPassword) {
+      setConfirmError('New password must be different from current password.')
+      return
+    }
+
     setIsPending(true)
     try {
       const result = await changePassword({

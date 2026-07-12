@@ -275,4 +275,29 @@ class AuthIntegrationTest : IntegrationTestBase() {
             .response.status
         assertThat(revoked).isIn(401, 403)
     }
+
+    @Test
+    fun `change password revokes remember-me tokens`() {
+        val verificationId = registerOnly()
+        verifyLatestEmail(verificationId)
+        val loginResult = doPost("/api/auth/login", body = LoginBody(email = "user@test.com", password = "password1", rememberMe = true))
+        val session = loginResult.response.getCookie("SESSION")!!
+        val rememberMeCookie = loginResult.response.getCookie("remember-me")!!
+
+        doPut("/api/auth/me/password", session, ChangePasswordBody(currentPassword = "password1", newPassword = "newpassword1"))
+
+        val status = mockMvc
+            .perform(get("/api/auth/me").cookie(rememberMeCookie))
+            .andReturn()
+            .response.status
+        assertThat(status).isIn(401, 403)
+    }
+
+    @Test
+    fun `successful change password sends a password-changed confirmation email`() {
+        val session = registerAndLogin()
+        doPut("/api/auth/me/password", session, ChangePasswordBody(currentPassword = "password1", newPassword = "newpassword1"))
+
+        waitForEmailTemplate("email/password-changed")
+    }
 }

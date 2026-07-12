@@ -101,6 +101,12 @@ paths:
       responses:
         "202":
           description: Accepted (same response regardless of account state or delivery outcome)
+        "429":
+          description: Too many requests from this client, try again later
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/reset-password:
     post:

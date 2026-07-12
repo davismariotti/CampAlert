@@ -22,4 +22,9 @@ interface PasswordResetRepository : CrudRepository<PasswordReset, UUID> {
     @Transactional
     @Query("UPDATE PasswordReset pr SET pr.consumedAt = :now WHERE pr.userId = :userId AND pr.consumedAt IS NULL")
     fun consumeAllPendingByUserId(userId: Long, now: Instant): Int
+
+    @Modifying(clearAutomatically = true)
+    @Transactional
+    @Query("DELETE FROM PasswordReset pr WHERE pr.expiresAt < :cutoff")
+    fun deleteExpiredBefore(cutoff: Instant): Int
 }

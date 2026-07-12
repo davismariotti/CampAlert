@@ -110,4 +110,50 @@ class PasswordResetRepositoryTest : IntegrationTestBase() {
     fun `findLatestByUserId returns null when no rows exist`() {
         assertThat(passwordResetRepository.findLatestByUserId(user.id!!)).isNull()
     }
+
+    @Test
+    fun `deleteExpiredBefore removes rows expired before the cutoff`() {
+        val longExpired = passwordResetRepository.save(reset(expiresAt = Instant.now().minus(10, ChronoUnit.DAYS)))
+        val cutoff = Instant.now().minus(7, ChronoUnit.DAYS)
+
+        val deleted = passwordResetRepository.deleteExpiredBefore(cutoff)
+
+        assertThat(deleted).isEqualTo(1)
+        assertThat(passwordResetRepository.findById(longExpired.id)).isEmpty
+    }
+
+    @Test
+    fun `deleteExpiredBefore leaves rows within the retention window untouched`() {
+        val recentlyExpired = passwordResetRepository.save(reset(expiresAt = Instant.now().minus(1, ChronoUnit.DAYS)))
+        val cutoff = Instant.now().minus(7, ChronoUnit.DAYS)
+
+        val deleted = passwordResetRepository.deleteExpiredBefore(cutoff)
+
+        assertThat(deleted).isEqualTo(0)
+        assertThat(passwordResetRepository.findById(recentlyExpired.id)).isPresent
+    }
+
+    @Test
+    fun `deleteExpiredBefore leaves still-pending rows untouched`() {
+        val pending = passwordResetRepository.save(reset(expiresAt = Instant.now().plus(15, ChronoUnit.MINUTES)))
+        val cutoff = Instant.now().minus(7, ChronoUnit.DAYS)
+
+        val deleted = passwordResetRepository.deleteExpiredBefore(cutoff)
+
+        assertThat(deleted).isEqualTo(0)
+        assertThat(passwordResetRepository.findById(pending.id)).isPresent
+    }
+
+    @Test
+    fun `deleteExpiredBefore removes a long-expired row even if it was consumed`() {
+        val consumedLongAgo = passwordResetRepository.save(
+            reset(expiresAt = Instant.now().minus(10, ChronoUnit.DAYS), consumedAt = Instant.now().minus(10, ChronoUnit.DAYS)),
+        )
+        val cutoff = Instant.now().minus(7, ChronoUnit.DAYS)
+
+        val deleted = passwordResetRepository.deleteExpiredBefore(cutoff)
+
+        assertThat(deleted).isEqualTo(1)
+        assertThat(passwordResetRepository.findById(consumedLongAgo.id)).isEmpty
+    }
 }

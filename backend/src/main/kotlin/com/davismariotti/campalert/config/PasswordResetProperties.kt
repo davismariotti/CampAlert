@@ -7,4 +7,5 @@ import java.time.Duration
 data class PasswordResetProperties(
     val expiresIn: Duration = Duration.ofMinutes(15),
     val resendCooldown: Duration = Duration.ofSeconds(60),
+    val cleanupRetention: Duration = Duration.ofDays(7),
 )

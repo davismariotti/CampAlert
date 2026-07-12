@@ -3,6 +3,7 @@ package com.davismariotti.campalert.service.email
 import com.davismariotti.campalert.config.PasswordResetProperties
 import com.davismariotti.campalert.model.PasswordReset
 import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.notification.PasswordChangedNotification
 import com.davismariotti.campalert.notification.ResetPasswordNotification
 import com.davismariotti.campalert.repository.PasswordResetRepository
 import com.davismariotti.campalert.repository.UserRepository
@@ -233,6 +234,19 @@ class PasswordResetServiceTest {
     }
 
     @Test
+    fun `consumeReset does not send a notification for an invalid token`() {
+        val user = verifiedUser()
+        val correctToken = "a".repeat(64)
+        val wrongToken = "b".repeat(64)
+        val row = pendingRow(user.id!!, tokenHash = service.sha256(correctToken))
+        setupConsumeFlow(row, user)
+
+        service.consumeReset(row.id, wrongToken, "newPassword1!")
+
+        verify(notificationService, never()).sendAsync(anyKt<PasswordChangedNotification>(), anyKt())
+    }
+
+    @Test
     fun `consumeReset returns PASSWORD_TOO_WEAK for password shorter than 8 chars`() {
         val user = verifiedUser()
         val token = rawToken()
@@ -293,6 +307,18 @@ class PasswordResetServiceTest {
         service.consumeReset(row.id, token, "newPassword1!")
 
         verify(passwordResetRepository).consumeAllPendingByUserId(anyLong(), anyKt())
+    }
+
+    @Test
+    fun `consumeReset sends a password-changed notification on success`() {
+        val user = verifiedUser()
+        val token = rawToken()
+        val row = pendingRow(user.id!!, tokenHash = service.sha256(token))
+        setupConsumeFlow(row, user)
+
+        service.consumeReset(row.id, token, "newPassword1!")
+
+        verify(notificationService).sendAsync(anyKt<PasswordChangedNotification>(), anyKt())
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

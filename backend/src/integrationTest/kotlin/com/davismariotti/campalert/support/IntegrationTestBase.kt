@@ -115,6 +115,9 @@ open class IntegrationTestBase {
     /** All params maps passed to templateRenderer.render() during this test, in the order rendered. */
     protected val sentEmailVarsList = CopyOnWriteArrayList<Map<String, Any>>()
 
+    /** Template name passed to templateRenderer.render() for each entry in [sentEmailVarsList], same order/index. */
+    protected val sentEmailTemplates = CopyOnWriteArrayList<String>()
+
     @BeforeEach
     fun resetState() {
         jdbcTemplate.execute(
@@ -132,8 +135,10 @@ open class IntegrationTestBase {
         `when`(pushoverSender.send(anyKt(), anyKt())).thenReturn(SendResult.success())
 
         sentEmailVarsList.clear()
+        sentEmailTemplates.clear()
         @Suppress("UNCHECKED_CAST")
         doAnswer { invocation ->
+            sentEmailTemplates.add(invocation.arguments[0] as String)
             sentEmailVarsList.add(invocation.arguments[1] as Map<String, Any>)
             ""
         }.`when`(templateRenderer).render(anyString(), anyKt())
@@ -205,6 +210,16 @@ open class IntegrationTestBase {
         }
         val capturedKeys = sentEmailVarsList.map { it.keys }.joinToString()
         error("No email captured with key '$key'. Captured keys: $capturedKeys")
+    }
+
+    /** Blocks (up to 5s) until an email with the given template name has been captured. */
+    protected fun waitForEmailTemplate(template: String) {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (System.currentTimeMillis() < deadline) {
+            if (sentEmailTemplates.contains(template)) return
+            Thread.sleep(25)
+        }
+        error("No email captured with template '$template'. Captured templates: $sentEmailTemplates")
     }
 
     protected fun verificationCodeFor(verificationId: String): String {

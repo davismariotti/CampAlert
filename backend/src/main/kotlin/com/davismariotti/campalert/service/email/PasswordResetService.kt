@@ -2,6 +2,7 @@ package com.davismariotti.campalert.service.email
 
 import com.davismariotti.campalert.config.PasswordResetProperties
 import com.davismariotti.campalert.model.PasswordReset
+import com.davismariotti.campalert.notification.PasswordChangedNotification
 import com.davismariotti.campalert.notification.ResetPasswordNotification
 import com.davismariotti.campalert.repository.PasswordResetRepository
 import com.davismariotti.campalert.repository.UserRepository
@@ -86,7 +87,7 @@ class PasswordResetService(
 
         if (row.expiresAt.isBefore(Instant.now())) return ResetResult.INVALID_OR_EXPIRED
 
-        if (sha256(token) != row.tokenHash) return ResetResult.INVALID_OR_EXPIRED
+        if (!CryptoUtils.constantTimeEquals(sha256(token), row.tokenHash)) return ResetResult.INVALID_OR_EXPIRED
 
         val user = userRepository.findById(row.userId).orElseThrow()
 
@@ -99,6 +100,8 @@ class PasswordResetService(
 
         rememberMeTokenRepository.removeUserTokens(user.email)
         sessionRevocationService.revokeAllSessionsFor(user.email)
+
+        notificationService.sendAsync(PasswordChangedNotification(frontendBaseUrl), SimpleRecipient(email = user.email))
 
         return ResetResult.SUCCESS
     }
