@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.recreation
 
+import com.fasterxml.jackson.annotation.JsonEnumDefaultValue
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.LocalDate
 
@@ -20,8 +21,24 @@ data class PermitItineraryAvailabilityResponse(
 )
 
 data class PermitItineraryAvailabilityPayload(
-    @JsonProperty("quota_type_maps") val quotaTypeMaps: Map<String, Map<LocalDate, PermitItineraryAvailabilityCell>> = emptyMap(),
+    @JsonProperty("quota_type_maps") val quotaTypeMaps: Map<PermitQuotaType, Map<LocalDate, PermitItineraryAvailabilityCell>> = emptyMap(),
 )
+
+/**
+ * The two `quota_type_maps` keys confirmed against live traffic, named to match the wire value
+ * directly so callers can check `type == PermitQuotaType.QuotaUsageByMemberDaily` with no translation
+ * layer in between. `ConstantQuotaUsageDaily` gates one flat permit slot regardless of group size;
+ * `QuotaUsageByMemberDaily` is PAX-based and needs room for the whole group. UNKNOWN is the fallback
+ * for any future/unseen key — since permititinerary is an undocumented, unversioned endpoint, a new
+ * quota type must not silently be treated as the laxer `ConstantQuotaUsageDaily` case.
+ */
+enum class PermitQuotaType {
+    ConstantQuotaUsageDaily,
+    QuotaUsageByMemberDaily,
+
+    @JsonEnumDefaultValue
+    UNKNOWN,
+}
 
 data class PermitItineraryAvailabilityCell(
     @JsonProperty("total") val total: Int = 0,

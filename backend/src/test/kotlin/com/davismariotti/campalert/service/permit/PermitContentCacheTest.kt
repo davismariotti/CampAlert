@@ -3,6 +3,7 @@ package com.davismariotti.campalert.service.permit
 import com.davismariotti.campalert.recreation.PermitContentPayload
 import com.davismariotti.campalert.recreation.PermitContentResponse
 import com.davismariotti.campalert.recreation.PermitDivisionContent
+import com.davismariotti.campalert.recreation.PermitDivisionType
 import com.davismariotti.campalert.recreation.PermitRuleContent
 import com.davismariotti.campalert.recreation.RecreationApi
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
@@ -93,7 +94,7 @@ class PermitContentCacheTest {
     fun `falls back to permit details when permitcontent rules are empty`() {
         `when`(valueOps.get("permit:content:233261")).thenReturn(null)
         val primaryPayload = PermitContentPayload(
-            divisions = mapOf("343" to PermitDivisionContent(id = "343", type = "Destination Zone")),
+            divisions = mapOf("343" to PermitDivisionContent(id = "343", type = PermitDivisionType.DESTINATION_ZONE)),
             rules = emptyList(),
         )
         val primaryCall = mockCall(PermitContentResponse(primaryPayload))

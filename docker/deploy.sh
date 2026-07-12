@@ -60,6 +60,8 @@ if [ "$FRONTEND_ONLY" = "false" ]; then
   fi
 
   echo "Pulling latest images..."
+  APP_IMAGE=$(docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile app config --images app)
+  OLD_APP_IMAGE_ID=$(docker image inspect "$APP_IMAGE" --format '{{.Id}}' 2>/dev/null || true)
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile app pull
 
   echo "Starting infra services..."
@@ -67,6 +69,16 @@ if [ "$FRONTEND_ONLY" = "false" ]; then
 
   echo "Rolling out app..."
   docker rollout -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile app --timeout 300 app
+
+  # $APP_IMAGE (e.g. davismariotti/campalert:latest) is a moving tag: every pull re-points it at a new
+  # digest, leaving the previous digest dangling. Remove only that specific superseded image rather than
+  # a host-wide `docker image prune`, which would also sweep up dangling images from unrelated stacks
+  # on this box (SurvivalAPI, etc).
+  NEW_APP_IMAGE_ID=$(docker image inspect "$APP_IMAGE" --format '{{.Id}}' 2>/dev/null || true)
+  if [ -n "$OLD_APP_IMAGE_ID" ] && [ "$OLD_APP_IMAGE_ID" != "$NEW_APP_IMAGE_ID" ]; then
+    echo "Removing superseded app image $OLD_APP_IMAGE_ID..."
+    docker rmi "$OLD_APP_IMAGE_ID" || true
+  fi
 fi
 
 echo "Deploying frontend..."
