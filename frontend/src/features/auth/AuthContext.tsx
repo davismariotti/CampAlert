@@ -18,7 +18,10 @@ function loadFromStorage(): AuthUser | null {
       id: parsed.id,
       email: parsed.email,
       timezone: parsed.timezone ?? DEFAULT_TIMEZONE,
-      verificationStatus: 'VERIFIED'
+      verificationStatus: 'VERIFIED',
+      pushoverUserKey: parsed.pushoverUserKey ?? null,
+      pushoverApiToken: parsed.pushoverApiToken ?? null,
+      pushoverOverrideEnabled: parsed.pushoverOverrideEnabled ?? false
     }
   } catch {
     return null
