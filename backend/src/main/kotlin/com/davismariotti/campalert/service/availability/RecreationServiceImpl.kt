@@ -7,9 +7,8 @@ import com.davismariotti.campalert.recreation.Campground
 import com.davismariotti.campalert.recreation.Campsite
 import com.davismariotti.campalert.recreation.Campsite.Companion.mergeWith
 import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.recreation.RecreationGovCallProtection
 import com.davismariotti.campalert.util.sleepJitter
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
-import io.github.resilience4j.retry.RetryRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -24,13 +23,10 @@ import java.util.concurrent.ConcurrentHashMap
 @Service
 class RecreationServiceImpl(
     val recreationApi: RecreationApi,
-    private val circuitBreakerRegistry: CircuitBreakerRegistry,
-    private val retryRegistry: RetryRegistry,
+    private val callProtection: RecreationGovCallProtection,
     @param:Value($$"${campfinder.polling.request-jitter-ms:0}") private val requestJitterMs: Long = 0,
 ) : RecreationService {
     private val log = LoggerFactory.getLogger(javaClass)
-    private val cb by lazy { circuitBreakerRegistry.circuitBreaker("recreation-gov") }
-    private val retry by lazy { retryRegistry.retry("recreation-gov") }
 
     override fun checkAvailability(
         searchRequest: SearchRequest,
@@ -89,10 +85,8 @@ class RecreationServiceImpl(
 
     private fun fetchMonth(campsiteId: Int, monthStart: LocalDate): Campground =
         try {
-            retry.executeSupplier {
-                cb.executeSupplier {
-                    fetchMonthDirect(campsiteId, monthStart)
-                }
+            callProtection.execute {
+                fetchMonthDirect(campsiteId, monthStart)
             }
         } catch (e: Exception) {
             log.warn("Recreation.gov call failed for campsiteId={} month={}", campsiteId, monthStart, e)

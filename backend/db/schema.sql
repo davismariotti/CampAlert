@@ -124,6 +124,21 @@ CREATE TABLE "public"."permit_search_request_state" (
   CONSTRAINT "fk_permit_search_request_state_request" FOREIGN KEY ("permit_search_request_id") REFERENCES "public"."permit_search_requests" ("id") ON DELETE CASCADE,
   CONSTRAINT "chk_permit_search_request_state_last_availability_state" CHECK (last_availability_state IN ('AVAILABLE', 'UNAVAILABLE'))
 );
+-- Create "poll_target_state" table
+CREATE TABLE "public"."poll_target_state" (
+  "target_type" character varying(16) NOT NULL,
+  "target_id" character varying(64) NOT NULL,
+  "phase_offset_ms" integer NOT NULL,
+  "next_due_at" timestamptz NOT NULL,
+  "locked_until" timestamptz NULL,
+  "last_started_at" timestamptz NULL,
+  "last_finished_at" timestamptz NULL,
+  "last_status" character varying(16) NULL,
+  "last_error" text NULL,
+  PRIMARY KEY ("target_type", "target_id"),
+  CONSTRAINT "chk_poll_target_state_target_type" CHECK (target_type IN ('CAMPGROUND', 'PERMIT'))
+);
+CREATE INDEX ON "public"."poll_target_state" ("next_due_at", "locked_until");
 -- Create "shedlock" table
 CREATE TABLE "public"."shedlock" (
   "name" character varying(64) NOT NULL,

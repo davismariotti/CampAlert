@@ -25,6 +25,7 @@ import com.davismariotti.campalert.service.permit.ItineraryLegValidator
 import com.davismariotti.campalert.service.permit.LegValidationResult
 import com.davismariotti.campalert.service.permit.PermitClassificationService
 import com.davismariotti.campalert.service.permit.PermitContentCache
+import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
 import com.davismariotti.campalert.util.currentUserId
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -42,6 +43,7 @@ class PermitSearchRequestsDelegateImpl(
     private val notificationOutboxRepository: NotificationOutboxRepository,
     private val permitClassificationService: PermitClassificationService,
     private val permitContentCache: PermitContentCache,
+    private val pollTargetRegistrationService: PollTargetRegistrationService,
 ) : PermitSearchRequestsApiDelegate {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -99,6 +101,7 @@ class PermitSearchRequestsDelegateImpl(
 
         val saved = permitSearchRequestRepository.save(entity)
         log.info("Permit search request created userId={} requestId={} permitId={} searchType={}", userId, saved.id, saved.permitId, saved.searchType)
+        pollTargetRegistrationService.ensurePermitTarget(saved.permitId)
         return ResponseEntity.status(201).body(saved.toResponse(fetchStats(saved)))
     }
 
@@ -157,6 +160,7 @@ class PermitSearchRequestsDelegateImpl(
         applyTargets(updated, body.zoneTarget, body.itineraryTarget)
 
         val saved = permitSearchRequestRepository.save(updated)
+        pollTargetRegistrationService.ensurePermitTarget(saved.permitId)
         return ResponseEntity.ok(saved.toResponse(fetchStats(saved)))
     }
 

@@ -18,6 +18,7 @@ import com.davismariotti.campalert.recreation.PermitZoneAvailabilityPayload
 import com.davismariotti.campalert.recreation.PermitZoneAvailabilityResponse
 import com.davismariotti.campalert.recreation.PermitZoneDivisionAvailability
 import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.recreation.RecreationGovCallProtection
 import com.davismariotti.campalert.recreation.SearchEntityType
 import com.davismariotti.campalert.recreation.SearchSuggestResponse
 import com.fasterxml.jackson.databind.DeserializationFeature
@@ -27,6 +28,8 @@ import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
+import io.github.resilience4j.ratelimiter.RateLimiterConfig
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry
 import io.github.resilience4j.retry.RetryConfig
 import io.github.resilience4j.retry.RetryRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -50,11 +53,20 @@ class PermitAvailabilityMatcherTest {
     private val recreationApi = mock(RecreationApi::class.java)
     private val circuitBreakerRegistry = CircuitBreakerRegistry.of(CircuitBreakerConfig.ofDefaults())
     private val retryRegistry = RetryRegistry.of(RetryConfig.ofDefaults())
+    private val rateLimiterRegistry = RateLimiterRegistry.of(
+        RateLimiterConfig
+            .custom()
+            .limitForPeriod(1000)
+            .limitRefreshPeriod(java.time.Duration.ofMillis(1))
+            .timeoutDuration(java.time.Duration.ofSeconds(5))
+            .build(),
+    )
+    private val callProtection = RecreationGovCallProtection(circuitBreakerRegistry, retryRegistry, rateLimiterRegistry)
 
     // Unstubbed Boolean-returning methods default to false in Mockito, so every existing test here
     // sees "not suspicious" unless a test explicitly stubs looksSuspicious to return true.
     private val zoneAvailabilityBaselineService = mock(ZoneAvailabilityBaselineService::class.java)
-    private val matcher = PermitAvailabilityMatcher(recreationApi, circuitBreakerRegistry, retryRegistry, zoneAvailabilityBaselineService)
+    private val matcher = PermitAvailabilityMatcher(recreationApi, callProtection, zoneAvailabilityBaselineService)
 
     private val zoneCache: ZoneAvailabilityCache = ConcurrentHashMap()
     private val itineraryCache: ItineraryAvailabilityCache = ConcurrentHashMap()
