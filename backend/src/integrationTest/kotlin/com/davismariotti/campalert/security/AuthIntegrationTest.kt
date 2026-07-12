@@ -266,6 +266,29 @@ class AuthIntegrationTest : IntegrationTestBase() {
         assertThat(tree.get("pushoverUserKey").asText()).isEqualTo("user-key")
     }
 
+    @Test
+    fun `PATCH me enabling the override with no keys set returns 400 and leaves it disabled`() {
+        val session = registerAndLogin()
+        val result = doPatch("/api/auth/me", session, UpdateMeBody(pushoverOverrideEnabled = true))
+        assertThat(result.response.status).isEqualTo(400)
+
+        val getResult = mockMvc.perform(get("/api/auth/me").cookie(session)).andReturn()
+        assertThat(
+            mapper.readTree(getResult.response.contentAsString).get("pushoverOverrideEnabled").asBoolean(),
+        ).isFalse()
+    }
+
+    @Test
+    fun `PATCH me enabling the override with only one key set returns 400`() {
+        val session = registerAndLogin()
+        val result = doPatch(
+            "/api/auth/me",
+            session,
+            UpdateMeBody(pushoverApiToken = "app-token", pushoverOverrideEnabled = true),
+        )
+        assertThat(result.response.status).isEqualTo(400)
+    }
+
     // --- PUT /auth/me/password ---
 
     @Test

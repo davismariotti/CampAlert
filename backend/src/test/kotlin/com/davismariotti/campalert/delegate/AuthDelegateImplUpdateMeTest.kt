@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.delegate
 
+import com.davismariotti.campalert.api.model.ErrorResponse
 import com.davismariotti.campalert.api.model.UpdateMeBody
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.repository.UserRepository
@@ -18,7 +19,10 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import org.springframework.http.HttpStatus
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.authority.SimpleGrantedAuthority
@@ -116,6 +120,47 @@ class AuthDelegateImplUpdateMeTest {
 
         val body = result.body!!
         assertEquals(false, body.pushoverOverrideEnabled)
+        assertEquals("existing-token", body.pushoverApiToken)
+        assertEquals("existing-key", body.pushoverUserKey)
+    }
+
+    @Test
+    fun `enabling the override with no keys set returns 400 and does not persist`() {
+        val result = delegate.updateMe(UpdateMeBody(pushoverOverrideEnabled = true))
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.statusCode)
+        assertEquals(
+            "Pushover app token and user key are required to enable the Pushover override",
+            (result.body as ErrorResponse).message,
+        )
+        verify(userRepository, never()).save(anyKt())
+    }
+
+    @Test
+    fun `enabling the override with only the api token set returns 400`() {
+        val result = delegate.updateMe(UpdateMeBody(pushoverApiToken = "app-token", pushoverOverrideEnabled = true))
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.statusCode)
+        verify(userRepository, never()).save(anyKt())
+    }
+
+    @Test
+    fun `enabling the override with only the user key set returns 400`() {
+        val result = delegate.updateMe(UpdateMeBody(pushoverUserKey = "user-key", pushoverOverrideEnabled = true))
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.statusCode)
+        verify(userRepository, never()).save(anyKt())
+    }
+
+    @Test
+    fun `enabling the override reusing an already-stored key from a previous save is allowed`() {
+        val existing = user.copy(pushoverApiToken = "existing-token", pushoverUserKey = "existing-key")
+        `when`(userRepository.findByEmail(user.email)).thenReturn(existing)
+
+        val result = delegate.updateMe(UpdateMeBody(pushoverOverrideEnabled = true))
+
+        val body = result.body!!
+        assertEquals(true, body.pushoverOverrideEnabled)
         assertEquals("existing-token", body.pushoverApiToken)
         assertEquals("existing-key", body.pushoverUserKey)
     }

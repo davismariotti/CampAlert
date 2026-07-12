@@ -131,18 +131,26 @@ class AuthDelegateImpl(
         return ResponseEntity.ok(user.toAuthResponse())
     }
 
+    @Suppress("UNCHECKED_CAST")
     @PreAuthorize("isAuthenticated()")
     override fun updateMe(updateMeBody: UpdateMeBody): ResponseEntity<AuthResponse> {
         val auth = SecurityContextHolder.getContext().authentication!!
         val user = userRepository.findByEmail(auth.name)!!
-        val updated = userRepository.save(
-            user.copy(
-                timezone = updateMeBody.timezone ?: user.timezone,
-                pushoverUserKey = updateMeBody.pushoverUserKey ?: user.pushoverUserKey,
-                pushoverApiToken = updateMeBody.pushoverApiToken ?: user.pushoverApiToken,
-                pushoverOverrideEnabled = updateMeBody.pushoverOverrideEnabled ?: user.pushoverOverrideEnabled,
-            ),
+        val merged = user.copy(
+            timezone = updateMeBody.timezone ?: user.timezone,
+            pushoverUserKey = updateMeBody.pushoverUserKey ?: user.pushoverUserKey,
+            pushoverApiToken = updateMeBody.pushoverApiToken ?: user.pushoverApiToken,
+            pushoverOverrideEnabled = updateMeBody.pushoverOverrideEnabled ?: user.pushoverOverrideEnabled,
         )
+
+        if (merged.pushoverOverrideEnabled && (merged.pushoverApiToken.isNullOrBlank() || merged.pushoverUserKey.isNullOrBlank())) {
+            return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse(message = "Pushover app token and user key are required to enable the Pushover override"))
+                as ResponseEntity<AuthResponse>
+        }
+
+        val updated = userRepository.save(merged)
         return ResponseEntity.ok(updated.toAuthResponse())
     }
 

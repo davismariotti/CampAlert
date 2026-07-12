@@ -58,6 +58,8 @@ export function AccountSettingsPage() {
     pushoverApiToken === (user?.pushoverApiToken ?? '') &&
     pushoverUserKey === (user?.pushoverUserKey ?? '')
 
+  const pushoverMissingFields = pushoverEnabled && (!pushoverApiToken.trim() || !pushoverUserKey.trim())
+
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-8">
       <div className="mb-6">
@@ -158,10 +160,17 @@ export function AccountSettingsPage() {
             />
           </label>
 
+          {pushoverMissingFields && (
+            <p className="text-sm text-red-600">App token and user key are both required to enable Pushover.</p>
+          )}
           {pushoverSaved && <p className="text-sm text-forest-600">Settings saved.</p>}
 
           <div>
-            <Button type="submit" loading={pushoverMutation.isPending} disabled={pushoverUnchanged}>
+            <Button
+              type="submit"
+              loading={pushoverMutation.isPending}
+              disabled={pushoverUnchanged || pushoverMissingFields}
+            >
               Save settings
             </Button>
           </div>
