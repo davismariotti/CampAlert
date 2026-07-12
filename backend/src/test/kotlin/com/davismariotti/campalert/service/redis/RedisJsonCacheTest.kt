@@ -85,4 +85,24 @@ class RedisJsonCacheTest {
         assertNull(result)
         verify(valueOps, never()).set(eq("widget:1"), org.mockito.ArgumentMatchers.anyString(), eq(5L), eq(TimeUnit.MINUTES))
     }
+
+    @Test
+    fun `increment sets the TTL on the first call in a window`() {
+        `when`(valueOps.increment("counter:1")).thenReturn(1L)
+
+        val result = cache.increment("counter:1", 5, TimeUnit.MINUTES)
+
+        assertEquals(1L, result)
+        verify(redisTemplate).expire("counter:1", 5L, TimeUnit.MINUTES)
+    }
+
+    @Test
+    fun `increment does not reset the TTL on later calls in the same window`() {
+        `when`(valueOps.increment("counter:1")).thenReturn(2L)
+
+        val result = cache.increment("counter:1", 5, TimeUnit.MINUTES)
+
+        assertEquals(2L, result)
+        verify(redisTemplate, never()).expire(eq("counter:1"), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any())
+    }
 }

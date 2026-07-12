@@ -34,6 +34,24 @@ class RedisJsonCache(
         redisTemplate.delete(key)
     }
 
+    /**
+     * Atomically increments the counter at [key] (via Redis `INCR`) and returns the new value.
+     * The key is expired after [ttl]/[unit] only on its first increment in a new window — later
+     * increments before expiry don't push the TTL back out — so repeated calls form a fixed-window
+     * counter (e.g. for rate limiting).
+     */
+    fun increment(
+        key: String,
+        ttl: Long,
+        unit: TimeUnit
+    ): Long {
+        val count = redisTemplate.opsForValue().increment(key) ?: 1L
+        if (count == 1L) {
+            redisTemplate.expire(key, ttl, unit)
+        }
+        return count
+    }
+
     /** Cache-aside: returns the cached value under [key] if present, otherwise calls [loader], caches a non-null result with [ttl]/[unit], and returns it. */
     fun <T : Any> getOrLoad(
         key: String,

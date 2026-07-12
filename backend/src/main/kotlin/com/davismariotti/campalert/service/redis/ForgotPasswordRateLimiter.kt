@@ -1,8 +1,8 @@
 package com.davismariotti.campalert.service.redis
 
 import com.davismariotti.campalert.config.ForgotPasswordRateLimitProperties
-import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
+import java.util.concurrent.TimeUnit
 
 /**
  * Fixed-window request counter keyed by client IP, backing the abuse-resistance backstop on
@@ -12,16 +12,13 @@ import org.springframework.stereotype.Component
  */
 @Component
 class ForgotPasswordRateLimiter(
-    private val redisTemplate: StringRedisTemplate,
+    private val redisJsonCache: RedisJsonCache,
     private val props: ForgotPasswordRateLimitProperties,
 ) {
     /** Returns true if the request is within the per-IP limit for the current window. */
     fun tryAcquire(clientIp: String): Boolean {
         val key = "ratelimit:forgot-password:$clientIp"
-        val count = redisTemplate.opsForValue().increment(key) ?: 1L
-        if (count == 1L) {
-            redisTemplate.expire(key, props.rateLimitWindow)
-        }
+        val count = redisJsonCache.increment(key, props.rateLimitWindow.toMillis(), TimeUnit.MILLISECONDS)
         return count <= props.rateLimitMaxRequests
     }
 }
