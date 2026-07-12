@@ -13,7 +13,8 @@ const verifiedAuth: AuthResponse = {
   id: 1,
   email: 'user@test.com',
   timezone: 'America/Los_Angeles',
-  verificationStatus: 'VERIFIED'
+  verificationStatus: 'VERIFIED',
+  pushoverOverrideEnabled: false
 }
 
 function Wrapper({ initialEntry = `/verify-email?verificationId=${verificationId}` }: { initialEntry?: string }) {

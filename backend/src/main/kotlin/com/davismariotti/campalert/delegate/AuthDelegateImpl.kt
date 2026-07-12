@@ -135,7 +135,14 @@ class AuthDelegateImpl(
     override fun updateMe(updateMeBody: UpdateMeBody): ResponseEntity<AuthResponse> {
         val auth = SecurityContextHolder.getContext().authentication!!
         val user = userRepository.findByEmail(auth.name)!!
-        val updated = updateMeBody.timezone?.let { userRepository.save(user.copy(timezone = it)) } ?: user
+        val updated = userRepository.save(
+            user.copy(
+                timezone = updateMeBody.timezone ?: user.timezone,
+                pushoverUserKey = updateMeBody.pushoverUserKey ?: user.pushoverUserKey,
+                pushoverApiToken = updateMeBody.pushoverApiToken ?: user.pushoverApiToken,
+                pushoverOverrideEnabled = updateMeBody.pushoverOverrideEnabled ?: user.pushoverOverrideEnabled,
+            ),
+        )
         return ResponseEntity.ok(updated.toAuthResponse())
     }
 
@@ -254,5 +261,8 @@ class AuthDelegateImpl(
             email = email,
             timezone = timezone,
             verificationStatus = VerificationStatus.VERIFIED,
+            pushoverUserKey = pushoverUserKey,
+            pushoverApiToken = pushoverApiToken,
+            pushoverOverrideEnabled = pushoverOverrideEnabled,
         )
 }

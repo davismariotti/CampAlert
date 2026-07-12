@@ -1011,6 +1011,7 @@ components:
         - email
         - timezone
         - verificationStatus
+        - pushoverOverrideEnabled
       properties:
         id:
           type: integer
@@ -1021,6 +1022,14 @@ components:
           type: string
         verificationStatus:
           $ref: '#/components/schemas/VerificationStatus'
+        pushoverUserKey:
+          type: string
+          nullable: true
+        pushoverApiToken:
+          type: string
+          nullable: true
+        pushoverOverrideEnabled:
+          type: boolean
 
     RegisterResponse:
       type: object
@@ -1256,6 +1265,17 @@ components:
       properties:
         timezone:
           type: string
+          nullable: true
+        pushoverUserKey:
+          type: string
+          maxLength: 255
+          nullable: true
+        pushoverApiToken:
+          type: string
+          maxLength: 255
+          nullable: true
+        pushoverOverrideEnabled:
+          type: boolean
           nullable: true
 
     CreateSearchRequestBody:

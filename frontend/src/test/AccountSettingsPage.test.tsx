@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -29,13 +29,19 @@ describe('AccountSettingsPage', () => {
     )
   })
 
+  afterEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
   it('saves timezone and refreshes stored auth user', async () => {
     const updateSpy = vi.spyOn(sdk, 'updateMe').mockResolvedValueOnce({
       data: {
         id: 1,
         email: 'user@test.com',
         timezone: 'America/Denver',
-        verificationStatus: 'VERIFIED'
+        verificationStatus: 'VERIFIED',
+        pushoverOverrideEnabled: false
       },
       error: undefined
     } as Awaited<ReturnType<typeof sdk.updateMe>>)
@@ -43,10 +49,65 @@ describe('AccountSettingsPage', () => {
     render(<Wrapper />)
 
     await userEvent.selectOptions(screen.getByLabelText('Timezone'), 'America/Denver')
-    await userEvent.click(screen.getByRole('button', { name: /save settings/i }))
+    await userEvent.click(screen.getAllByRole('button', { name: /save settings/i })[0])
 
     await waitFor(() => expect(updateSpy).toHaveBeenCalledWith({ body: { timezone: 'America/Denver' } }))
     await waitFor(() => expect(JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)!).timezone).toBe('America/Denver'))
     expect(screen.getByText('Settings saved.')).toBeInTheDocument()
+  })
+
+  it('saves Pushover keys and enables the override', async () => {
+    const updateSpy = vi.spyOn(sdk, 'updateMe').mockResolvedValueOnce({
+      data: {
+        id: 1,
+        email: 'user@test.com',
+        timezone: 'America/Los_Angeles',
+        verificationStatus: 'VERIFIED',
+        pushoverApiToken: 'app-token-123',
+        pushoverUserKey: 'user-key-456',
+        pushoverOverrideEnabled: true
+      },
+      error: undefined
+    } as Awaited<ReturnType<typeof sdk.updateMe>>)
+
+    render(<Wrapper />)
+
+    await userEvent.click(screen.getByRole('switch'))
+    await userEvent.type(screen.getByPlaceholderText('Pushover application API token'), 'app-token-123')
+    await userEvent.type(screen.getByPlaceholderText('Pushover user key'), 'user-key-456')
+    await userEvent.click(screen.getAllByRole('button', { name: /save settings/i })[1])
+
+    await waitFor(() =>
+      expect(updateSpy).toHaveBeenCalledWith({
+        body: {
+          pushoverOverrideEnabled: true,
+          pushoverApiToken: 'app-token-123',
+          pushoverUserKey: 'user-key-456'
+        }
+      })
+    )
+    await waitFor(() => expect(JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)!).pushoverOverrideEnabled).toBe(true))
+  })
+
+  it('seeds Pushover fields from the stored auth user and disables save when unchanged', () => {
+    localStorage.setItem(
+      AUTH_STORAGE_KEY,
+      JSON.stringify({
+        id: 1,
+        email: 'user@test.com',
+        timezone: 'America/Los_Angeles',
+        verificationStatus: 'VERIFIED',
+        pushoverApiToken: 'existing-token',
+        pushoverUserKey: 'existing-key',
+        pushoverOverrideEnabled: true
+      })
+    )
+
+    render(<Wrapper />)
+
+    expect(screen.getByDisplayValue('existing-token')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('existing-key')).toBeInTheDocument()
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getAllByRole('button', { name: /save settings/i })[1]).toBeDisabled()
   })
 })
