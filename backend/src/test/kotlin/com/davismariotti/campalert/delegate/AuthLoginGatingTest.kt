@@ -8,6 +8,8 @@ import com.davismariotti.campalert.security.UserDetailsServiceImpl
 import com.davismariotti.campalert.service.SessionRevocationService
 import com.davismariotti.campalert.service.email.EmailVerificationService
 import com.davismariotti.campalert.service.email.PasswordResetService
+import com.davismariotti.campalert.service.notification.NotificationService
+import com.davismariotti.campalert.service.redis.ForgotPasswordRateLimiter
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import jakarta.servlet.http.HttpSession
@@ -26,6 +28,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
+import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository
 import java.time.Instant
 import java.util.UUID
 
@@ -37,6 +40,8 @@ class AuthLoginGatingTest {
     private val rememberMeServices = mock(RememberMeServices::class.java)
     private val emailVerificationService = mock(EmailVerificationService::class.java)
     private val passwordResetService = mock(PasswordResetService::class.java)
+    private val rememberMeTokenRepository = mock(PersistentTokenRepository::class.java)
+    private val notificationService = mock(NotificationService::class.java)
     private val session = mock(HttpSession::class.java)
 
     private val delegate = AuthDelegateImpl(
@@ -50,6 +55,10 @@ class AuthLoginGatingTest {
         passwordResetService = passwordResetService,
         userDetailsService = mock(UserDetailsServiceImpl::class.java),
         sessionRevocationService = mock(SessionRevocationService::class.java),
+        rememberMeTokenRepository = rememberMeTokenRepository,
+        notificationService = notificationService,
+        forgotPasswordRateLimiter = mock(ForgotPasswordRateLimiter::class.java),
+        frontendBaseUrl = "http://localhost:5173",
     )
 
     @AfterEach

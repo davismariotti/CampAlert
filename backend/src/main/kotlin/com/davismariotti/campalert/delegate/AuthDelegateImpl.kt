@@ -13,6 +13,7 @@ import com.davismariotti.campalert.api.model.ResetPasswordBody
 import com.davismariotti.campalert.api.model.UpdateMeBody
 import com.davismariotti.campalert.api.model.VerificationStatus
 import com.davismariotti.campalert.api.model.VerifyEmailBody
+import com.davismariotti.campalert.notification.PasswordChangedNotification
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.security.RememberMeServices
 import com.davismariotti.campalert.security.UserDetailsServiceImpl
@@ -21,8 +22,12 @@ import com.davismariotti.campalert.service.email.EmailVerificationService
 import com.davismariotti.campalert.service.email.EmailVerificationService.VerifyResult
 import com.davismariotti.campalert.service.email.PasswordResetService
 import com.davismariotti.campalert.service.email.PasswordResetService.ResetResult
+import com.davismariotti.campalert.service.notification.NotificationService
+import com.davismariotti.campalert.service.redis.ForgotPasswordRateLimiter
+import com.davismariotti.notifications.SimpleRecipient
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -32,6 +37,7 @@ import org.springframework.security.core.AuthenticationException
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
+import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
@@ -49,6 +55,10 @@ class AuthDelegateImpl(
     private val passwordResetService: PasswordResetService,
     private val userDetailsService: UserDetailsServiceImpl,
     private val sessionRevocationService: SessionRevocationService,
+    private val rememberMeTokenRepository: PersistentTokenRepository,
+    private val notificationService: NotificationService,
+    private val forgotPasswordRateLimiter: ForgotPasswordRateLimiter,
+    @Value("\${campfinder.email.frontend-base-url}") private val frontendBaseUrl: String,
 ) : AuthApiDelegate {
     override fun register(registerBody: RegisterBody): ResponseEntity<RegisterResponse> {
         if (userRepository.findByEmail(registerBody.email) != null) {
@@ -198,11 +208,21 @@ class AuthDelegateImpl(
         } else {
             sessionRevocationService.revokeAllSessionsFor(auth.name)
         }
+        rememberMeTokenRepository.removeUserTokens(auth.name)
+
+        notificationService.sendAsync(PasswordChangedNotification(frontendBaseUrl), SimpleRecipient(email = user.email))
 
         return ResponseEntity.noContent().build()
     }
 
+    @Suppress("UNCHECKED_CAST")
     override fun forgotPassword(forgotPasswordBody: ForgotPasswordBody): ResponseEntity<Unit> {
+        if (!forgotPasswordRateLimiter.tryAcquire(request.remoteAddr)) {
+            return ResponseEntity
+                .status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ErrorResponse(message = "Too many requests, please try again later"))
+                as ResponseEntity<Unit>
+        }
         passwordResetService.forgotPassword(forgotPasswordBody.email)
         return ResponseEntity.accepted().build()
     }
