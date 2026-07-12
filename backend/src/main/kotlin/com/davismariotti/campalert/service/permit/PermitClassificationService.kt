@@ -4,13 +4,12 @@ import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.recreation.PermitDivisionType
 import com.davismariotti.campalert.recreation.PermitMappingPayload
 import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.service.redis.RedisJsonCache
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.github.resilience4j.retry.RetryRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
-import tools.jackson.databind.ObjectMapper
 import java.util.concurrent.TimeUnit
 
 /**
@@ -22,8 +21,7 @@ import java.util.concurrent.TimeUnit
 class PermitClassificationService(
     private val recreationApi: RecreationApi,
     private val permitContentCache: PermitContentCache,
-    private val redisTemplate: StringRedisTemplate,
-    private val objectMapper: ObjectMapper,
+    private val redisJsonCache: RedisJsonCache,
     private val circuitBreakerRegistry: CircuitBreakerRegistry,
     private val retryRegistry: RetryRegistry,
     @param:Value("\${campfinder.permit.mapping-cache-ttl-hours:24}")
@@ -49,14 +47,7 @@ class PermitClassificationService(
         return if (hasDestinationZone && hasEnteringPerDayRule) SearchType.ZONE else null
     }
 
-    private fun getMapping(): PermitMappingPayload? {
-        redisTemplate.opsForValue().get(MAPPING_CACHE_KEY)?.let {
-            return objectMapper.readValue(it, PermitMappingPayload::class.java)
-        }
-        val fetched = fetchMapping() ?: return null
-        redisTemplate.opsForValue().set(MAPPING_CACHE_KEY, objectMapper.writeValueAsString(fetched), ttlHours, TimeUnit.HOURS)
-        return fetched
-    }
+    private fun getMapping(): PermitMappingPayload? = redisJsonCache.getOrLoad(MAPPING_CACHE_KEY, PermitMappingPayload::class.java, ttlHours, TimeUnit.HOURS) { fetchMapping() }
 
     private fun fetchMapping(): PermitMappingPayload? =
         try {

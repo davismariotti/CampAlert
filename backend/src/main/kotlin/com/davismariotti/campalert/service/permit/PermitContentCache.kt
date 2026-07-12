@@ -2,13 +2,12 @@ package com.davismariotti.campalert.service.permit
 
 import com.davismariotti.campalert.recreation.PermitContentPayload
 import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.service.redis.RedisJsonCache
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.github.resilience4j.retry.RetryRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
-import tools.jackson.databind.ObjectMapper
 import java.util.concurrent.TimeUnit
 
 /**
@@ -20,8 +19,7 @@ import java.util.concurrent.TimeUnit
 @Service
 class PermitContentCache(
     private val recreationApi: RecreationApi,
-    private val redisTemplate: StringRedisTemplate,
-    private val objectMapper: ObjectMapper,
+    private val redisJsonCache: RedisJsonCache,
     private val circuitBreakerRegistry: CircuitBreakerRegistry,
     private val retryRegistry: RetryRegistry,
     @param:Value("\${campfinder.permit.content-cache-ttl-hours:2}")
@@ -32,14 +30,7 @@ class PermitContentCache(
     private val retry by lazy { retryRegistry.retry("recreation-gov") }
 
     /** Cached (or freshly fetched) divisions+rules for [permitId]; null when unreachable. */
-    fun get(permitId: String): PermitContentPayload? {
-        val key = cacheKey(permitId)
-        redisTemplate.opsForValue().get(key)?.let { return objectMapper.readValue(it, PermitContentPayload::class.java) }
-
-        val fetched = fetch(permitId) ?: return null
-        redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(fetched), ttlHours, TimeUnit.HOURS)
-        return fetched
-    }
+    fun get(permitId: String): PermitContentPayload? = redisJsonCache.getOrLoad(cacheKey(permitId), PermitContentPayload::class.java, ttlHours, TimeUnit.HOURS) { fetch(permitId) }
 
     private fun fetch(permitId: String): PermitContentPayload? {
         val primary = try {

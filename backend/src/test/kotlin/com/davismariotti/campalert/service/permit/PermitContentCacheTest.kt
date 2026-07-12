@@ -6,6 +6,7 @@ import com.davismariotti.campalert.recreation.PermitDivisionContent
 import com.davismariotti.campalert.recreation.PermitDivisionType
 import com.davismariotti.campalert.recreation.PermitRuleContent
 import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.service.redis.RedisJsonCache
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.github.resilience4j.retry.RetryConfig
@@ -36,11 +37,12 @@ class PermitContentCacheTest {
     @Suppress("UNCHECKED_CAST")
     private val valueOps = mock(ValueOperations::class.java) as ValueOperations<String, String>
     private val objectMapper = JsonMapper.builder().addModule(KotlinModule.Builder().build()).build()
+    private val redisJsonCache = RedisJsonCache(redisTemplate, objectMapper)
 
     private val circuitBreakerRegistry = CircuitBreakerRegistry.of(CircuitBreakerConfig.ofDefaults())
     private val retryRegistry = RetryRegistry.of(RetryConfig.ofDefaults())
 
-    private val cache = PermitContentCache(recreationApi, redisTemplate, objectMapper, circuitBreakerRegistry, retryRegistry, 2L)
+    private val cache = PermitContentCache(recreationApi, redisJsonCache, circuitBreakerRegistry, retryRegistry, 2L)
 
     @BeforeEach
     fun setUp() {

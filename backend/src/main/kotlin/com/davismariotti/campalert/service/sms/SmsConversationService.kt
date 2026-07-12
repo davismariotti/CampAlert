@@ -1,39 +1,31 @@
 package com.davismariotti.campalert.service.sms
 
-import org.springframework.data.redis.core.StringRedisTemplate
+import com.davismariotti.campalert.service.redis.RedisJsonCache
 import org.springframework.stereotype.Service
 import tools.jackson.core.type.TypeReference
-import tools.jackson.databind.ObjectMapper
 import java.util.concurrent.TimeUnit
 
 @Service
 class SmsConversationService(
-    private val redisTemplate: StringRedisTemplate,
-    private val objectMapper: ObjectMapper,
+    private val redisJsonCache: RedisJsonCache,
 ) {
     fun getContext(phone: String): List<Long>? {
-        val json = redisTemplate.opsForValue().get(contextKey(phone)) ?: return null
-        val map = objectMapper.readValue(json, object : TypeReference<Map<String, List<Long>>>() {})
-        return map["requestIds"]
+        val map = redisJsonCache.get(contextKey(phone), object : TypeReference<Map<String, List<Long>>>() {})
+        return map?.get("requestIds")
     }
 
     fun setContext(phone: String, requestIds: List<Long>) {
-        val json = objectMapper.writeValueAsString(mapOf("requestIds" to requestIds))
-        redisTemplate.opsForValue().set(contextKey(phone), json, 24, TimeUnit.HOURS)
+        redisJsonCache.set(contextKey(phone), mapOf("requestIds" to requestIds), 24, TimeUnit.HOURS)
     }
 
     fun setAwaiting(phone: String, intent: String, requestIds: List<Long>) {
-        val json = objectMapper.writeValueAsString(AwaitingContext(intent = intent, requestIds = requestIds))
-        redisTemplate.opsForValue().set(awaitingKey(phone), json, 10, TimeUnit.MINUTES)
+        redisJsonCache.set(awaitingKey(phone), AwaitingContext(intent = intent, requestIds = requestIds), 10, TimeUnit.MINUTES)
     }
 
-    fun getAwaiting(phone: String): AwaitingContext? {
-        val json = redisTemplate.opsForValue().get(awaitingKey(phone)) ?: return null
-        return objectMapper.readValue(json, AwaitingContext::class.java)
-    }
+    fun getAwaiting(phone: String): AwaitingContext? = redisJsonCache.get(awaitingKey(phone), AwaitingContext::class.java)
 
     fun clearAwaiting(phone: String) {
-        redisTemplate.delete(awaitingKey(phone))
+        redisJsonCache.delete(awaitingKey(phone))
     }
 
     private fun contextKey(phone: String) = "sms:context:$phone"

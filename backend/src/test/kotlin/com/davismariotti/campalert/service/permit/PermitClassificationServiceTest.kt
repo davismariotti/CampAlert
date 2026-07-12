@@ -8,6 +8,7 @@ import com.davismariotti.campalert.recreation.PermitMappingPayload
 import com.davismariotti.campalert.recreation.PermitMappingResponse
 import com.davismariotti.campalert.recreation.PermitRuleContent
 import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.service.redis.RedisJsonCache
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.github.resilience4j.retry.RetryConfig
@@ -40,6 +41,7 @@ class PermitClassificationServiceTest {
     @Suppress("UNCHECKED_CAST")
     private val valueOps = mock(ValueOperations::class.java) as ValueOperations<String, String>
     private val objectMapper = JsonMapper.builder().addModule(KotlinModule.Builder().build()).build()
+    private val redisJsonCache = RedisJsonCache(redisTemplate, objectMapper)
 
     private val circuitBreakerRegistry = CircuitBreakerRegistry.of(CircuitBreakerConfig.ofDefaults())
     private val retryRegistry = RetryRegistry.of(RetryConfig.ofDefaults())
@@ -47,8 +49,7 @@ class PermitClassificationServiceTest {
     private val service = PermitClassificationService(
         recreationApi,
         permitContentCache,
-        redisTemplate,
-        objectMapper,
+        redisJsonCache,
         circuitBreakerRegistry,
         retryRegistry,
         24L,

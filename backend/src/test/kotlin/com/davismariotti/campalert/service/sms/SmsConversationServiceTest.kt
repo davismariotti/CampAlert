@@ -1,65 +1,54 @@
 package com.davismariotti.campalert.service.sms
 
+import com.davismariotti.campalert.service.redis.RedisJsonCache
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
-import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.springframework.data.redis.core.StringRedisTemplate
-import org.springframework.data.redis.core.ValueOperations
-import tools.jackson.databind.json.JsonMapper
-import tools.jackson.module.kotlin.KotlinModule
+import org.mockito.kotlin.any
+import org.mockito.kotlin.eq
+import tools.jackson.core.type.TypeReference
 import java.util.concurrent.TimeUnit
 
 class SmsConversationServiceTest {
-    @Suppress("UNCHECKED_CAST")
-    private val redisTemplate = mock(StringRedisTemplate::class.java)
-
-    @Suppress("UNCHECKED_CAST")
-    private val valueOps = mock(ValueOperations::class.java) as ValueOperations<String, String>
-    private val objectMapper = JsonMapper.builder().addModule(KotlinModule.Builder().build()).build()
-    private val service = SmsConversationService(redisTemplate, objectMapper)
-
-    init {
-        `when`(redisTemplate.opsForValue()).thenReturn(valueOps)
-    }
+    private val redisJsonCache = mock(RedisJsonCache::class.java)
+    private val service = SmsConversationService(redisJsonCache)
 
     // --- sms:context ---
 
     @Test
     fun `getContext returns null when key missing`() {
-        `when`(valueOps.get("sms:context:+15550001234")).thenReturn(null)
+        `when`(redisJsonCache.get(eq("sms:context:+15550001234"), any<TypeReference<Map<String, List<Long>>>>())).thenReturn(null)
         assertNull(service.getContext("+15550001234"))
     }
 
     @Test
     fun `getContext returns request IDs from Redis`() {
-        `when`(valueOps.get("sms:context:+15550001234"))
-            .thenReturn("""{"requestIds":[1,2]}""")
+        `when`(redisJsonCache.get(eq("sms:context:+15550001234"), any<TypeReference<Map<String, List<Long>>>>()))
+            .thenReturn(mapOf("requestIds" to listOf(1L, 2L)))
         assertEquals(listOf(1L, 2L), service.getContext("+15550001234"))
     }
 
     @Test
     fun `setContext writes JSON with 24h TTL`() {
         service.setContext("+15550001234", listOf(5, 6))
-        verify(valueOps).set(eq("sms:context:+15550001234"), any(String::class.java), eq(24L), eq(TimeUnit.HOURS))
+        verify(redisJsonCache).set(eq("sms:context:+15550001234"), any(), eq(24L), eq(TimeUnit.HOURS))
     }
 
     // --- sms:awaiting ---
 
     @Test
     fun `getAwaiting returns null when key missing`() {
-        `when`(valueOps.get("sms:awaiting:+15550001234")).thenReturn(null)
+        `when`(redisJsonCache.get("sms:awaiting:+15550001234", AwaitingContext::class.java)).thenReturn(null)
         assertNull(service.getAwaiting("+15550001234"))
     }
 
     @Test
     fun `getAwaiting deserializes AwaitingContext`() {
-        `when`(valueOps.get("sms:awaiting:+15550001234"))
-            .thenReturn("""{"intent":"PAUSE","requestIds":[3]}""")
+        `when`(redisJsonCache.get("sms:awaiting:+15550001234", AwaitingContext::class.java))
+            .thenReturn(AwaitingContext(intent = "PAUSE", requestIds = listOf(3)))
         val ctx = service.getAwaiting("+15550001234")!!
         assertEquals("PAUSE", ctx.intent)
         assertEquals(listOf(3L), ctx.requestIds)
@@ -68,12 +57,12 @@ class SmsConversationServiceTest {
     @Test
     fun `setAwaiting writes JSON with 10min TTL`() {
         service.setAwaiting("+15550001234", "PAUSE", listOf(7))
-        verify(valueOps).set(eq("sms:awaiting:+15550001234"), any(String::class.java), eq(10L), eq(TimeUnit.MINUTES))
+        verify(redisJsonCache).set(eq("sms:awaiting:+15550001234"), any(), eq(10L), eq(TimeUnit.MINUTES))
     }
 
     @Test
     fun `clearAwaiting deletes the key`() {
         service.clearAwaiting("+15550001234")
-        verify(redisTemplate).delete(eq("sms:awaiting:+15550001234"))
+        verify(redisJsonCache).delete(eq("sms:awaiting:+15550001234"))
     }
 }

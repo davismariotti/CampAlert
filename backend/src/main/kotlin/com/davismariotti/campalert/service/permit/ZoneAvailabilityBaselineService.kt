@@ -1,10 +1,9 @@
 package com.davismariotti.campalert.service.permit
 
 import com.davismariotti.campalert.recreation.PermitZoneAvailabilityCell
+import com.davismariotti.campalert.service.redis.RedisJsonCache
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
-import tools.jackson.databind.ObjectMapper
 import java.time.YearMonth
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
@@ -28,8 +27,7 @@ data class ZoneBaselineSnapshot(
  */
 @Service
 class ZoneAvailabilityBaselineService(
-    private val redisTemplate: StringRedisTemplate,
-    private val objectMapper: ObjectMapper,
+    private val redisJsonCache: RedisJsonCache,
     @param:Value("\${campfinder.permit.zone-baseline-ttl-minutes:30}") private val ttlMinutes: Long,
 ) {
     /** True if any date in [current] flipped from partially-booked to fully-open since the last recorded tick; always records [current] as the new baseline regardless of the result. */
@@ -40,7 +38,7 @@ class ZoneAvailabilityBaselineService(
         current: Map<ZonedDateTime, PermitZoneAvailabilityCell>,
     ): Boolean {
         val key = cacheKey(permitId, divisionId, month)
-        val previous = redisTemplate.opsForValue().get(key)?.let { objectMapper.readValue(it, ZoneBaselineSnapshot::class.java) }
+        val previous = redisJsonCache.get(key, ZoneBaselineSnapshot::class.java)
 
         val suspicious = previous != null &&
             current.any { (dateTime, cell) ->
@@ -49,7 +47,7 @@ class ZoneAvailabilityBaselineService(
             }
 
         val snapshot = ZoneBaselineSnapshot(current.mapKeys { it.key.toString() })
-        redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(snapshot), ttlMinutes, TimeUnit.MINUTES)
+        redisJsonCache.set(key, snapshot, ttlMinutes, TimeUnit.MINUTES)
 
         return suspicious
     }
