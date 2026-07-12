@@ -3,6 +3,7 @@ package com.davismariotti.campalert.service.permit
 import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.recreation.PermitContentPayload
 import com.davismariotti.campalert.recreation.PermitDivisionContent
+import com.davismariotti.campalert.recreation.PermitDivisionType
 import com.davismariotti.campalert.recreation.PermitMappingPayload
 import com.davismariotti.campalert.recreation.PermitMappingResponse
 import com.davismariotti.campalert.recreation.PermitRuleContent
@@ -103,7 +104,7 @@ class PermitClassificationServiceTest {
         stubMapping(mapping())
         `when`(permitContentCache.get("233261")).thenReturn(
             PermitContentPayload(
-                divisions = mapOf("343" to PermitDivisionContent(id = "343", type = "Destination Zone")),
+                divisions = mapOf("343" to PermitDivisionContent(id = "343", type = PermitDivisionType.DESTINATION_ZONE)),
                 rules = listOf(PermitRuleContent(operation = "FixedValueByMembersEnteringPerDay")),
             ),
         )
@@ -130,7 +131,7 @@ class PermitClassificationServiceTest {
         stubMapping(mapping())
         `when`(permitContentCache.get("999")).thenReturn(
             PermitContentPayload(
-                divisions = mapOf("1" to PermitDivisionContent(id = "1", type = "Destination Zone")),
+                divisions = mapOf("1" to PermitDivisionContent(id = "1", type = PermitDivisionType.DESTINATION_ZONE)),
                 rules = emptyList(),
             ),
         )

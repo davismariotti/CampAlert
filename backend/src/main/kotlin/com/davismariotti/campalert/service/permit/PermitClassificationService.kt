@@ -1,6 +1,7 @@
 package com.davismariotti.campalert.service.permit
 
 import com.davismariotti.campalert.model.SearchType
+import com.davismariotti.campalert.recreation.PermitDivisionType
 import com.davismariotti.campalert.recreation.PermitMappingPayload
 import com.davismariotti.campalert.recreation.RecreationApi
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
@@ -43,7 +44,7 @@ class PermitClassificationService(
 
         // Unflagged: verify structurally before trusting it as ZONE.
         val content = permitContentCache.get(permitId) ?: return null
-        val hasDestinationZone = content.divisions.values.any { it.type == "Destination Zone" }
+        val hasDestinationZone = content.divisions.values.any { it.type == PermitDivisionType.DESTINATION_ZONE }
         val hasEnteringPerDayRule = content.rules.any { it.operation?.contains("EnteringPerDay") == true }
         return if (hasDestinationZone && hasEnteringPerDayRule) SearchType.ZONE else null
     }

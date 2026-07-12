@@ -29,6 +29,9 @@ class RecreationConfiguration(
             .registerModule(JavaTimeModule())
             .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            // Lets @JsonEnumDefaultValue-annotated enums (e.g. PermitQuotaType) fall back gracefully
+            // instead of throwing when these undocumented, unversioned endpoints send an unrecognized value.
+            .configure(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE, true)
         val okHttpClient = OkHttpClient
             .Builder()
             .cookieJar(InMemoryCookieJar())

@@ -6,7 +6,9 @@ import com.davismariotti.campalert.recreation.PermitDivisionContent
 import com.davismariotti.campalert.recreation.PermitItineraryAvailabilityCell
 import com.davismariotti.campalert.recreation.PermitItineraryAvailabilityPayload
 import com.davismariotti.campalert.recreation.PermitItineraryAvailabilityResponse
+import com.davismariotti.campalert.recreation.PermitQuotaType
 import com.davismariotti.campalert.recreation.PermitRuleContent
+import com.davismariotti.campalert.recreation.PermitRuleName
 import com.davismariotti.campalert.recreation.PermitZoneAvailabilityCell
 import com.davismariotti.campalert.recreation.PermitZoneAvailabilityPayload
 import com.davismariotti.campalert.recreation.PermitZoneAvailabilityResponse
@@ -61,7 +63,7 @@ class PermitsDelegateImplTest {
                 divisions = mapOf(
                     "343" to PermitDivisionContent(id = "343", name = "33 Aloha", district = "Desolation Wilderness"),
                 ),
-                rules = listOf(PermitRuleContent(divisionId = "", name = "MaxGroupSize", value = 12)),
+                rules = listOf(PermitRuleContent(divisionId = "", name = PermitRuleName.MaxGroupSize, value = 12)),
             ),
         )
 
@@ -99,7 +101,7 @@ class PermitsDelegateImplTest {
                         children = listOf("4675323002"),
                     ),
                 ),
-                rules = listOf(PermitRuleContent(divisionId = "4675323001", name = "MaxGroupSize", value = 10)),
+                rules = listOf(PermitRuleContent(divisionId = "4675323001", name = PermitRuleName.MaxGroupSize, value = 10)),
             ),
         )
 
@@ -198,10 +200,10 @@ class PermitsDelegateImplTest {
             PermitItineraryAvailabilityResponse(
                 PermitItineraryAvailabilityPayload(
                     quotaTypeMaps = mapOf(
-                        "ConstantQuotaUsageDaily" to mapOf(
+                        PermitQuotaType.ConstantQuotaUsageDaily to mapOf(
                             LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(total = 1, remaining = 1),
                         ),
-                        "QuotaUsageByMemberDaily" to mapOf(
+                        PermitQuotaType.QuotaUsageByMemberDaily to mapOf(
                             LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(total = 4, remaining = 0),
                         ),
                     ),

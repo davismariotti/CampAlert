@@ -11,6 +11,7 @@ import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.recreation.PermitContentPayload
 import com.davismariotti.campalert.recreation.PermitContentResponse
 import com.davismariotti.campalert.recreation.PermitDivisionContent
+import com.davismariotti.campalert.recreation.PermitDivisionType
 import com.davismariotti.campalert.recreation.PermitMappingPayload
 import com.davismariotti.campalert.recreation.PermitMappingResponse
 import com.davismariotti.campalert.recreation.PermitRuleContent
@@ -60,7 +61,7 @@ class PermitSearchRequestsIntegrationTest : IntegrationTestBase() {
         stubMapping()
         stubContent(
             permitId,
-            divisions = divisionIds.associateWith { PermitDivisionContent(id = it, name = "Zone $it", type = "Destination Zone") },
+            divisions = divisionIds.associateWith { PermitDivisionContent(id = it, name = "Zone $it", type = PermitDivisionType.DESTINATION_ZONE) },
             rules = listOf(PermitRuleContent(operation = "FixedValueByMembersEnteringPerDay")),
         )
     }

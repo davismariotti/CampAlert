@@ -3,6 +3,7 @@ package com.davismariotti.campalert.service.permit
 import com.davismariotti.campalert.model.PermitSearchRequest
 import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.recreation.PermitItineraryAvailabilityPayload
+import com.davismariotti.campalert.recreation.PermitQuotaType
 import com.davismariotti.campalert.recreation.PermitZoneAvailabilityPayload
 import com.davismariotti.campalert.recreation.RawResponseCapture
 import com.davismariotti.campalert.recreation.RecreationApi
@@ -103,9 +104,11 @@ class PermitAvailabilityMatcher(
                             val date = dateTime.toLocalDate()
                             !date.isBefore(target.startDay) && !date.isAfter(target.endDay)
                         }.sortedBy { it.key }
-                        .firstOrNull { it.value.remaining > 0 }
+                        // Zone quotas are PAX-based (Recreation.gov's `total`/`remaining` count people,
+                        // not permit slots), so a cell only fits this request if it can seat the whole group.
+                        .firstOrNull { it.value.remaining >= request.groupSize }
                     if (match != null) {
-                        log.info(
+                        log.debug(
                             "Zone permit availability match permitId={} divisionId={} matchedDate={} response={}",
                             request.permitId,
                             divisionId,
@@ -164,8 +167,16 @@ class PermitAvailabilityMatcher(
             val payload = fetchItineraryMonth(request.permitId, leg.divisionId, month, cache)
             val quotaMaps = payload?.quotaTypeMaps ?: emptyMap()
             // Every present quota type must have room on this date — Recreation.gov enforces each
-            // one simultaneously (e.g. a constant per-day quota and a per-member quota).
-            val available = quotaMaps.isNotEmpty() && quotaMaps.values.all { byDate -> (byDate[leg.date]?.remaining ?: 0) > 0 }
+            // one simultaneously (e.g. a constant per-day quota and a per-member quota). Only
+            // ConstantQuotaUsageDaily gates a single flat permit slot regardless of group size;
+            // QuotaUsageByMemberDaily (and UNKNOWN, since an unrecognized quota type's semantics
+            // aren't known) are treated as PAX-based and need room for the whole group — safer to
+            // under-alert than to alert on a slot too small to book.
+            val available = quotaMaps.isNotEmpty() &&
+                quotaMaps.all { (type, byDate) ->
+                    val needed = if (type == PermitQuotaType.ConstantQuotaUsageDaily) 1 else request.groupSize
+                    (byDate[leg.date]?.remaining ?: 0) >= needed
+                }
             if (!available) {
                 return PermitAvailabilityResult(
                     request,

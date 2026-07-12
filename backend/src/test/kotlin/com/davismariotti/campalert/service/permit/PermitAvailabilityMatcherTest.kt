@@ -6,14 +6,25 @@ import com.davismariotti.campalert.model.PermitSearchRequest
 import com.davismariotti.campalert.model.PermitSearchRequestState
 import com.davismariotti.campalert.model.PermitZoneTarget
 import com.davismariotti.campalert.model.SearchType
+import com.davismariotti.campalert.recreation.PermitContentResponse
+import com.davismariotti.campalert.recreation.PermitDivisionType
 import com.davismariotti.campalert.recreation.PermitItineraryAvailabilityCell
 import com.davismariotti.campalert.recreation.PermitItineraryAvailabilityPayload
 import com.davismariotti.campalert.recreation.PermitItineraryAvailabilityResponse
+import com.davismariotti.campalert.recreation.PermitQuotaType
+import com.davismariotti.campalert.recreation.PermitRuleName
 import com.davismariotti.campalert.recreation.PermitZoneAvailabilityCell
 import com.davismariotti.campalert.recreation.PermitZoneAvailabilityPayload
 import com.davismariotti.campalert.recreation.PermitZoneAvailabilityResponse
 import com.davismariotti.campalert.recreation.PermitZoneDivisionAvailability
 import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.recreation.SearchEntityType
+import com.davismariotti.campalert.recreation.SearchSuggestResponse
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.KotlinModule
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.github.resilience4j.retry.RetryConfig
@@ -72,8 +83,13 @@ class PermitAvailabilityMatcherTest {
         return call
     }
 
-    private fun zoneRequest(divisionIds: List<String>, startDay: LocalDate, endDay: LocalDate): PermitSearchRequest {
-        val req = PermitSearchRequest(id = 1L, permitId = "233261", permitName = "Desolation", groupSize = 2, name = "Test", searchType = SearchType.ZONE)
+    private fun zoneRequest(
+        divisionIds: List<String>,
+        startDay: LocalDate,
+        endDay: LocalDate,
+        groupSize: Int = 2
+    ): PermitSearchRequest {
+        val req = PermitSearchRequest(id = 1L, permitId = "233261", permitName = "Desolation", groupSize = groupSize, name = "Test", searchType = SearchType.ZONE)
         val state = PermitSearchRequestState()
         state.permitSearchRequest = req
         req.state = state
@@ -86,8 +102,8 @@ class PermitAvailabilityMatcherTest {
         return req
     }
 
-    private fun itineraryRequest(legs: List<PermitItineraryLeg>): PermitSearchRequest {
-        val req = PermitSearchRequest(id = 2L, permitId = "4675323", permitName = "Yellowstone", groupSize = 2, name = "Test", searchType = SearchType.ITINERARY)
+    private fun itineraryRequest(legs: List<PermitItineraryLeg>, groupSize: Int = 2): PermitSearchRequest {
+        val req = PermitSearchRequest(id = 2L, permitId = "4675323", permitName = "Yellowstone", groupSize = groupSize, name = "Test", searchType = SearchType.ITINERARY)
         val state = PermitSearchRequestState()
         state.permitSearchRequest = req
         req.state = state
@@ -120,7 +136,7 @@ class PermitAvailabilityMatcherTest {
         divisionId: String,
         month: Int,
         year: Int,
-        quotaTypeMaps: Map<String, Map<LocalDate, PermitItineraryAvailabilityCell>>
+        quotaTypeMaps: Map<PermitQuotaType, Map<LocalDate, PermitItineraryAvailabilityCell>>
     ) {
         val call = mockCall(PermitItineraryAvailabilityResponse(PermitItineraryAvailabilityPayload(quotaTypeMaps)))
         `when`(recreationApi.getItineraryDivisionAvailability(permitId, divisionId, month, year)).thenReturn(call)
@@ -159,6 +175,34 @@ class PermitAvailabilityMatcherTest {
         assertFalse(result.hasAvailability)
         assertNull(result.matchedDivisionId)
         assertNull(result.matchedDate)
+    }
+
+    @Test
+    fun `zone matcher marks unavailable when remaining quota is nonzero but too small for the group`() {
+        // Mirrors a real Desolation Wilderness capture: total=25, remaining=1 on a date, but the
+        // request's group is 4 — one PAX slot left can't seat the whole group.
+        val request = zoneRequest(divisionIds = listOf("343"), LocalDate.of(2026, 7, 10), LocalDate.of(2026, 7, 20), groupSize = 4)
+        stubZoneAvailability(
+            "233261",
+            mapOf("343" to PermitZoneDivisionAvailability("343", mapOf(LocalDate.of(2026, 7, 17).atStartOfDay(ZoneOffset.UTC) to zoneCell(1)))),
+        )
+
+        val result = matcher.check(request, zoneCache, itineraryCache)
+
+        assertFalse(result.hasAvailability)
+    }
+
+    @Test
+    fun `zone matcher marks available when remaining quota exactly fits the group`() {
+        val request = zoneRequest(divisionIds = listOf("343"), LocalDate.of(2026, 7, 10), LocalDate.of(2026, 7, 20), groupSize = 4)
+        stubZoneAvailability(
+            "233261",
+            mapOf("343" to PermitZoneDivisionAvailability("343", mapOf(LocalDate.of(2026, 7, 17).atStartOfDay(ZoneOffset.UTC) to zoneCell(4)))),
+        )
+
+        val result = matcher.check(request, zoneCache, itineraryCache)
+
+        assertTrue(result.hasAvailability)
     }
 
     @Test
@@ -253,14 +297,14 @@ class PermitAvailabilityMatcherTest {
             "4675323001",
             7,
             2026,
-            mapOf("ConstantQuotaUsageDaily" to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 1))),
+            mapOf(PermitQuotaType.ConstantQuotaUsageDaily to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 1))),
         )
         stubItineraryAvailability(
             "4675323",
             "4675323002",
             7,
             2026,
-            mapOf("ConstantQuotaUsageDaily" to mapOf(LocalDate.of(2026, 7, 13) to PermitItineraryAvailabilityCell(remaining = 1))),
+            mapOf(PermitQuotaType.ConstantQuotaUsageDaily to mapOf(LocalDate.of(2026, 7, 13) to PermitItineraryAvailabilityCell(remaining = 1))),
         )
 
         val result = matcher.check(request, zoneCache, itineraryCache)
@@ -281,7 +325,7 @@ class PermitAvailabilityMatcherTest {
             "4675323001",
             7,
             2026,
-            mapOf("ConstantQuotaUsageDaily" to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 0))),
+            mapOf(PermitQuotaType.ConstantQuotaUsageDaily to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 0))),
         )
 
         val result = matcher.check(request, zoneCache, itineraryCache)
@@ -301,14 +345,216 @@ class PermitAvailabilityMatcherTest {
             7,
             2026,
             mapOf(
-                "ConstantQuotaUsageDaily" to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 1)),
-                "QuotaUsageByMemberDaily" to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 0)),
+                PermitQuotaType.ConstantQuotaUsageDaily to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 1)),
+                PermitQuotaType.QuotaUsageByMemberDaily to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 0)),
             ),
         )
 
         val result = matcher.check(request, zoneCache, itineraryCache)
 
         assertFalse(result.hasAvailability)
+    }
+
+    @Test
+    fun `itinerary matcher requires the MEMBER quota to fit the whole group, but CONSTANT only needs one slot`() {
+        val legs = listOf(PermitItineraryLeg("4675323001", LocalDate.of(2026, 7, 12)))
+        val request = itineraryRequest(legs, groupSize = 4)
+        stubItineraryAvailability(
+            "4675323",
+            "4675323001",
+            7,
+            2026,
+            mapOf(
+                // One permit slot is plenty (CONSTANT is flat, not PAX-based)...
+                PermitQuotaType.ConstantQuotaUsageDaily to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 1)),
+                // ...but only 3 PAX remain in the member quota, not enough to seat a group of 4.
+                PermitQuotaType.QuotaUsageByMemberDaily to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 3)),
+            ),
+        )
+
+        val result = matcher.check(request, zoneCache, itineraryCache)
+
+        assertFalse(result.hasAvailability)
+    }
+
+    @Test
+    fun `itinerary matcher matches when the MEMBER quota has room for the whole group`() {
+        val legs = listOf(PermitItineraryLeg("4675323001", LocalDate.of(2026, 7, 12)))
+        val request = itineraryRequest(legs, groupSize = 4)
+        stubItineraryAvailability(
+            "4675323",
+            "4675323001",
+            7,
+            2026,
+            mapOf(
+                PermitQuotaType.ConstantQuotaUsageDaily to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 1)),
+                PermitQuotaType.QuotaUsageByMemberDaily to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 4)),
+            ),
+        )
+
+        val result = matcher.check(request, zoneCache, itineraryCache)
+
+        assertTrue(result.hasAvailability)
+    }
+
+    @Test
+    fun `itinerary matcher treats an unrecognized quota type as PAX-based, not as a flat slot`() {
+        val legs = listOf(PermitItineraryLeg("4675323001", LocalDate.of(2026, 7, 12)))
+        val request = itineraryRequest(legs, groupSize = 4)
+        stubItineraryAvailability(
+            "4675323",
+            "4675323001",
+            7,
+            2026,
+            // A future/unseen quota type key deserializes to UNKNOWN — remaining=1 must NOT be treated
+            // as "one flat slot is enough"; an unrecognized quota's semantics aren't known, so it's
+            // held to the stricter PAX-based bar rather than defaulting to CONSTANT's laxer check.
+            mapOf(PermitQuotaType.UNKNOWN to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 1))),
+        )
+
+        val result = matcher.check(request, zoneCache, itineraryCache)
+
+        assertFalse(result.hasAvailability)
+    }
+
+    // --- PermitQuotaType JSON parsing (real ObjectMapper config, matching RecreationConfiguration) ---
+
+    @Test
+    fun `PermitQuotaType parses known quota type keys and falls back to UNKNOWN for anything unrecognized`() {
+        val objectMapper = jacksonObjectMapper()
+            .registerModule(KotlinModule.Builder().build())
+            .registerModule(JavaTimeModule())
+            .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+            .configure(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE, true)
+
+        val json = """
+            {
+              "payload": {
+                "quota_type_maps": {
+                  "ConstantQuotaUsageDaily": { "2026-07-12": { "total": 1, "remaining": 1 } },
+                  "QuotaUsageByMemberDaily": { "2026-07-12": { "total": 4, "remaining": 3 } },
+                  "SomeFutureQuotaTypeRecreationGovAdds": { "2026-07-12": { "total": 1, "remaining": 1 } }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val payload = objectMapper.readValue(json, PermitItineraryAvailabilityResponse::class.java).payload
+
+        assertEquals(setOf(PermitQuotaType.ConstantQuotaUsageDaily, PermitQuotaType.QuotaUsageByMemberDaily, PermitQuotaType.UNKNOWN), payload.quotaTypeMaps.keys)
+        assertEquals(
+            1,
+            payload.quotaTypeMaps
+                .getValue(PermitQuotaType.ConstantQuotaUsageDaily)
+                .getValue(LocalDate.of(2026, 7, 12))
+                .remaining
+        )
+        assertEquals(
+            3,
+            payload.quotaTypeMaps
+                .getValue(PermitQuotaType.QuotaUsageByMemberDaily)
+                .getValue(LocalDate.of(2026, 7, 12))
+                .remaining
+        )
+    }
+
+    @Test
+    fun `PermitDivisionType parses known division types and falls back to UNKNOWN for anything unrecognized`() {
+        val objectMapper = jacksonObjectMapper()
+            .registerModule(KotlinModule.Builder().build())
+            .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+            .configure(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE, true)
+
+        // "Destination Zone" (Desolation, 233261) and "Camp Area" (Yellowstone, 4675323001) are both
+        // confirmed live captures (see openspec/changes/add-permit-search/appendix.md).
+        val json = """
+            {
+              "payload": {
+                "divisions": {
+                  "343": { "id": "343", "type": "Destination Zone" },
+                  "4675323001": { "id": "4675323001", "type": "Camp Area" },
+                  "999": { "id": "999", "type": "SomeFutureDivisionTypeRecreationGovAdds" }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val divisions = objectMapper.readValue(json, PermitContentResponse::class.java).payload.divisions
+
+        assertEquals(PermitDivisionType.DESTINATION_ZONE, divisions.getValue("343").type)
+        assertEquals(PermitDivisionType.CAMP_AREA, divisions.getValue("4675323001").type)
+        assertEquals(PermitDivisionType.UNKNOWN, divisions.getValue("999").type)
+    }
+
+    @Test
+    fun `PermitRuleName parses known rule names and falls back to UNKNOWN for anything unrecognized`() {
+        val objectMapper = jacksonObjectMapper()
+            .registerModule(KotlinModule.Builder().build())
+            .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+            .configure(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE, true)
+
+        // First four rule names are confirmed live captures on the Yellowstone itinerary permit
+        // (appendix.md). "QuotaUsageByMember" (no "Daily") is Desolation's zone-permit variant of the
+        // same rule — a real, live-verified value this enum deliberately doesn't model, to prove it
+        // falls back to UNKNOWN rather than being silently misread as one of the other four.
+        val json = """
+            {
+              "payload": {
+                "rules": [
+                  { "division_id": "4675323001", "name": "MaxGroupSize", "value": 10 },
+                  { "division_id": "4675323001", "name": "StayLimitPerLeg", "value": 259200 },
+                  { "division_id": "ALL_DIVISIONS", "name": "ConstantQuotaUsageDaily", "value": 1 },
+                  { "division_id": "ALL_DIVISIONS", "name": "QuotaUsageByMemberDaily", "value": 1 },
+                  { "division_id": "343", "name": "QuotaUsageByMember", "value": 1 }
+                ]
+              }
+            }
+        """.trimIndent()
+
+        val ruleNames = objectMapper
+            .readValue(json, PermitContentResponse::class.java)
+            .payload.rules
+            .map { it.name }
+
+        assertEquals(
+            listOf(
+                PermitRuleName.MaxGroupSize,
+                PermitRuleName.StayLimitPerLeg,
+                PermitRuleName.ConstantQuotaUsageDaily,
+                PermitRuleName.QuotaUsageByMemberDaily,
+                PermitRuleName.UNKNOWN,
+            ),
+            ruleNames,
+        )
+    }
+
+    @Test
+    fun `SearchEntityType parses known entity types and falls back to UNKNOWN for anything unrecognized`() {
+        val objectMapper = jacksonObjectMapper()
+            .registerModule(KotlinModule.Builder().build())
+            .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+            .configure(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE, true)
+
+        // entity_type "permit" and parent_entity_type "recarea" are the confirmed live capture
+        // (appendix.md); the search/suggest endpoint mixes in other inventory kinds too (campgrounds,
+        // activity passes) whose exact literal casing isn't confirmed, hence the UNKNOWN fallback case.
+        val json = """
+            {
+              "inventory_suggestions": [
+                {
+                  "entity_id": "4675323", "entity_type": "permit", "name": "Yellowstone",
+                  "parent_entity_id": "2988", "parent_entity_type": "recarea", "parent_name": "Yellowstone National Park"
+                },
+                { "entity_id": "1234", "entity_type": "someFutureEntityKindRecreationGovAdds", "name": "Unknown Thing" }
+              ]
+            }
+        """.trimIndent()
+
+        val suggestions = objectMapper.readValue(json, SearchSuggestResponse::class.java).inventorySuggestions!!
+
+        assertEquals(SearchEntityType.Permit, suggestions[0].entityType)
+        assertEquals(SearchEntityType.Recarea, suggestions[0].parentEntityType)
+        assertEquals(SearchEntityType.UNKNOWN, suggestions[1].entityType)
     }
 
     // --- tick-scoped cache dedup (shared across requests, not just within one check() call) ---
@@ -343,7 +589,7 @@ class PermitAvailabilityMatcherTest {
             7,
             2026,
             mapOf(
-                "ConstantQuotaUsageDaily" to
+                PermitQuotaType.ConstantQuotaUsageDaily to
                     mapOf(
                         LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 1),
                         LocalDate.of(2026, 7, 20) to PermitItineraryAvailabilityCell(remaining = 1),

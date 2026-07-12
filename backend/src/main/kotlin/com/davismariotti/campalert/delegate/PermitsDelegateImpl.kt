@@ -10,7 +10,9 @@ import com.davismariotti.campalert.api.model.PermitSearchResult
 import com.davismariotti.campalert.api.model.PermitZoneAvailabilityPreviewResponse
 import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.recreation.PermitRuleContent
+import com.davismariotti.campalert.recreation.PermitRuleName
 import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.recreation.SearchEntityType
 import com.davismariotti.campalert.service.permit.PermitClassificationService
 import com.davismariotti.campalert.service.permit.PermitContentCache
 import com.davismariotti.campalert.util.naturalOrder
@@ -55,7 +57,7 @@ class PermitsDelegateImpl(
         val results = response
             .body()
             ?.inventorySuggestions
-            ?.filter { it.entityType == "permit" }
+            ?.filter { it.entityType == SearchEntityType.Permit }
             ?.map { suggestion ->
                 val type = permitClassificationService.classify(suggestion.entityId)
                 PermitSearchResult(
@@ -201,7 +203,7 @@ class PermitsDelegateImpl(
     private fun maxGroupSizeFor(rules: List<PermitRuleContent>, divisionId: String?): Int? =
         rules
             .firstOrNull { rule ->
-                rule.name == "MaxGroupSize" &&
+                rule.name == PermitRuleName.MaxGroupSize &&
                     if (divisionId == null) rule.divisionId.isNullOrEmpty() else rule.divisionId == divisionId
             }?.value
             ?.toInt()
