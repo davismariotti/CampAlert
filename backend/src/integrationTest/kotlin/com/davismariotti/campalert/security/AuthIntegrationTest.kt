@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.security
 
+import com.davismariotti.campalert.api.model.ChangePasswordBody
 import com.davismariotti.campalert.api.model.LoginBody
 import com.davismariotti.campalert.api.model.RegisterBody
 import com.davismariotti.campalert.api.model.UpdateMeBody
@@ -193,5 +194,85 @@ class AuthIntegrationTest : IntegrationTestBase() {
         assertThat(
             mapper.readTree(getResult.response.contentAsString).get("timezone").asText(),
         ).isEqualTo("Europe/London")
+    }
+
+    // --- PUT /auth/me/password ---
+
+    @Test
+    fun `unauthenticated PUT me password returns 401`() {
+        val result = doPut(
+            "/api/auth/me/password",
+            body = ChangePasswordBody(currentPassword = "password1", newPassword = "newpassword1"),
+        )
+        assertThat(result.response.status).isEqualTo(401)
+    }
+
+    @Test
+    fun `change password with wrong current password returns 400`() {
+        val session = registerAndLogin()
+        val result = doPut(
+            "/api/auth/me/password",
+            session,
+            ChangePasswordBody(currentPassword = "wrongpassword", newPassword = "newpassword1"),
+        )
+        assertThat(result.response.status).isEqualTo(400)
+    }
+
+    @Test
+    fun `change password with new password same as current returns 400`() {
+        val session = registerAndLogin()
+        val result = doPut(
+            "/api/auth/me/password",
+            session,
+            ChangePasswordBody(currentPassword = "password1", newPassword = "password1"),
+        )
+        assertThat(result.response.status).isEqualTo(400)
+    }
+
+    @Test
+    fun `successful change password returns 204`() {
+        val session = registerAndLogin()
+        val result = doPut(
+            "/api/auth/me/password",
+            session,
+            ChangePasswordBody(currentPassword = "password1", newPassword = "newpassword1"),
+        )
+        assertThat(result.response.status).isEqualTo(204)
+    }
+
+    @Test
+    fun `after change password, old password no longer logs in and new password does`() {
+        val session = registerAndLogin()
+        doPut("/api/auth/me/password", session, ChangePasswordBody(currentPassword = "password1", newPassword = "newpassword1"))
+
+        val oldLogin = doPost("/api/auth/login", body = LoginBody(email = "user@test.com", password = "password1"))
+        assertThat(oldLogin.response.status).isEqualTo(401)
+
+        val newLogin = doPost("/api/auth/login", body = LoginBody(email = "user@test.com", password = "newpassword1"))
+        assertThat(newLogin.response.status).isEqualTo(200)
+    }
+
+    @Test
+    fun `change password revokes other sessions but keeps the current session active`() {
+        // Two independent logins for the same account simulate two devices — each establishes its
+        // own Redis-backed session, which is exactly what SessionRevocationService distinguishes.
+        val sessionA = registerAndLogin()
+        val sessionB = doPost("/api/auth/login", body = LoginBody(email = "user@test.com", password = "password1"))
+            .response
+            .getCookie("SESSION")!!
+
+        doPut("/api/auth/me/password", sessionA, ChangePasswordBody(currentPassword = "password1", newPassword = "newpassword1"))
+
+        val stillAuthenticated = mockMvc
+            .perform(get("/api/auth/me").cookie(sessionA))
+            .andReturn()
+            .response.status
+        assertThat(stillAuthenticated).isEqualTo(200)
+
+        val revoked = mockMvc
+            .perform(get("/api/auth/me").cookie(sessionB))
+            .andReturn()
+            .response.status
+        assertThat(revoked).isIn(401, 403)
     }
 }
