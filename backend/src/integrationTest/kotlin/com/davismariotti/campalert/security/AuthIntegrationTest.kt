@@ -196,6 +196,76 @@ class AuthIntegrationTest : IntegrationTestBase() {
         ).isEqualTo("Europe/London")
     }
 
+    @Test
+    fun `new account has no pushover keys and override disabled by default`() {
+        val session = registerAndLogin()
+        val result = mockMvc.perform(get("/api/auth/me").cookie(session)).andReturn()
+        val tree = mapper.readTree(result.response.contentAsString)
+        assertThat(tree.get("pushoverApiToken").isNull).isTrue()
+        assertThat(tree.get("pushoverUserKey").isNull).isTrue()
+        assertThat(tree.get("pushoverOverrideEnabled").asBoolean()).isFalse()
+    }
+
+    @Test
+    fun `PATCH me with pushover keys and override enabled returns them in the response`() {
+        val session = registerAndLogin()
+        val result = doPatch(
+            "/api/auth/me",
+            session,
+            UpdateMeBody(pushoverApiToken = "app-token", pushoverUserKey = "user-key", pushoverOverrideEnabled = true),
+        )
+        assertThat(result.response.status).isEqualTo(200)
+        val tree = mapper.readTree(result.response.contentAsString)
+        assertThat(tree.get("pushoverApiToken").asText()).isEqualTo("app-token")
+        assertThat(tree.get("pushoverUserKey").asText()).isEqualTo("user-key")
+        assertThat(tree.get("pushoverOverrideEnabled").asBoolean()).isTrue()
+    }
+
+    @Test
+    fun `PATCH me with pushover keys persists them visible on subsequent GET me`() {
+        val session = registerAndLogin()
+        doPatch(
+            "/api/auth/me",
+            session,
+            UpdateMeBody(pushoverApiToken = "app-token", pushoverUserKey = "user-key", pushoverOverrideEnabled = true),
+        )
+        val getResult = mockMvc.perform(get("/api/auth/me").cookie(session)).andReturn()
+        val tree = mapper.readTree(getResult.response.contentAsString)
+        assertThat(tree.get("pushoverApiToken").asText()).isEqualTo("app-token")
+        assertThat(tree.get("pushoverUserKey").asText()).isEqualTo("user-key")
+        assertThat(tree.get("pushoverOverrideEnabled").asBoolean()).isTrue()
+    }
+
+    @Test
+    fun `PATCH me omitting pushover fields leaves previously saved keys unchanged`() {
+        val session = registerAndLogin()
+        doPatch(
+            "/api/auth/me",
+            session,
+            UpdateMeBody(pushoverApiToken = "app-token", pushoverUserKey = "user-key", pushoverOverrideEnabled = true),
+        )
+        val result = doPatch("/api/auth/me", session, UpdateMeBody(timezone = "Europe/London"))
+        val tree = mapper.readTree(result.response.contentAsString)
+        assertThat(tree.get("pushoverApiToken").asText()).isEqualTo("app-token")
+        assertThat(tree.get("pushoverUserKey").asText()).isEqualTo("user-key")
+        assertThat(tree.get("pushoverOverrideEnabled").asBoolean()).isTrue()
+    }
+
+    @Test
+    fun `PATCH me with pushoverOverrideEnabled false disables the override even with keys still set`() {
+        val session = registerAndLogin()
+        doPatch(
+            "/api/auth/me",
+            session,
+            UpdateMeBody(pushoverApiToken = "app-token", pushoverUserKey = "user-key", pushoverOverrideEnabled = true),
+        )
+        val result = doPatch("/api/auth/me", session, UpdateMeBody(pushoverOverrideEnabled = false))
+        val tree = mapper.readTree(result.response.contentAsString)
+        assertThat(tree.get("pushoverOverrideEnabled").asBoolean()).isFalse()
+        assertThat(tree.get("pushoverApiToken").asText()).isEqualTo("app-token")
+        assertThat(tree.get("pushoverUserKey").asText()).isEqualTo("user-key")
+    }
+
     // --- PUT /auth/me/password ---
 
     @Test
