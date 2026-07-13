@@ -40,7 +40,8 @@ export function ZoneRequestBuilder({ permit, onClear, onSuccess }: Props) {
           searchType: 'ZONE',
           // Zone quota is only consumed on the first night — startDay/endDay model a flexibility
           // window, but date-range flexibility isn't built yet, so both are set to the same night.
-          zoneTarget: { divisionIds, startDay: night, endDay: night }
+          zoneTarget: { divisionIds, startDay: night, endDay: night },
+          provider: permit.provider
         }
       })
       if (result.error) throw result

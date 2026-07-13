@@ -44,7 +44,8 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
           groupSize,
           campsiteId: campground.id,
           campgroundName: campground.name,
-          loops
+          loops,
+          provider: campground.provider
         }
       })
       if (result.error) throw result

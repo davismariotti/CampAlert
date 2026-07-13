@@ -238,7 +238,12 @@ export function RequestCard({ request }: Props) {
         </div>
 
         {/* Names */}
-        <h3 className="font-semibold text-forest-900">{request.name}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-forest-900">{request.name}</h3>
+          <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
+            {request.provider.name}
+          </span>
+        </div>
         {!isPermit && request.campgroundName && (
           <p className="mt-0.5 text-sm text-forest-500">{request.campgroundName}</p>
         )}

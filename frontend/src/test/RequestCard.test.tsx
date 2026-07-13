@@ -23,7 +23,8 @@ const request: SearchRequestResponse = {
     availabilityRate: 0.25,
     avgAvailabilityWindowMinutes: 42,
     missedQuietHoursWindows: 1
-  }
+  },
+  provider: { type: 'RECREATION_GOV', name: 'Recreation.gov' }
 }
 
 function Wrapper({ children }: { children: ReactNode }) {
@@ -50,5 +51,31 @@ describe('RequestCard', () => {
     expect(screen.getByText('42 min')).toBeInTheDocument()
     expect(screen.getByText('1')).toBeInTheDocument()
     expect(detailSpy).not.toHaveBeenCalled()
+  })
+
+  it('always shows a provider badge, even with a single provider in the system', () => {
+    render(<RequestCard request={request} />, { wrapper: Wrapper })
+
+    expect(screen.getByText('Recreation.gov')).toBeInTheDocument()
+  })
+
+  it("shows each card's own provider name when requests span more than one provider", () => {
+    const otherProviderRequest: SearchRequestResponse = {
+      ...request,
+      id: 2,
+      name: 'Other provider request',
+      provider: { type: 'RECREATION_GOV', name: 'Some Other Provider' }
+    }
+
+    render(
+      <>
+        <RequestCard request={request} />
+        <RequestCard request={otherProviderRequest} />
+      </>,
+      { wrapper: Wrapper }
+    )
+
+    expect(screen.getByText('Recreation.gov')).toBeInTheDocument()
+    expect(screen.getByText('Some Other Provider')).toBeInTheDocument()
   })
 })
