@@ -5,6 +5,8 @@ import com.davismariotti.campalert.api.model.CampgroundResponse
 import com.davismariotti.campalert.api.model.CampgroundSearchResult
 import com.davismariotti.campalert.api.model.CampsiteResponse
 import com.davismariotti.campalert.api.model.LoopInfo
+import com.davismariotti.campalert.api.model.ProviderType
+import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.recreation.RecreationApi
 import com.davismariotti.campalert.recreation.RidbApi
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException
@@ -84,7 +86,7 @@ class CampgroundsDelegateImpl(
     }
 
     @PreAuthorize("isAuthenticated()")
-    override fun searchCampgrounds(q: String): ResponseEntity<List<CampgroundSearchResult>> {
+    override fun searchCampgrounds(q: String, provider: ProviderType?): ResponseEntity<List<CampgroundSearchResult>> {
         if (q.isBlank()) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Query parameter 'q' must not be blank")
         }
@@ -100,13 +102,16 @@ class CampgroundsDelegateImpl(
         if (!response.isSuccessful) {
             throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "RIDB upstream error")
         }
+        // provider param is accepted for API-contract readiness but unused until a second provider
+        // exists — every result is stamped RECREATION_GOV regardless (see design decision 7).
+        val resultProvider = Provider.RECREATION_GOV.toApi()
         val results = response
             .body()
             ?.recdata
             ?.filter { it.facilityTypeDescription == "Campground" }
             ?.mapNotNull { facility ->
                 facility.facilityId.toIntOrNull()?.let { id ->
-                    CampgroundSearchResult(id = id, name = facility.facilityName)
+                    CampgroundSearchResult(id = id, name = facility.facilityName, provider = resultProvider)
                 }
             }
             ?: emptyList()

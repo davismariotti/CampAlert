@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react'
 import { usePermitSearch } from './usePermitSearch'
 import { Spinner } from '../../components/ui/Spinner'
+import { ProviderSelect } from '../../components/ui/ProviderSelect'
+import { AVAILABLE_PROVIDERS, DEFAULT_PROVIDER } from '../../utils/providers'
 import type { PermitSearchResult } from '../../api/generated/types.gen'
 
 interface Props {
@@ -10,13 +12,15 @@ interface Props {
 export function PermitSearch({ onSelect }: Props) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
+  const [provider, setProvider] = useState(DEFAULT_PROVIDER)
   const inputRef = useRef<HTMLInputElement>(null)
-  const { data, isFetching, isError } = usePermitSearch(query)
+  const { data, isFetching, isError } = usePermitSearch(query, provider.type)
 
   const showDropdown = open && query.trim().length >= 3
 
   return (
     <div className="relative w-full">
+      <ProviderSelect providers={AVAILABLE_PROVIDERS} selected={provider} onChange={setProvider} />
       <div className="relative">
         <input
           ref={inputRef}

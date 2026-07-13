@@ -8,6 +8,8 @@ import com.davismariotti.campalert.api.model.PermitDivisionAvailabilityPreviewRe
 import com.davismariotti.campalert.api.model.PermitResponse
 import com.davismariotti.campalert.api.model.PermitSearchResult
 import com.davismariotti.campalert.api.model.PermitZoneAvailabilityPreviewResponse
+import com.davismariotti.campalert.api.model.ProviderType
+import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.recreation.PermitRuleContent
 import com.davismariotti.campalert.recreation.PermitRuleName
@@ -38,7 +40,7 @@ class PermitsDelegateImpl(
     private val recreationCb by lazy { circuitBreakerRegistry.circuitBreaker("recreation-gov") }
 
     @PreAuthorize("isAuthenticated()")
-    override fun searchPermits(q: String): ResponseEntity<List<PermitSearchResult>> {
+    override fun searchPermits(q: String, provider: ProviderType?): ResponseEntity<List<PermitSearchResult>> {
         if (q.isBlank()) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Query parameter 'q' must not be blank")
         }
@@ -54,6 +56,9 @@ class PermitsDelegateImpl(
         if (!response.isSuccessful) {
             throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Recreation.gov upstream error")
         }
+        // provider param is accepted for API-contract readiness but unused until a second provider
+        // exists — every result is stamped RECREATION_GOV regardless (see design decision 7).
+        val resultProvider = Provider.RECREATION_GOV.toApi()
         val results = response
             .body()
             ?.inventorySuggestions
@@ -65,6 +70,7 @@ class PermitsDelegateImpl(
                     name = suggestion.name,
                     recareaName = suggestion.parentName,
                     type = type?.toApi(),
+                    provider = resultProvider,
                 )
             }
             ?: emptyList()

@@ -255,6 +255,11 @@ paths:
           required: true
           schema:
             type: string
+        - name: provider
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProviderType'
       responses:
         "200":
           description: List of matching campgrounds
@@ -526,6 +531,11 @@ paths:
           required: true
           schema:
             type: string
+        - name: provider
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProviderType'
       responses:
         "200":
           description: List of matching permits
@@ -1373,11 +1383,14 @@ components:
       required:
         - id
         - name
+        - provider
       properties:
         id:
           type: integer
         name:
           type: string
+        provider:
+          $ref: '#/components/schemas/Provider'
 
     PermitType:
       type: string
@@ -1404,6 +1417,7 @@ components:
       required:
         - id
         - name
+        - provider
       properties:
         id:
           type: string
@@ -1416,6 +1430,8 @@ components:
           allOf:
             - $ref: '#/components/schemas/PermitType'
           nullable: true
+        provider:
+          $ref: '#/components/schemas/Provider'
           description: Null when the permit's reservation mechanism isn't supported.
 
     PermitDivision:

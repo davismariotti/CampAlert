@@ -57,7 +57,8 @@ export function ItineraryRequestBuilder({ permit, onClear, onSuccess }: Props) {
           permitName: permit.name,
           groupSize,
           searchType: 'ITINERARY',
-          itineraryTarget: { legs }
+          itineraryTarget: { legs },
+          provider: permit.provider
         }
       })
       if (result.error) throw result
