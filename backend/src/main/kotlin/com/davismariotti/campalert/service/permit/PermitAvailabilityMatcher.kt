@@ -1,6 +1,7 @@
 package com.davismariotti.campalert.service.permit
 
 import com.davismariotti.campalert.model.PermitSearchRequest
+import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.recreation.PermitItineraryAvailabilityPayload
 import com.davismariotti.campalert.recreation.PermitQuotaType
@@ -41,10 +42,12 @@ class PermitAvailabilityMatcher(
     private val callProtection: RecreationGovCallProtection,
     private val zoneAvailabilityBaselineService: ZoneAvailabilityBaselineService,
     @param:Value($$"${campfinder.polling.request-jitter-ms:0}") private val requestJitterMs: Long = 0,
-) {
+) : PermitAvailabilityProvider {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    fun check(
+    override val provider = Provider.RECREATION_GOV
+
+    override fun check(
         request: PermitSearchRequest,
         zoneCache: ZoneAvailabilityCache,
         itineraryCache: ItineraryAvailabilityCache,

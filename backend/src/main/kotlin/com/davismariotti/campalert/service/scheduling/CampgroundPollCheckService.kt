@@ -1,10 +1,11 @@
 package com.davismariotti.campalert.service.scheduling
 
+import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.recreation.Campground
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.availability.AvailabilityResult
-import com.davismariotti.campalert.service.availability.RecreationService
+import com.davismariotti.campalert.service.availability.CampgroundAvailabilityProviderRegistry
 import com.davismariotti.campalert.service.state.AvailabilityStateService
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
@@ -27,15 +28,16 @@ import java.util.concurrent.ConcurrentHashMap
 class CampgroundPollCheckService(
     private val searchRequestRepository: SearchRequestRepository,
     private val userRepository: UserRepository,
-    private val recreationService: RecreationService,
+    private val campgroundAvailabilityProviderRegistry: CampgroundAvailabilityProviderRegistry,
     private val availabilityStateService: AvailabilityStateService,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     /** Returns the number of active requests evaluated this cycle (for instrumentation). */
-    fun check(campsiteId: Int): Int {
-        val allRequests = searchRequestRepository.findByCampsiteIdAndCompletedFalse(campsiteId)
+    fun check(provider: Provider, campsiteId: Int): Int {
+        val recreationService = campgroundAvailabilityProviderRegistry.forProvider(provider)
+        val allRequests = searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, provider)
         if (allRequests.isEmpty()) return 0
 
         val toComplete = allRequests.filter { it.startDay < today(it.campgroundTimezone) }

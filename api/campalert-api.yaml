@@ -1194,6 +1194,7 @@ components:
         - completed
         - campgroundName
         - stats
+        - provider
       properties:
         id:
           type: integer
@@ -1225,6 +1226,8 @@ components:
           nullable: true
         stats:
           $ref: '#/components/schemas/SearchRequestStats'
+        provider:
+          $ref: '#/components/schemas/Provider'
 
     SearchRequestStats:
       type: object
@@ -1314,6 +1317,10 @@ components:
           nullable: true
         name:
           type: string
+        provider:
+          allOf:
+            - $ref: '#/components/schemas/Provider'
+          nullable: true
 
     LoopInfo:
       type: object
@@ -1356,6 +1363,10 @@ components:
           type: string
         completed:
           type: boolean
+        provider:
+          allOf:
+            - $ref: '#/components/schemas/Provider'
+          nullable: true
 
     CampgroundSearchResult:
       type: object
@@ -1371,6 +1382,22 @@ components:
     PermitType:
       type: string
       enum: [ZONE, ITINERARY]
+
+    ProviderType:
+      type: string
+      enum: [RECREATION_GOV]
+
+    Provider:
+      type: object
+      required:
+        - type
+        - name
+      properties:
+        type:
+          $ref: '#/components/schemas/ProviderType'
+        name:
+          type: string
+          description: Human-friendly display name for the provider (e.g. "Recreation.gov").
 
     PermitSearchResult:
       type: object
@@ -1592,6 +1619,10 @@ components:
           allOf:
             - $ref: '#/components/schemas/PermitItineraryTargetBody'
           nullable: true
+        provider:
+          allOf:
+            - $ref: '#/components/schemas/Provider'
+          nullable: true
 
     UpdatePermitSearchRequestBody:
       type: object
@@ -1624,6 +1655,10 @@ components:
           nullable: true
         completed:
           type: boolean
+        provider:
+          allOf:
+            - $ref: '#/components/schemas/Provider'
+          nullable: true
 
     PermitSearchRequestResponse:
       type: object
@@ -1636,6 +1671,7 @@ components:
         - searchType
         - completed
         - stats
+        - provider
       properties:
         id:
           type: integer
@@ -1668,6 +1704,8 @@ components:
           nullable: true
         stats:
           $ref: '#/components/schemas/SearchRequestStats'
+        provider:
+          $ref: '#/components/schemas/Provider'
 
     ErrorResponse:
       type: object

@@ -21,12 +21,12 @@ class PollTargetReconciliationRunner(
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun run(args: ApplicationArguments) {
-        val campgroundIds = searchRequestRepository.findDistinctActiveCampsiteIds()
-        campgroundIds.forEach { pollTargetRegistrationService.ensureCampgroundTarget(it) }
+        val campgroundTargets = searchRequestRepository.findDistinctActiveCampsiteTargets()
+        campgroundTargets.forEach { pollTargetRegistrationService.ensureCampgroundTarget(it.campsiteId, it.provider) }
 
-        val permitIds = permitSearchRequestRepository.findDistinctActivePermitIds()
-        permitIds.forEach { pollTargetRegistrationService.ensurePermitTarget(it) }
+        val permitTargets = permitSearchRequestRepository.findDistinctActivePermitTargets()
+        permitTargets.forEach { pollTargetRegistrationService.ensurePermitTarget(it.permitId, it.provider) }
 
-        log.info("Poll target reconciliation complete campgrounds={} permits={}", campgroundIds.size, permitIds.size)
+        log.info("Poll target reconciliation complete campgrounds={} permits={}", campgroundTargets.size, permitTargets.size)
     }
 }

@@ -1,22 +1,29 @@
 package com.davismariotti.campalert.repository
 
+import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchRequest
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.CrudRepository
 import org.springframework.transaction.annotation.Transactional
 
+data class ActiveCampsiteTarget(
+    val campsiteId: Int,
+    val provider: Provider
+)
+
 interface SearchRequestRepository : CrudRepository<SearchRequest, Long> {
     @Query("SELECT r FROM SearchRequest r WHERE r.state.completed = false")
     fun findAllIncomplete(): List<SearchRequest>
 
-    @Query("SELECT r FROM SearchRequest r WHERE r.campsiteId = :campsiteId AND r.state.completed = false")
-    fun findByCampsiteIdAndCompletedFalse(campsiteId: Int): List<SearchRequest>
+    @Query("SELECT r FROM SearchRequest r WHERE r.campsiteId = :campsiteId AND r.provider = :provider AND r.state.completed = false")
+    fun findByCampsiteIdAndProviderAndCompletedFalse(campsiteId: Int, provider: Provider): List<SearchRequest>
 
     @Query(
-        "SELECT DISTINCT r.campsiteId FROM SearchRequest r WHERE r.state.completed = false AND r.state.pauseReason IS NULL AND r.userId IS NOT NULL",
+        "SELECT DISTINCT new com.davismariotti.campalert.repository.ActiveCampsiteTarget(r.campsiteId, r.provider) " +
+            "FROM SearchRequest r WHERE r.state.completed = false AND r.state.pauseReason IS NULL AND r.userId IS NOT NULL",
     )
-    fun findDistinctActiveCampsiteIds(): List<Int>
+    fun findDistinctActiveCampsiteTargets(): List<ActiveCampsiteTarget>
 
     @Query("SELECT r FROM SearchRequest r WHERE r.state.completed = :completed")
     fun findAllByCompleted(completed: Boolean): List<SearchRequest>

@@ -12,6 +12,10 @@ data class PollTargetId(
     @Column(name = "target_type")
     val targetType: TargetType,
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provider")
+    val provider: Provider,
+
     @Column(name = "target_id")
     val targetId: String,
 ) : Serializable

@@ -16,6 +16,7 @@ import com.davismariotti.campalert.model.PermitSearchRequest
 import com.davismariotti.campalert.model.PermitSearchRequestState
 import com.davismariotti.campalert.model.PermitZoneTarget
 import com.davismariotti.campalert.model.PhoneNumberStatus
+import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.RequestType
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PermitSearchRequestRepository
@@ -93,6 +94,7 @@ class PermitSearchRequestsDelegateImpl(
             name = body.name,
             userId = userId,
             searchType = classifiedType,
+            provider = body.provider?.type?.toModel() ?: Provider.RECREATION_GOV,
         )
         val state = PermitSearchRequestState()
         state.permitSearchRequest = entity
@@ -101,7 +103,7 @@ class PermitSearchRequestsDelegateImpl(
 
         val saved = permitSearchRequestRepository.save(entity)
         log.info("Permit search request created userId={} requestId={} permitId={} searchType={}", userId, saved.id, saved.permitId, saved.searchType)
-        pollTargetRegistrationService.ensurePermitTarget(saved.permitId)
+        pollTargetRegistrationService.ensurePermitTarget(saved.permitId, saved.provider)
         return ResponseEntity.status(201).body(saved.toResponse(fetchStats(saved)))
     }
 
@@ -149,6 +151,7 @@ class PermitSearchRequestsDelegateImpl(
             groupSize = body.groupSize,
             name = body.name,
             searchType = classifiedType,
+            provider = body.provider?.type?.toModel() ?: existing.provider,
         )
         // state/zoneTarget/itineraryTarget are body properties excluded from copy(); transfer
         // references before applyTargets() so it mutates the existing rows in place rather than
@@ -160,7 +163,7 @@ class PermitSearchRequestsDelegateImpl(
         applyTargets(updated, body.zoneTarget, body.itineraryTarget)
 
         val saved = permitSearchRequestRepository.save(updated)
-        pollTargetRegistrationService.ensurePermitTarget(saved.permitId)
+        pollTargetRegistrationService.ensurePermitTarget(saved.permitId, saved.provider)
         return ResponseEntity.ok(saved.toResponse(fetchStats(saved)))
     }
 
@@ -285,5 +288,6 @@ class PermitSearchRequestsDelegateImpl(
             completed = this.state.completed,
             pauseReason = this.state.pauseReason,
             stats = stats,
+            provider = this.provider.toApi(),
         )
 }

@@ -28,9 +28,11 @@ CREATE TABLE "public"."search_requests" (
   "user_id" bigint NULL,
   "campground_name" character varying(255) NOT NULL DEFAULT '',
   "campground_timezone" character varying(64) NULL,
+  "provider" character varying(32) NOT NULL DEFAULT 'RECREATION_GOV',
   PRIMARY KEY ("id"),
   -- atlas:renamed_from fk_search_requests_v2_user
-  CONSTRAINT "fk_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id")
+  CONSTRAINT "fk_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
+  CONSTRAINT "chk_search_requests_provider" CHECK (provider IN ('RECREATION_GOV'))
 );
 CREATE INDEX ON "public"."search_requests" ("user_id");
 -- Create "notification_outbox" table
@@ -81,9 +83,11 @@ CREATE TABLE "public"."permit_search_requests" (
   "name" character varying(255) NOT NULL,
   "user_id" bigint NULL,
   "search_type" character varying(16) NOT NULL,
+  "provider" character varying(32) NOT NULL DEFAULT 'RECREATION_GOV',
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_permit_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
-  CONSTRAINT "chk_permit_search_requests_search_type" CHECK (search_type IN ('ZONE', 'ITINERARY'))
+  CONSTRAINT "chk_permit_search_requests_search_type" CHECK (search_type IN ('ZONE', 'ITINERARY')),
+  CONSTRAINT "chk_permit_search_requests_provider" CHECK (provider IN ('RECREATION_GOV'))
 );
 CREATE INDEX ON "public"."permit_search_requests" ("user_id");
 -- Create "permit_zone_target" table
@@ -128,6 +132,7 @@ CREATE TABLE "public"."permit_search_request_state" (
 CREATE TABLE "public"."poll_target_state" (
   "target_type" character varying(16) NOT NULL,
   "target_id" character varying(64) NOT NULL,
+  "provider" character varying(32) NOT NULL DEFAULT 'RECREATION_GOV',
   "phase_offset_ms" integer NOT NULL,
   "next_due_at" timestamptz NOT NULL,
   "locked_until" timestamptz NULL,
@@ -135,8 +140,9 @@ CREATE TABLE "public"."poll_target_state" (
   "last_finished_at" timestamptz NULL,
   "last_status" character varying(16) NULL,
   "last_error" text NULL,
-  PRIMARY KEY ("target_type", "target_id"),
-  CONSTRAINT "chk_poll_target_state_target_type" CHECK (target_type IN ('CAMPGROUND', 'PERMIT'))
+  PRIMARY KEY ("target_type", "provider", "target_id"),
+  CONSTRAINT "chk_poll_target_state_target_type" CHECK (target_type IN ('CAMPGROUND', 'PERMIT')),
+  CONSTRAINT "chk_poll_target_state_provider" CHECK (provider IN ('RECREATION_GOV'))
 );
 CREATE INDEX ON "public"."poll_target_state" ("next_due_at", "locked_until");
 -- Create "shedlock" table
