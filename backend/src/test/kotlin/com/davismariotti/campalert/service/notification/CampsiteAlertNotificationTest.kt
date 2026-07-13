@@ -1,6 +1,7 @@
 package com.davismariotti.campalert.service.notification
 
 import com.davismariotti.campalert.model.OutboxType
+import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.notification.CampsiteAlertNotification
@@ -39,6 +40,32 @@ class CampsiteAlertNotificationTest {
         assertTrue(body.contains("recreation.gov/camping/campgrounds/99"))
         assertTrue(body.contains("Reply PAUSE to snooze"))
         assertTrue(body.contains("Reply STOP to unsubscribe"))
+    }
+
+    @Test
+    fun `sms includes a camplife booking link for CampLife requests`() {
+        val collinsLake = SearchRequest(
+            id = 3L,
+            startDay = LocalDate.now().plusDays(10),
+            nights = 2,
+            groupSize = 2,
+            campsiteId = 791,
+            name = "Collins Lake Trip",
+            campgroundName = "Collins Lake",
+            provider = Provider.CAMPLIFE,
+        ).also { req ->
+            val st = SearchRequestState()
+            st.searchRequest = req
+            st.searchRequestId = 3L
+            req.state = st
+        }
+        val notifications = listOf(PendingNotification(request = collinsLake, type = OutboxType.AVAILABLE, outboxId = 3L))
+        val notification = CampsiteAlertNotification(available = notifications, gone = emptyList())
+
+        val body = notification.sms()!!.text
+
+        assertTrue(body.contains("https://www.camplife.com/791/reservation/step1"))
+        assertTrue(!body.contains("recreation.gov"))
     }
 
     @Test

@@ -1,4 +1,4 @@
-package com.davismariotti.campalert.recreation
+package com.davismariotti.campalert.httpclient
 
 import okhttp3.Interceptor
 import okhttp3.Response
@@ -11,16 +11,22 @@ private val DESKTOP_USER_AGENTS = listOf(
 )
 
 /**
- * Recreation.gov's own web app calls this same API from a browser tab; without these headers every
- * request instead carries the bare default OkHttp User-Agent and no Referer/Origin, which is a far
- * easier signal for bot detection to key on than a plausible (if not perfectly matched) browser profile.
+ * A provider's own web app calls its API from a browser tab; without these headers every request
+ * instead carries the bare default OkHttp User-Agent and no Referer/Origin, which is a far easier
+ * signal for bot detection to key on than a plausible (if not perfectly matched) browser profile.
  *
  * The User-Agent is picked once per interceptor instance (effectively once per process lifetime,
  * since this is built as a single OkHttpClient) rather than per request — a real browser tab never
  * changes identity between calls in the same session, so rotating per-request combined with a
  * persistent cookie jar would be a stronger tell than not rotating at all.
+ *
+ * [refererOrigin] is the provider's own origin (e.g. `https://www.recreation.gov`) — each provider
+ * builds its own instance with its own origin; this class carries no per-provider state beyond that
+ * constructor argument, so it must never become a shared Spring singleton across providers.
  */
-class BrowserHeadersInterceptor : Interceptor {
+class BrowserHeadersInterceptor(
+    private val refererOrigin: String
+) : Interceptor {
     private val userAgent = DESKTOP_USER_AGENTS.random()
 
     override fun intercept(chain: Interceptor.Chain): Response {
@@ -30,8 +36,8 @@ class BrowserHeadersInterceptor : Interceptor {
             .header("User-Agent", userAgent)
             .header("Accept", "application/json, text/plain, */*")
             .header("Accept-Language", "en-US,en;q=0.9")
-            .header("Referer", "https://www.recreation.gov/")
-            .header("Origin", "https://www.recreation.gov")
+            .header("Referer", "$refererOrigin/")
+            .header("Origin", refererOrigin)
             .header("Sec-Fetch-Mode", "cors")
             .header("Sec-Fetch-Site", "same-origin")
             .header("Sec-Fetch-Dest", "empty")

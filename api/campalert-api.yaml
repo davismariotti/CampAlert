@@ -299,6 +299,11 @@ paths:
           required: true
           schema:
             type: integer
+        - name: provider
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProviderType'
       responses:
         "200":
           description: Campground availability
@@ -329,13 +334,18 @@ paths:
     get:
       tags: [Campgrounds]
       operationId: getCampgroundLoops
-      summary: Get distinct loop names for a campground
+      summary: Get distinct grouping (loop / site type) names for a campground
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: integer
+        - name: provider
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProviderType'
       responses:
         "200":
           description: Sorted list of loops with access type metadata
@@ -1156,6 +1166,29 @@ components:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/CampsiteResponse'
+        equipmentTypes:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Equipment types the campground's catalog supports (e.g. CampLife's config.equipTypes). Absent/null for providers that don't expose this (e.g. Recreation.gov) — its presence is the signal the frontend uses to show the equipment-type filter.
+        amenities:
+          type: array
+          items:
+            $ref: '#/components/schemas/AmenityOption'
+          nullable: true
+          description: Campground-level amenity id/name options (e.g. CampLife's config.amenities) a request can filter by via `amenityIds`. Absent/null for providers that don't expose amenities. Not resolved per-site — CampLife has no reliable way to know which sites match without asking its own availability endpoint (see AvailabilityResult/search-request matching).
+
+    AmenityOption:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
 
     CampsiteResponse:
       type: object
@@ -1191,6 +1224,12 @@ components:
           additionalProperties:
             type: integer
           description: Map of ISO-8601 date-time string to quantity
+        equipmentTypes:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Equipment types permitted at this specific site, used to narrow the equipment-type filter. Absent/null for providers that don't expose this.
 
     SearchRequestResponse:
       type: object
@@ -1227,6 +1266,17 @@ components:
           items:
             type: string
           nullable: true
+        siteIds:
+          type: array
+          items:
+            type: string
+          nullable: true
+        amenityIds:
+          type: array
+          items:
+            type: integer
+          nullable: true
+          description: CampLife amenity IDs the request must match (via the availability endpoint's cgAmenity filter). Always null for other providers.
         name:
           type: string
         completed:
@@ -1325,6 +1375,16 @@ components:
           items:
             type: string
           nullable: true
+        siteIds:
+          type: array
+          items:
+            type: string
+          nullable: true
+        amenityIds:
+          type: array
+          items:
+            type: integer
+          nullable: true
         name:
           type: string
         provider:
@@ -1369,6 +1429,16 @@ components:
           items:
             type: string
           nullable: true
+        siteIds:
+          type: array
+          items:
+            type: string
+          nullable: true
+        amenityIds:
+          type: array
+          items:
+            type: integer
+          nullable: true
         name:
           type: string
         completed:
@@ -1398,7 +1468,7 @@ components:
 
     ProviderType:
       type: string
-      enum: [RECREATION_GOV]
+      enum: [RECREATION_GOV, CAMPLIFE]
 
     Provider:
       type: object

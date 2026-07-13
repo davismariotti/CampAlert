@@ -1,28 +1,39 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getCampgroundLoops } from '../../api/generated/sdk.gen'
-import type { LoopInfo } from '../../api/generated/types.gen'
+import type { LoopInfo, Provider } from '../../api/generated/types.gen'
 
 interface Props {
   campgroundId: number
+  provider: Provider
   selectedLoops: string[] | null
   onChange: (loops: string[] | null) => void
+  /** When non-null, only groupings in this list are shown/selectable — used by the equipment-type filter to narrow candidates without persisting a separate field (design.md decision 6). */
+  allowedGroupings?: string[] | null
 }
 
-export function LoopPicker({ campgroundId, selectedLoops, onChange }: Props) {
+/** "Loops" for Recreation.gov's physical loop model, "Site Types" for CampLife's siteType groupings — the one deliberately cosmetic, provider-keyed exception called out in design.md decision 6. */
+function groupingLabel(provider: Provider): string {
+  return provider.type === 'CAMPLIFE' ? 'Site Types' : 'Loops'
+}
+
+export function LoopPicker({ campgroundId, provider, selectedLoops, onChange, allowedGroupings = null }: Props) {
   const {
-    data: loops,
+    data: allLoops,
     isLoading,
     isError
   } = useQuery({
-    queryKey: ['campground-loops', campgroundId],
+    queryKey: ['campground-loops', campgroundId, provider.type],
     queryFn: async () => {
-      const result = await getCampgroundLoops({ path: { id: campgroundId } })
+      const result = await getCampgroundLoops({ path: { id: campgroundId }, query: { provider: provider.type } })
       if (result.error) throw result
       return result.data as LoopInfo[]
     },
     staleTime: 5 * 60 * 1000
   })
+
+  const loops = allowedGroupings ? allLoops?.filter((l) => allowedGroupings.includes(l.name)) : allLoops
+  const label = groupingLabel(provider)
 
   // When loops load and selectedLoops is null (no explicit selection yet),
   // default to all non-boat-in loops selected if any boat-in loops exist.
@@ -37,7 +48,7 @@ export function LoopPicker({ campgroundId, selectedLoops, onChange }: Props) {
   if (isLoading) {
     return (
       <div>
-        <label className="mb-1 block text-xs font-medium text-forest-600">Loops</label>
+        <label className="mb-1 block text-xs font-medium text-forest-600">{label}</label>
         <div className="flex flex-wrap gap-1.5">
           {[80, 56, 64, 72, 48].map((w) => (
             <div key={w} className="h-6 animate-pulse rounded-full bg-forest-100" style={{ width: w }} />
@@ -48,15 +59,23 @@ export function LoopPicker({ campgroundId, selectedLoops, onChange }: Props) {
   }
 
   if (isError) {
-    return <p className="text-xs text-forest-400">Couldn't load loops — alert will watch all sites.</p>
+    return <p className="text-xs text-forest-400">Couldn't load {label.toLowerCase()} — alert will watch all sites.</p>
   }
 
   if (!loops || loops.length === 0) return null
 
   const hasBoatIn = loops.some((l) => l.boatInOnly)
   const allSelected = selectedLoops === null
+  // CampLife's availability endpoint only accepts a single siteTypeId at a time, unlike
+  // Recreation.gov's multi-loop model — so the picker is single-select for CampLife.
+  const singleSelect = provider.type === 'CAMPLIFE'
 
   function toggle(loop: LoopInfo) {
+    if (singleSelect) {
+      const isSelected = selectedLoops?.length === 1 && selectedLoops[0] === loop.name
+      onChange(isSelected ? null : [loop.name])
+      return
+    }
     const currentNames = allSelected ? loops!.map((l) => l.name) : selectedLoops!
     const next = currentNames.includes(loop.name)
       ? currentNames.filter((n) => n !== loop.name)
@@ -65,13 +84,13 @@ export function LoopPicker({ campgroundId, selectedLoops, onChange }: Props) {
     onChange(next.length === 0 && !hasBoatIn ? null : next)
   }
 
-  const selectedCount = allSelected ? loops.length : selectedLoops!.length
-  const label = allSelected || selectedCount === loops.length ? 'all' : `${selectedCount} of ${loops.length}`
+  const selectedCount = allSelected ? loops.length : loops.filter((l) => selectedLoops!.includes(l.name)).length
+  const label2 = allSelected || selectedCount === loops.length ? 'all' : `${selectedCount} of ${loops.length}`
 
   return (
     <div>
       <label className="mb-1 block text-xs font-medium text-forest-600">
-        Loops <span className="font-normal text-forest-400">({label})</span>
+        {label} <span className="font-normal text-forest-400">({label2})</span>
       </label>
       <div className="flex flex-wrap gap-1.5">
         {loops.map((loop) => {

@@ -6,4 +6,5 @@ data class AvailabilityResult(
     val searchRequest: SearchRequest,
     val hasAvailableSites: Boolean,
     val availableSiteCount: Int,
+    val availableSiteIds: Set<String> = emptySet(),
 )

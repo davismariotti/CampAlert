@@ -1,8 +1,6 @@
 import { useState, useRef } from 'react'
 import { useCampgroundSearch } from './useCampgroundSearch'
 import { Spinner } from '../../components/ui/Spinner'
-import { ProviderSelect } from '../../components/ui/ProviderSelect'
-import { AVAILABLE_PROVIDERS, DEFAULT_PROVIDER } from '../../utils/providers'
 import type { CampgroundSearchResult } from '../../api/generated/types.gen'
 
 interface Props {
@@ -12,15 +10,13 @@ interface Props {
 export function CampgroundSearch({ onSelect }: Props) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
-  const [provider, setProvider] = useState(DEFAULT_PROVIDER)
   const inputRef = useRef<HTMLInputElement>(null)
-  const { data, isFetching, isError } = useCampgroundSearch(query, provider.type)
+  const { data, isFetching, isError } = useCampgroundSearch(query)
 
   const showDropdown = open && query.trim().length >= 3
 
   return (
     <div className="relative w-full">
-      <ProviderSelect providers={AVAILABLE_PROVIDERS} selected={provider} onChange={setProvider} />
       <div className="relative">
         <input
           ref={inputRef}
@@ -52,7 +48,7 @@ export function CampgroundSearch({ onSelect }: Props) {
           {!isError &&
             (data ?? []).map((cg) => (
               <button
-                key={cg.id}
+                key={`${cg.provider.type}-${cg.id}`}
                 type="button"
                 className="flex w-full flex-col px-4 py-3 text-left hover:bg-forest-100 first:rounded-t-2xl last:rounded-b-2xl"
                 onMouseDown={() => {
@@ -61,7 +57,12 @@ export function CampgroundSearch({ onSelect }: Props) {
                   setOpen(false)
                 }}
               >
-                <span className="text-sm font-medium text-forest-900">{cg.name}</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-forest-900">{cg.name}</span>
+                  <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-500">
+                    {cg.provider.name}
+                  </span>
+                </span>
                 <span className="text-xs text-forest-500">ID: {cg.id}</span>
               </button>
             ))}

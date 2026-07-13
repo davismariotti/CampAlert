@@ -55,6 +55,16 @@ class CampFinderApplication {
             setThreadNamePrefix("tz-resolution-")
             initialize()
         }
+
+    @Bean("campLifeCatalogExecutor")
+    fun campLifeCatalogExecutor(): TaskExecutor =
+        ThreadPoolTaskExecutor().apply {
+            corePoolSize = 1
+            maxPoolSize = 2
+            queueCapacity = 10
+            setThreadNamePrefix("camplife-catalog-")
+            initialize()
+        }
 }
 
 fun main(args: Array<String>) {

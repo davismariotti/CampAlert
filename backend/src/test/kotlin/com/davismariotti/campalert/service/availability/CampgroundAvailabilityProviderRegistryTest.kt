@@ -3,11 +3,7 @@ package com.davismariotti.campalert.service.availability
 import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.User
-import com.davismariotti.campalert.recreation.Campground
 import org.junit.jupiter.api.Test
-import java.time.YearMonth
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 
@@ -17,7 +13,7 @@ private class FakeCampgroundAvailabilityProvider(
     override fun checkAvailability(
         searchRequest: SearchRequest,
         user: User,
-        campgroundCache: ConcurrentHashMap<Pair<Int, YearMonth>, CompletableFuture<Campground>>?,
+        campgroundCache: CheckCycleCache<*, *>?,
     ): AvailabilityResult = AvailabilityResult(searchRequest, hasAvailableSites = false, availableSiteCount = 0)
 }
 

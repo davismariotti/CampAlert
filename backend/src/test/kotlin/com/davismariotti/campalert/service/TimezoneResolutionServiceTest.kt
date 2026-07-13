@@ -1,5 +1,8 @@
 package com.davismariotti.campalert.service
 
+import com.davismariotti.campalert.camplife.CampLifeCatalogCache
+import com.davismariotti.campalert.camplife.CampLifeDirectoryEntry
+import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.recreation.RidbApi
 import com.davismariotti.campalert.recreation.RidbFacility
 import com.davismariotti.campalert.recreation.RidbFacilityResponse
@@ -21,6 +24,7 @@ import java.util.Optional
 
 class TimezoneResolutionServiceTest {
     private val ridbApi = mock(RidbApi::class.java)
+    private val campLifeCatalogCache = mock(CampLifeCatalogCache::class.java)
     private val timeZoneEngine = mock(TimeZoneEngine::class.java)
     private val searchRequestRepository = mock(SearchRequestRepository::class.java)
 
@@ -28,6 +32,7 @@ class TimezoneResolutionServiceTest {
 
     private val service = TimezoneResolutionService(
         ridbApi,
+        campLifeCatalogCache,
         timeZoneEngine,
         searchRequestRepository,
         circuitBreakerRegistry,
@@ -54,7 +59,7 @@ class TimezoneResolutionServiceTest {
             timeZoneEngine.query(37.8716, -122.2727)
         ).thenReturn(Optional.of(java.time.ZoneId.of("America/Los_Angeles")))
 
-        service.resolveAndPersistAsync(1L, 10)
+        service.resolveAndPersistAsync(1L, 10, Provider.RECREATION_GOV)
 
         verify(searchRequestRepository).updateTimezone(1L, "America/Los_Angeles")
     }
@@ -66,7 +71,7 @@ class TimezoneResolutionServiceTest {
         `when`(ridbApi.getFacility(10)).thenReturn(call as Call<RidbFacilityResponse>)
         `when`(call.execute()).thenThrow(RuntimeException("RIDB down"))
 
-        service.resolveAndPersistAsync(1L, 10)
+        service.resolveAndPersistAsync(1L, 10, Provider.RECREATION_GOV)
 
         verify(searchRequestRepository, never()).updateTimezone(anyLong(), org.mockito.Mockito.any())
     }
@@ -75,10 +80,32 @@ class TimezoneResolutionServiceTest {
     fun `circuit open logs warn and does not call repository`() {
         circuitBreakerRegistry.circuitBreaker("ridb").transitionToOpenState()
 
-        service.resolveAndPersistAsync(1L, 10)
+        service.resolveAndPersistAsync(1L, 10, Provider.RECREATION_GOV)
 
         verify(searchRequestRepository, never()).updateTimezone(anyLong(), org.mockito.Mockito.any())
         verify(ridbApi, never()).getFacility(anyInt())
+    }
+
+    @Test
+    fun `CampLife request resolves timezone from cached directory entry without calling RIDB`() {
+        `when`(campLifeCatalogCache.getDirectory()).thenReturn(
+            listOf(CampLifeDirectoryEntry(id = 791, name = "Collins Lake", lat = "39.3374", lon = "-121.1544")),
+        )
+        `when`(timeZoneEngine.query(39.3374, -121.1544)).thenReturn(Optional.of(java.time.ZoneId.of("America/Los_Angeles")))
+
+        service.resolveAndPersistAsync(1L, 791, Provider.CAMPLIFE)
+
+        verify(searchRequestRepository).updateTimezone(1L, "America/Los_Angeles")
+        verify(ridbApi, never()).getFacility(anyInt())
+    }
+
+    @Test
+    fun `CampLife request with no matching directory entry persists null timezone`() {
+        `when`(campLifeCatalogCache.getDirectory()).thenReturn(emptyList())
+
+        service.resolveAndPersistAsync(1L, 791, Provider.CAMPLIFE)
+
+        verify(searchRequestRepository).updateTimezone(1L, null)
     }
 
     @Suppress("UNCHECKED_CAST")

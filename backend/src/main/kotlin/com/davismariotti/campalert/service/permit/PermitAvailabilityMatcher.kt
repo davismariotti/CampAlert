@@ -32,7 +32,7 @@ typealias ItineraryAvailabilityCache = ConcurrentHashMap<Triple<String, String, 
  * Implements the two permit matching semantics from design decision 3: zone is OR-across-accepted-
  * divisions-and-dates-in-window; itinerary is AND-across-every-ordered-leg. Both caches are scoped to
  * one check cycle and passed in by the caller (see [PermitPollCheckService]), mirroring
- * [com.davismariotti.campalert.service.availability.RecreationServiceImpl]'s `(campsiteId, YearMonth)`
+ * [com.davismariotti.campalert.recreation.RecreationServiceImpl]'s `(campsiteId, YearMonth)`
  * dedup cache — one fetch per (permit, month) or (permit, division, month) across every request being
  * processed in a cycle, not one per request.
  */

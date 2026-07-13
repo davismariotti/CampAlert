@@ -1,4 +1,4 @@
-package com.davismariotti.campalert.recreation
+package com.davismariotti.campalert.httpclient
 
 import com.newrelic.api.agent.NewRelic
 import okhttp3.Interceptor

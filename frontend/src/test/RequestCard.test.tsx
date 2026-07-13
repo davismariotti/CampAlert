@@ -78,4 +78,29 @@ describe('RequestCard', () => {
     expect(screen.getByText('Recreation.gov')).toBeInTheDocument()
     expect(screen.getByText('Some Other Provider')).toBeInTheDocument()
   })
+
+  it('shows a specific-sites indicator instead of loop pills when siteIds is set', () => {
+    const siteScopedRequest: SearchRequestResponse = {
+      ...request,
+      loops: ['North Loop'],
+      siteIds: ['12345', '12346']
+    }
+
+    render(<RequestCard request={siteScopedRequest} />, { wrapper: Wrapper })
+
+    expect(screen.getByText('2 specific sites')).toBeInTheDocument()
+    expect(screen.queryByText('North Loop')).not.toBeInTheDocument()
+  })
+
+  it('shows loop pills when siteIds is empty', () => {
+    const loopScopedRequest: SearchRequestResponse = {
+      ...request,
+      loops: ['North Loop'],
+      siteIds: null
+    }
+
+    render(<RequestCard request={loopScopedRequest} />, { wrapper: Wrapper })
+
+    expect(screen.getByText('North Loop')).toBeInTheDocument()
+  })
 })

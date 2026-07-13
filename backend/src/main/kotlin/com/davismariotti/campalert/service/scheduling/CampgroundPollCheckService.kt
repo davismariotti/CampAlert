@@ -1,7 +1,6 @@
 package com.davismariotti.campalert.service.scheduling
 
 import com.davismariotti.campalert.model.Provider
-import com.davismariotti.campalert.recreation.Campground
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.availability.AvailabilityResult
@@ -11,11 +10,8 @@ import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.ZoneId
 import java.time.ZoneOffset
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Per-campground poll check — campground analogue of the old global-tick `AvailabilityChecker`,
@@ -58,7 +54,7 @@ class CampgroundPollCheckService(
         val valid = active.filter { userMap.containsKey(it.userId) }
         if (valid.isEmpty()) return 0
 
-        val cache = ConcurrentHashMap<Pair<Int, YearMonth>, CompletableFuture<Campground>>()
+        val cache = recreationService.newCheckCycleCache()
         val resultsByUser = valid
             .mapNotNull { it.userId }
             .distinct()
