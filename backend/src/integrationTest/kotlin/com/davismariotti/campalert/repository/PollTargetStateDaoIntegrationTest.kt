@@ -2,6 +2,7 @@ package com.davismariotti.campalert.repository
 
 import com.davismariotti.campalert.model.PollTargetId
 import com.davismariotti.campalert.model.PollTargetState
+import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.TargetType
@@ -50,7 +51,7 @@ class PollTargetStateDaoIntegrationTest : IntegrationTestBase() {
         req.state = state
         searchRequestRepository.save(req)
 
-        targetId = PollTargetId(TargetType.CAMPGROUND, campsiteId.toString())
+        targetId = PollTargetId(TargetType.CAMPGROUND, Provider.RECREATION_GOV, campsiteId.toString())
     }
 
     private fun saveDueRow(nextDueAt: Instant = Instant.now().minusSeconds(1), lockedUntil: Instant? = null) {
@@ -98,7 +99,7 @@ class PollTargetStateDaoIntegrationTest : IntegrationTestBase() {
     @Test
     fun `claimDue does not claim a row with no active request`() {
         // Pause the only request for this campground — the EXISTS gate should now exclude it.
-        val req = searchRequestRepository.findByCampsiteIdAndCompletedFalse(campsiteId).single()
+        val req = searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, Provider.RECREATION_GOV).single()
         req.state.pauseReason = "SYSTEM_PAUSED"
         searchRequestRepository.save(req)
         saveDueRow()
@@ -147,7 +148,7 @@ class PollTargetStateDaoIntegrationTest : IntegrationTestBase() {
 
     @Test
     fun `deleteStaleOrphans removes a stale row with no active request`() {
-        val req = searchRequestRepository.findByCampsiteIdAndCompletedFalse(campsiteId).single()
+        val req = searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, Provider.RECREATION_GOV).single()
         req.state.completed = true
         searchRequestRepository.save(req)
         pollTargetStateRepository.save(
@@ -175,7 +176,7 @@ class PollTargetStateDaoIntegrationTest : IntegrationTestBase() {
 
     @Test
     fun `deleteStaleOrphans leaves a recently-touched orphan alone`() {
-        val req = searchRequestRepository.findByCampsiteIdAndCompletedFalse(campsiteId).single()
+        val req = searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, Provider.RECREATION_GOV).single()
         req.state.completed = true
         searchRequestRepository.save(req)
         pollTargetStateRepository.save(
@@ -191,7 +192,7 @@ class PollTargetStateDaoIntegrationTest : IntegrationTestBase() {
 
     @Test
     fun `deleteStaleOrphans does not remove a currently-locked row`() {
-        val req = searchRequestRepository.findByCampsiteIdAndCompletedFalse(campsiteId).single()
+        val req = searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, Provider.RECREATION_GOV).single()
         req.state.completed = true
         searchRequestRepository.save(req)
         pollTargetStateRepository.save(
