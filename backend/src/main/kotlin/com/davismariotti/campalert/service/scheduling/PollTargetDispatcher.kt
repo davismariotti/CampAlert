@@ -30,8 +30,8 @@ class PollTargetDispatcher(
     private val pollTargetStateRepository: PollTargetStateRepository,
     private val campgroundPollCheckService: CampgroundPollCheckService,
     private val permitPollCheckService: PermitPollCheckService,
+    private val providerPollingProperties: ProviderPollingProperties,
     @Qualifier("availabilityCheckerExecutor") private val executor: Executor,
-    @param:Value($$"${campfinder.polling.interval-ms}") private val intervalMs: Long,
     @param:Value($$"${campfinder.polling.tick-jitter-ms:0}") private val phaseJitterMs: Long,
     @param:Value($$"${campfinder.polling.claim-lease-ms:180000}") private val claimLeaseMs: Long,
 ) {
@@ -56,13 +56,13 @@ class PollTargetDispatcher(
         var requestsEvaluated = 0
         try {
             requestsEvaluated = when (id.targetType) {
-                TargetType.CAMPGROUND -> campgroundPollCheckService.check(id.targetId.toInt())
-                TargetType.PERMIT -> permitPollCheckService.check(id.targetId)
+                TargetType.CAMPGROUND -> campgroundPollCheckService.check(id.provider, id.targetId.toInt())
+                TargetType.PERMIT -> permitPollCheckService.check(id.provider, id.targetId)
             }
         } catch (e: Exception) {
             status = PollCheckStatus.FAILURE
             error = e.message?.take(1000)
-            log.error("Poll target check failed targetType={} targetId={}", id.targetType, id.targetId, e)
+            log.error("Poll target check failed targetType={} provider={} targetId={}", id.targetType, id.provider, id.targetId, e)
         }
         val finishedAt = Instant.now()
 
@@ -70,6 +70,7 @@ class PollTargetDispatcher(
             "PollTargetCheckCompleted",
             mapOf(
                 "targetType" to id.targetType.name,
+                "provider" to id.provider.name,
                 "targetId" to id.targetId,
                 "status" to status.name,
                 "durationMs" to Duration.between(startedAt, finishedAt).toMillis(),
@@ -89,7 +90,7 @@ class PollTargetDispatcher(
     ) {
         val existing = pollTargetStateRepository.findById(id).orElse(null) ?: return
         val jitter = if (phaseJitterMs > 0) Random.nextLong(phaseJitterMs + 1) else 0
-        val nextDueAt = finishedAt.plusMillis(intervalMs).plusMillis(jitter)
+        val nextDueAt = finishedAt.plusMillis(providerPollingProperties.intervalFor(id.provider)).plusMillis(jitter)
         pollTargetStateRepository.save(
             existing.copy(
                 nextDueAt = nextDueAt,

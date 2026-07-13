@@ -1,6 +1,7 @@
 package com.davismariotti.campalert.service.permit
 
 import com.davismariotti.campalert.model.PermitSearchRequest
+import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.repository.PermitSearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
@@ -22,15 +23,16 @@ import java.util.concurrent.ConcurrentHashMap
 class PermitPollCheckService(
     private val permitSearchRequestRepository: PermitSearchRequestRepository,
     private val userRepository: UserRepository,
-    private val permitAvailabilityMatcher: PermitAvailabilityMatcher,
+    private val permitAvailabilityProviderRegistry: PermitAvailabilityProviderRegistry,
     private val permitAvailabilityStateService: PermitAvailabilityStateService,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     /** Returns the number of active requests evaluated this cycle (for instrumentation). */
-    fun check(permitId: String): Int {
-        val allRequests = permitSearchRequestRepository.findByPermitIdAndCompletedFalse(permitId)
+    fun check(provider: Provider, permitId: String): Int {
+        val permitAvailabilityMatcher = permitAvailabilityProviderRegistry.forProvider(provider)
+        val allRequests = permitSearchRequestRepository.findByPermitIdAndProviderAndCompletedFalse(permitId, provider)
         if (allRequests.isEmpty()) return 0
 
         val toComplete = allRequests.filter { req ->

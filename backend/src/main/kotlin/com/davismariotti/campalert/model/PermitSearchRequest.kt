@@ -41,6 +41,10 @@ data class PermitSearchRequest(
     @Enumerated(EnumType.STRING)
     @Column(name = "search_type")
     val searchType: SearchType,
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provider")
+    val provider: Provider = Provider.RECREATION_GOV,
 ) : AlertableRequest {
     // Body properties: excluded from equals/hashCode/copy/toString to prevent circular reference.
     @OneToOne(mappedBy = "permitSearchRequest", cascade = [CascadeType.ALL], fetch = FetchType.EAGER, orphanRemoval = true)

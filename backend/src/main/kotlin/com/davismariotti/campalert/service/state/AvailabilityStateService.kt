@@ -81,7 +81,7 @@ class AvailabilityStateService(
                 request.campsiteId,
                 currentState,
                 newState,
-                result.campground.campsites.size,
+                result.availableSiteCount,
                 outboxType,
             )
             NewRelic.getAgent().insights.recordCustomEvent(
@@ -93,7 +93,7 @@ class AvailabilityStateService(
                     "campgroundName" to (request.campgroundName ?: ""),
                     "from" to (currentState?.name ?: "null"),
                     "to" to newState.name,
-                    "availableSiteCount" to result.campground.campsites.size,
+                    "availableSiteCount" to result.availableSiteCount,
                 ),
             )
 

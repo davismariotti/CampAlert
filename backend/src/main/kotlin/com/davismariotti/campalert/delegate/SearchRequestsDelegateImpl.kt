@@ -7,6 +7,7 @@ import com.davismariotti.campalert.api.model.SearchRequestResponse
 import com.davismariotti.campalert.api.model.SearchRequestStats
 import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
 import com.davismariotti.campalert.model.PhoneNumberStatus
+import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.RequestType
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
@@ -93,13 +94,14 @@ class SearchRequestsDelegateImpl(
             loops = createSearchRequestBody.loops,
             name = createSearchRequestBody.name,
             userId = userId,
+            provider = createSearchRequestBody.provider?.type?.toModel() ?: Provider.RECREATION_GOV,
         )
         val state = SearchRequestState()
         state.searchRequest = entity
         entity.state = state
         val savedRequest = searchRequestRepository.save(entity)
         log.info("Search request created userId={} requestId={} campsiteId={} nights={}", userId, savedRequest.id, savedRequest.campsiteId, savedRequest.nights)
-        pollTargetRegistrationService.ensureCampgroundTarget(savedRequest.campsiteId)
+        pollTargetRegistrationService.ensureCampgroundTarget(savedRequest.campsiteId, savedRequest.provider)
         timezoneResolutionService.resolveAndPersistAsync(savedRequest.id!!, createSearchRequestBody.campsiteId)
         return ResponseEntity.status(201).body(savedRequest.toResponse(fetchStats(savedRequest)))
     }
@@ -133,12 +135,13 @@ class SearchRequestsDelegateImpl(
             campsiteId = updateSearchRequestBody.campsiteId,
             loops = updateSearchRequestBody.loops,
             name = updateSearchRequestBody.name,
+            provider = updateSearchRequestBody.provider?.type?.toModel() ?: existing.provider,
         )
         // state is a body property excluded from copy(); transfer reference and apply state mutation
         updated.state = existing.state
         updated.state.completed = updateSearchRequestBody.completed
         val saved = searchRequestRepository.save(updated)
-        pollTargetRegistrationService.ensureCampgroundTarget(saved.campsiteId)
+        pollTargetRegistrationService.ensureCampgroundTarget(saved.campsiteId, saved.provider)
         return ResponseEntity.ok(saved.toResponse(fetchStats(saved)))
     }
 
@@ -182,5 +185,6 @@ class SearchRequestsDelegateImpl(
             completed = this.state.completed,
             pauseReason = this.state.pauseReason,
             stats = stats,
+            provider = this.provider.toApi(),
         )
 }

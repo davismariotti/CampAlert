@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.service.availability
 
+import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.recreation.AvailabilityType
@@ -25,8 +26,10 @@ class RecreationServiceImpl(
     val recreationApi: RecreationApi,
     private val callProtection: RecreationGovCallProtection,
     @param:Value($$"${campfinder.polling.request-jitter-ms:0}") private val requestJitterMs: Long = 0,
-) : RecreationService {
+) : CampgroundAvailabilityProvider {
     private val log = LoggerFactory.getLogger(javaClass)
+
+    override val provider = Provider.RECREATION_GOV
 
     override fun checkAvailability(
         searchRequest: SearchRequest,
@@ -65,8 +68,8 @@ class RecreationServiceImpl(
 
         return AvailabilityResult(
             searchRequest = searchRequest,
-            campground = Campground(availableSites),
             hasAvailableSites = availableSites.isNotEmpty(),
+            availableSiteCount = availableSites.size,
         )
     }
 

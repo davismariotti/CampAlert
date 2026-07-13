@@ -6,7 +6,6 @@ import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
-import com.davismariotti.campalert.recreation.Campground
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.service.availability.AvailabilityResult
@@ -58,20 +57,8 @@ class AvailabilityStateServiceTest {
     private fun result(request: SearchRequest, available: Boolean) =
         AvailabilityResult(
             searchRequest = request,
-            campground = Campground(if (available) mapOf(1 to mockCampsite()) else emptyMap()),
             hasAvailableSites = available,
-        )
-
-    private fun mockCampsite() =
-        com.davismariotti.campalert.recreation.Campsite(
-            campsiteId = 1,
-            site = "001",
-            loop = "A",
-            campsiteReserveType = "SITE_SPECIFIC",
-            minimumNumberOfPeople = 1,
-            maximumNumberOfPeople = 6,
-            availabilities = emptyMap(),
-            quantities = emptyMap(),
+            availableSiteCount = if (available) 1 else 0,
         )
 
     @Test
