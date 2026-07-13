@@ -1,4 +1,4 @@
-package com.davismariotti.campalert.recreation
+package com.davismariotti.campalert.httpclient
 
 import okhttp3.Cookie
 import okhttp3.CookieJar
@@ -10,6 +10,10 @@ import java.util.concurrent.ConcurrentHashMap
  * cookie jar every call looks like a brand-new, cookie-less client instead of a returning visitor.
  * OkHttp 5.x moved `JavaNetCookieJar` to a separate artifact, so this is a minimal in-memory
  * equivalent scoped to this one process — persistence across restarts isn't needed here.
+ *
+ * Every provider's HTTP client config constructs its own instance of this class and passes it only
+ * to that provider's own `OkHttpClient.Builder()` — it must never become a shared Spring singleton,
+ * or cookies from one provider's calls would leak into another's.
  */
 class InMemoryCookieJar : CookieJar {
     private val store = ConcurrentHashMap<String, List<Cookie>>()

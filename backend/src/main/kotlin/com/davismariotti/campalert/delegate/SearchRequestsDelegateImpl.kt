@@ -6,8 +6,11 @@ import com.davismariotti.campalert.api.model.ErrorResponse
 import com.davismariotti.campalert.api.model.SearchRequestResponse
 import com.davismariotti.campalert.api.model.SearchRequestStats
 import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
+import com.davismariotti.campalert.camplife.CampLifeCatalogCache
+import com.davismariotti.campalert.model.CampLifeSearchRequestDetails
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.Provider
+import com.davismariotti.campalert.model.RecreationGovSearchRequestDetails
 import com.davismariotti.campalert.model.RequestType
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
@@ -32,6 +35,7 @@ class SearchRequestsDelegateImpl(
     private val notificationOutboxRepository: NotificationOutboxRepository,
     private val timezoneResolutionService: TimezoneResolutionService,
     private val pollTargetRegistrationService: PollTargetRegistrationService,
+    private val campLifeCatalogCache: CampLifeCatalogCache,
 ) : SearchRequestsApiDelegate {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -85,24 +89,26 @@ class SearchRequestsDelegateImpl(
                 ),
             ) as ResponseEntity<SearchRequestResponse>
         }
+        val provider = createSearchRequestBody.provider?.type?.toModel() ?: Provider.RECREATION_GOV
         val entity = SearchRequest(
             startDay = createSearchRequestBody.startDay,
             nights = createSearchRequestBody.nights,
             groupSize = createSearchRequestBody.groupSize,
             campsiteId = createSearchRequestBody.campsiteId,
             campgroundName = createSearchRequestBody.campgroundName,
-            loops = createSearchRequestBody.loops,
+            siteIds = createSearchRequestBody.siteIds,
             name = createSearchRequestBody.name,
             userId = userId,
-            provider = createSearchRequestBody.provider?.type?.toModel() ?: Provider.RECREATION_GOV,
+            provider = provider,
         )
         val state = SearchRequestState()
         state.searchRequest = entity
         entity.state = state
+        applyProviderDetails(entity, provider, createSearchRequestBody.loops, createSearchRequestBody.amenityIds)
         val savedRequest = searchRequestRepository.save(entity)
         log.info("Search request created userId={} requestId={} campsiteId={} nights={}", userId, savedRequest.id, savedRequest.campsiteId, savedRequest.nights)
         pollTargetRegistrationService.ensureCampgroundTarget(savedRequest.campsiteId, savedRequest.provider)
-        timezoneResolutionService.resolveAndPersistAsync(savedRequest.id!!, createSearchRequestBody.campsiteId)
+        timezoneResolutionService.resolveAndPersistAsync(savedRequest.id!!, createSearchRequestBody.campsiteId, savedRequest.provider)
         return ResponseEntity.status(201).body(savedRequest.toResponse(fetchStats(savedRequest)))
     }
 
@@ -128,18 +134,24 @@ class SearchRequestsDelegateImpl(
             .orElse(null)
             ?.takeIf { it.userId == userId }
             ?: return ResponseEntity.notFound().build()
+        val provider = updateSearchRequestBody.provider?.type?.toModel() ?: existing.provider
         val updated = existing.copy(
             startDay = updateSearchRequestBody.startDay,
             nights = updateSearchRequestBody.nights,
             groupSize = updateSearchRequestBody.groupSize,
             campsiteId = updateSearchRequestBody.campsiteId,
-            loops = updateSearchRequestBody.loops,
+            siteIds = updateSearchRequestBody.siteIds,
             name = updateSearchRequestBody.name,
-            provider = updateSearchRequestBody.provider?.type?.toModel() ?: existing.provider,
+            provider = provider,
         )
-        // state is a body property excluded from copy(); transfer reference and apply state mutation
+        // state/recreationGovDetails/campLifeDetails are body properties excluded from copy(); transfer
+        // references before applyProviderDetails() so it mutates the existing rows in place rather than
+        // detaching them (orphanRemoval would otherwise delete-then-reinsert on the same PK).
         updated.state = existing.state
         updated.state.completed = updateSearchRequestBody.completed
+        updated.recreationGovDetails = existing.recreationGovDetails
+        updated.campLifeDetails = existing.campLifeDetails
+        applyProviderDetails(updated, provider, updateSearchRequestBody.loops, updateSearchRequestBody.amenityIds)
         val saved = searchRequestRepository.save(updated)
         pollTargetRegistrationService.ensureCampgroundTarget(saved.campsiteId, saved.provider)
         return ResponseEntity.ok(saved.toResponse(fetchStats(saved)))
@@ -172,6 +184,74 @@ class SearchRequestsDelegateImpl(
         )
     }
 
+    /**
+     * Persists provider-specific grouping/amenity data into the correct details table
+     * (`recreation_gov_search_request_details` / `camplife_search_request_details`), clearing the
+     * other provider's table — mirrors [PermitSearchRequestsDelegateImpl]'s `applyTargets` pattern.
+     * `loops` stays a provider-agnostic wire field (grouping selection by name); for CampLife it's
+     * resolved to the single `siteTypeId` its availability endpoint actually accepts.
+     */
+    private fun applyProviderDetails(
+        entity: SearchRequest,
+        provider: Provider,
+        loops: List<String>?,
+        amenityIds: List<Int>?
+    ) {
+        when (provider) {
+            Provider.RECREATION_GOV -> {
+                entity.campLifeDetails = null
+                entity.recreationGovDetails = if (!loops.isNullOrEmpty()) {
+                    val details = entity.recreationGovDetails ?: RecreationGovSearchRequestDetails()
+                    details.searchRequest = entity
+                    details.loops = loops
+                    details
+                } else {
+                    null
+                }
+            }
+            Provider.CAMPLIFE -> {
+                entity.recreationGovDetails = null
+                val siteTypeId = loops?.firstOrNull()?.let { resolveCampLifeSiteTypeId(entity.campsiteId, it) }
+                val nonEmptyAmenityIds = amenityIds?.takeIf { it.isNotEmpty() }
+                entity.campLifeDetails = if (siteTypeId != null || nonEmptyAmenityIds != null) {
+                    val details = entity.campLifeDetails ?: CampLifeSearchRequestDetails()
+                    details.searchRequest = entity
+                    details.siteTypeId = siteTypeId
+                    details.amenityIds = nonEmptyAmenityIds
+                    details
+                } else {
+                    null
+                }
+            }
+        }
+    }
+
+    private fun resolveCampLifeSiteTypeId(campgroundId: Int, groupingName: String): Int? =
+        campLifeCatalogCache
+            .getCampgroundCatalog(campgroundId)
+            ?.config
+            ?.siteTypes
+            ?.find { it.name.equals(groupingName, ignoreCase = true) }
+            ?.id
+
+    private fun resolveCampLifeSiteTypeName(campgroundId: Int, siteTypeId: Int): String? =
+        campLifeCatalogCache
+            .getCampgroundCatalog(campgroundId)
+            ?.config
+            ?.siteTypes
+            ?.find { it.id == siteTypeId }
+            ?.name
+
+    private fun SearchRequest.resolveLoops(): List<String>? =
+        when (provider) {
+            Provider.RECREATION_GOV -> recreationGovDetails?.loops
+            Provider.CAMPLIFE ->
+                campLifeDetails
+                    ?.siteTypeId
+                    ?.let { resolveCampLifeSiteTypeName(campsiteId, it) }
+                    ?.let { listOf(it) }
+        }
+
     private fun SearchRequest.toResponse(stats: SearchRequestStats): SearchRequestResponse =
         SearchRequestResponse(
             id = this.id ?: error("Cannot map unsaved search request"),
@@ -180,7 +260,9 @@ class SearchRequestsDelegateImpl(
             groupSize = this.groupSize,
             campsiteId = this.campsiteId,
             campgroundName = this.campgroundName,
-            loops = this.loops,
+            loops = this.resolveLoops(),
+            siteIds = this.siteIds,
+            amenityIds = this.campLifeDetails?.amenityIds,
             name = this.name,
             completed = this.state.completed,
             pauseReason = this.state.pauseReason,

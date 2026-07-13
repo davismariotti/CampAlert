@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useApiMutation } from '../../hooks/useApiMutation'
-import { createSearchRequest } from '../../api/generated/sdk.gen'
+import { createSearchRequest, getCampground } from '../../api/generated/sdk.gen'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { LoopPicker } from './LoopPicker'
-import type { CampgroundSearchResult } from '../../api/generated/types.gen'
+import { EquipmentTypeFilter } from './EquipmentTypeFilter'
+import { AmenityFilter } from './AmenityFilter'
+import { CampsitePickerModal } from './CampsitePickerModal'
+import type { CampgroundResponse, CampgroundSearchResult } from '../../api/generated/types.gen'
 import type { AxiosError } from 'axios'
 
 interface Props {
@@ -31,8 +35,38 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
   const [nights, setNights] = useState(1)
   const [groupSize, setGroupSize] = useState(1)
   const [loops, setLoops] = useState<string[] | null>(null)
+  const [siteIds, setSiteIds] = useState<string[] | null>(null)
+  const [equipmentType, setEquipmentType] = useState<string | null>(null)
+  const [amenityIds, setAmenityIds] = useState<number[] | null>(null)
+  const [showCampsiteModal, setShowCampsiteModal] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<{ noPhone?: boolean; message?: string } | null>(null)
+
+  // Only fetched for providers that might expose equipment-type data (CampLife) — Recreation.gov
+  // requests never need this extra catalog fetch alongside the loops fetch LoopPicker already makes.
+  const { data: catalog } = useQuery({
+    queryKey: ['campground-catalog', campground.id, campground.provider.type],
+    queryFn: async () => {
+      const result = await getCampground({ path: { id: campground.id }, query: { provider: campground.provider.type } })
+      if (result.error) throw result
+      return result.data as CampgroundResponse
+    },
+    enabled: campground.provider.type === 'CAMPLIFE',
+    staleTime: 5 * 60 * 1000
+  })
+
+  const equipmentTypes = catalog?.equipmentTypes ?? []
+  const amenities = catalog?.amenities ?? []
+
+  const allowedGroupings = useMemo(() => {
+    if (!equipmentType || !catalog) return null
+    const groupings = new Set(
+      Object.values(catalog.campsites)
+        .filter((s) => (s.equipmentTypes ?? []).includes(equipmentType))
+        .map((s) => s.loop)
+    )
+    return Array.from(groupings)
+  }, [equipmentType, catalog])
 
   const mutation = useApiMutation({
     mutationFn: async () => {
@@ -45,6 +79,8 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
           campsiteId: campground.id,
           campgroundName: campground.name,
           loops,
+          siteIds,
+          amenityIds,
           provider: campground.provider
         }
       })
@@ -146,7 +182,57 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
             </div>
           </div>
 
-          <LoopPicker campgroundId={campground.id} selectedLoops={loops} onChange={setLoops} />
+          <EquipmentTypeFilter equipmentTypes={equipmentTypes} selected={equipmentType} onChange={setEquipmentType} />
+
+          <AmenityFilter amenities={amenities} selected={amenityIds} onChange={setAmenityIds} />
+
+          <LoopPicker
+            campgroundId={campground.id}
+            provider={campground.provider}
+            selectedLoops={loops}
+            onChange={setLoops}
+            allowedGroupings={allowedGroupings}
+          />
+
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-medium text-forest-600">Specific campsites</label>
+              <button
+                type="button"
+                onClick={() => setShowCampsiteModal(true)}
+                className="text-xs font-medium text-forest-600 hover:text-forest-800"
+              >
+                Choose specific campsites
+              </button>
+            </div>
+            {siteIds && siteIds.length > 0 ? (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {siteIds.map((id) => (
+                  <span
+                    key={id}
+                    className="flex items-center gap-1 rounded-full bg-forest-700 px-2.5 py-0.5 text-xs font-medium text-white"
+                  >
+                    {id}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSiteIds((prev) => {
+                          const next = (prev ?? []).filter((s) => s !== id)
+                          return next.length === 0 ? null : next
+                        })
+                      }
+                      aria-label={`Remove site ${id}`}
+                      className="hover:text-forest-200"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1 text-xs text-forest-400">No specific sites selected — watching by grouping above</p>
+            )}
+          </div>
 
           {submitError?.noPhone && (
             <p className="text-sm text-amber-700">
@@ -172,6 +258,19 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
           </Button>
         </div>
       </div>
+
+      {showCampsiteModal && (
+        <CampsitePickerModal
+          campgroundId={campground.id}
+          provider={campground.provider}
+          selectedSiteIds={siteIds}
+          onConfirm={(ids) => {
+            setSiteIds(ids)
+            setShowCampsiteModal(false)
+          }}
+          onClose={() => setShowCampsiteModal(false)}
+        />
+      )}
     </div>
   )
 }

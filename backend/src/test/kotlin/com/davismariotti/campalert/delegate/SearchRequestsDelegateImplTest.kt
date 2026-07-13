@@ -2,6 +2,7 @@ package com.davismariotti.campalert.delegate
 
 import com.davismariotti.campalert.api.model.CreateSearchRequestBody
 import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
+import com.davismariotti.campalert.camplife.CampLifeCatalogCache
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchRequest
@@ -34,6 +35,7 @@ class SearchRequestsDelegateImplTest {
     private val notificationOutboxRepository = mock(NotificationOutboxRepository::class.java)
     private val timezoneResolutionService = mock(TimezoneResolutionService::class.java)
     private val pollTargetRegistrationService = mock(PollTargetRegistrationService::class.java)
+    private val campLifeCatalogCache = mock(CampLifeCatalogCache::class.java)
 
     private val delegate = SearchRequestsDelegateImpl(
         searchRequestRepository,
@@ -42,6 +44,7 @@ class SearchRequestsDelegateImplTest {
         notificationOutboxRepository,
         timezoneResolutionService,
         pollTargetRegistrationService,
+        campLifeCatalogCache,
     )
 
     private val user = User(id = 1L, email = "user@example.com", passwordHash = "hash")

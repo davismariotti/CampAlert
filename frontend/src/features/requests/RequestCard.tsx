@@ -252,15 +252,25 @@ export function RequestCard({ request }: Props) {
         {/* Meta */}
         <p className="mt-2 text-sm text-forest-600">{meta}</p>
 
-        {/* Loops (campground only) */}
-        {!isPermit && request.loops && request.loops.length > 0 && (
+        {/* Specific campsites take precedence over loops for matching, so surface them distinctly */}
+        {!isPermit && request.siteIds && request.siteIds.length > 0 ? (
           <div className="mt-2 flex flex-wrap gap-1">
-            {request.loops.map((loop) => (
-              <span key={loop} className="rounded-full bg-forest-100 px-2 py-0.5 text-xs font-medium text-forest-600">
-                {loop}
-              </span>
-            ))}
+            <span className="rounded-full bg-forest-700 px-2 py-0.5 text-xs font-medium text-white">
+              {request.siteIds.length} specific site{request.siteIds.length !== 1 ? 's' : ''}
+            </span>
           </div>
+        ) : (
+          !isPermit &&
+          request.loops &&
+          request.loops.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {request.loops.map((loop) => (
+                <span key={loop} className="rounded-full bg-forest-100 px-2 py-0.5 text-xs font-medium text-forest-600">
+                  {loop}
+                </span>
+              ))}
+            </div>
+          )
         )}
 
         {/* Permit match/blocking state */}

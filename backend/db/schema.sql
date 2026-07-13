@@ -24,6 +24,7 @@ CREATE TABLE "public"."search_requests" (
   "group_size" integer NOT NULL,
   "campsite_id" integer NOT NULL,
   "loops" json NULL,
+  "site_ids" json NULL,
   "name" character varying(255) NOT NULL,
   "user_id" bigint NULL,
   "campground_name" character varying(255) NOT NULL DEFAULT '',
@@ -32,9 +33,26 @@ CREATE TABLE "public"."search_requests" (
   PRIMARY KEY ("id"),
   -- atlas:renamed_from fk_search_requests_v2_user
   CONSTRAINT "fk_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
-  CONSTRAINT "chk_search_requests_provider" CHECK (provider IN ('RECREATION_GOV'))
+  CONSTRAINT "chk_search_requests_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE'))
 );
 CREATE INDEX ON "public"."search_requests" ("user_id");
+-- Create "recreation_gov_search_request_details" table
+-- Step 1 of a two-step migration: additive only. search_requests.loops stays in place (unmapped by
+-- the app after this step) until a follow-up PR drops it once this table is confirmed populated.
+CREATE TABLE "public"."recreation_gov_search_request_details" (
+  "search_request_id" bigint NOT NULL,
+  "loops" json NOT NULL,
+  PRIMARY KEY ("search_request_id"),
+  CONSTRAINT "fk_recreation_gov_search_request_details_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests" ("id") ON DELETE CASCADE
+);
+-- Create "camplife_search_request_details" table
+CREATE TABLE "public"."camplife_search_request_details" (
+  "search_request_id" bigint NOT NULL,
+  "site_type_id" integer NULL,
+  "amenity_ids" json NULL,
+  PRIMARY KEY ("search_request_id"),
+  CONSTRAINT "fk_camplife_search_request_details_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests" ("id") ON DELETE CASCADE
+);
 -- Create "notification_outbox" table
 CREATE TABLE "public"."notification_outbox" (
   "id" bigserial NOT NULL,
@@ -142,7 +160,7 @@ CREATE TABLE "public"."poll_target_state" (
   "last_error" text NULL,
   PRIMARY KEY ("target_type", "provider", "target_id"),
   CONSTRAINT "chk_poll_target_state_target_type" CHECK (target_type IN ('CAMPGROUND', 'PERMIT')),
-  CONSTRAINT "chk_poll_target_state_provider" CHECK (provider IN ('RECREATION_GOV'))
+  CONSTRAINT "chk_poll_target_state_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE'))
 );
 CREATE INDEX ON "public"."poll_target_state" ("next_due_at", "locked_until");
 -- Create "shedlock" table

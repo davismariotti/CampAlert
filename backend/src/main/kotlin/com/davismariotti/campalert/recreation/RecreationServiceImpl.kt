@@ -1,14 +1,12 @@
-package com.davismariotti.campalert.service.availability
+package com.davismariotti.campalert.recreation
 
 import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.User
-import com.davismariotti.campalert.recreation.AvailabilityType
-import com.davismariotti.campalert.recreation.Campground
-import com.davismariotti.campalert.recreation.Campsite
 import com.davismariotti.campalert.recreation.Campsite.Companion.mergeWith
-import com.davismariotti.campalert.recreation.RecreationApi
-import com.davismariotti.campalert.recreation.RecreationGovCallProtection
+import com.davismariotti.campalert.service.availability.AvailabilityResult
+import com.davismariotti.campalert.service.availability.CampgroundAvailabilityProvider
+import com.davismariotti.campalert.service.availability.CheckCycleCache
 import com.davismariotti.campalert.util.sleepJitter
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -31,11 +29,22 @@ class RecreationServiceImpl(
 
     override val provider = Provider.RECREATION_GOV
 
+    /** Month-chunked dedup cache: one fetch per (campgroundId, month) across every request processed in a cycle, not one per request — [compute] runs on a background thread so distinct-month fetches within a cycle still happen concurrently. */
+    class MonthFetchCache : CheckCycleCache<Pair<Int, YearMonth>, Campground> {
+        private val futures = ConcurrentHashMap<Pair<Int, YearMonth>, CompletableFuture<Campground>>()
+
+        override fun computeIfAbsent(key: Pair<Int, YearMonth>, compute: () -> Campground): Campground = futures.computeIfAbsent(key) { CompletableFuture.supplyAsync(compute) }.get()
+    }
+
+    override fun newCheckCycleCache(): CheckCycleCache<*, *> = MonthFetchCache()
+
     override fun checkAvailability(
         searchRequest: SearchRequest,
         user: User,
-        campgroundCache: ConcurrentHashMap<Pair<Int, YearMonth>, CompletableFuture<Campground>>?,
+        campgroundCache: CheckCycleCache<*, *>?,
     ): AvailabilityResult {
+        @Suppress("UNCHECKED_CAST")
+        val cache = campgroundCache as? CheckCycleCache<Pair<Int, YearMonth>, Campground>
         val endNight = searchRequest.startDay.plusDays(searchRequest.nights.toLong())
         var monthStart = searchRequest.startDay.withDayOfMonth(1)
         var campground: Campground? = null
@@ -44,13 +53,10 @@ class RecreationServiceImpl(
             val month = YearMonth.from(monthStart)
             val capturedMonthStart = monthStart
 
-            val monthly = if (campgroundCache != null) {
-                campgroundCache
-                    .computeIfAbsent(Pair(searchRequest.campsiteId, month)) {
-                        CompletableFuture.supplyAsync {
-                            fetchMonth(searchRequest.campsiteId, capturedMonthStart)
-                        }
-                    }.get()
+            val monthly = if (cache != null) {
+                cache.computeIfAbsent(Pair(searchRequest.campsiteId, month)) {
+                    fetchMonth(searchRequest.campsiteId, capturedMonthStart)
+                }
             } else {
                 fetchMonth(searchRequest.campsiteId, capturedMonthStart)
             }
@@ -59,28 +65,39 @@ class RecreationServiceImpl(
             monthStart = monthStart.plusMonths(1)
         }
 
-        val loops = searchRequest.loops?.map { it.lowercase() }
+        val siteIds = searchRequest.siteIds
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            ?.takeIf { it.isNotEmpty() }
+        // Site-ID scoping is authoritative when present — loops is not separately enforced (design.md decision 4).
+        val loops = if (siteIds == null) searchRequest.recreationGovDetails?.loops?.map { it.lowercase() } else null
         val availableSites = (campground ?: Campground(emptyMap()))
             .campsites
             .filterValues { site ->
-                matchesRequest(site, loops, searchRequest.groupSize, searchRequest.startDay, endNight)
+                matchesRequest(site, loops, siteIds, searchRequest.groupSize, searchRequest.startDay, endNight)
             }
 
         return AvailabilityResult(
             searchRequest = searchRequest,
             hasAvailableSites = availableSites.isNotEmpty(),
             availableSiteCount = availableSites.size,
+            availableSiteIds = availableSites.keys.map { it.toString() }.toSet(),
         )
     }
 
     private fun matchesRequest(
         site: Campsite,
         loops: List<String>?,
+        siteIds: Set<String>?,
         groupSize: Int,
         startDay: LocalDate,
         endNight: LocalDate,
     ): Boolean {
-        if (loops != null && site.loop.lowercase() !in loops) return false
+        if (siteIds != null) {
+            if (site.campsiteId.toString() !in siteIds) return false
+        } else if (loops != null && site.loop.lowercase() !in loops) {
+            return false
+        }
         if (site.minimumNumberOfPeople > groupSize || site.maximumNumberOfPeople < groupSize) return false
         val relevant = site.availabilities.filterKeys { it.isBetween(startDay, endNight) }
         return relevant.isNotEmpty() && relevant.values.all { it == AvailabilityType.AVAILABLE }

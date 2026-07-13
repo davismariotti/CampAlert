@@ -35,9 +35,9 @@ data class SearchRequest(
     @Column(name = "campsite_id")
     val campsiteId: Int,
 
-    @Column(name = "loops", columnDefinition = "json")
+    @Column(name = "site_ids", columnDefinition = "json")
     @JdbcTypeCode(SqlTypes.JSON)
-    val loops: List<String>? = null,
+    val siteIds: List<String>? = null,
 
     @Column(name = "name")
     val name: String,
@@ -55,9 +55,15 @@ data class SearchRequest(
     @Column(name = "provider")
     val provider: Provider = Provider.RECREATION_GOV,
 ) : AlertableRequest {
-    // Body property: excluded from equals/hashCode/copy/toString to prevent circular reference.
+    // Body properties: excluded from equals/hashCode/copy/toString to prevent circular reference.
     @OneToOne(mappedBy = "searchRequest", cascade = [CascadeType.ALL], fetch = FetchType.EAGER, orphanRemoval = true)
     lateinit var state: SearchRequestState
+
+    @OneToOne(mappedBy = "searchRequest", cascade = [CascadeType.ALL], fetch = FetchType.EAGER, orphanRemoval = true)
+    var recreationGovDetails: RecreationGovSearchRequestDetails? = null
+
+    @OneToOne(mappedBy = "searchRequest", cascade = [CascadeType.ALL], fetch = FetchType.EAGER, orphanRemoval = true)
+    var campLifeDetails: CampLifeSearchRequestDetails? = null
 
     override var lastAvailabilityState: AvailabilityState?
         get() = state.lastAvailabilityState
