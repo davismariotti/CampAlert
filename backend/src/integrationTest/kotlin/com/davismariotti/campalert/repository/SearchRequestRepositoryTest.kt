@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.repository
 
+import com.davismariotti.campalert.model.RecreationGovSearchRequestDetails
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.support.IntegrationTestBase
@@ -16,7 +17,7 @@ class SearchRequestRepositoryTest : IntegrationTestBase() {
     fun `saves and reads back loops as JSON`() {
         val saved = repository.save(searchRequest(loops = listOf("wildcat", "coast")))
         val found = repository.findById(saved.id!!).get()
-        assertThat(found.loops).containsExactly("wildcat", "coast")
+        assertThat(found.recreationGovDetails?.loops).containsExactly("wildcat", "coast")
     }
 
     @Test
@@ -25,13 +26,13 @@ class SearchRequestRepositoryTest : IntegrationTestBase() {
         saved.state.completed = true
         val updated = repository.save(saved)
         assertThat(updated.state.completed).isTrue()
-        assertThat(updated.loops).containsExactly("wildcat")
+        assertThat(updated.recreationGovDetails?.loops).containsExactly("wildcat")
     }
 
     @Test
     fun `saves and reads back null loops`() {
         val saved = repository.save(searchRequest(loops = null))
-        assertThat(repository.findById(saved.id!!).get().loops).isNull()
+        assertThat(repository.findById(saved.id!!).get().recreationGovDetails).isNull()
     }
 
     @Test
@@ -48,13 +49,18 @@ class SearchRequestRepositoryTest : IntegrationTestBase() {
             nights = 2,
             groupSize = 4,
             campsiteId = 233359,
-            loops = loops,
             name = "Test",
         )
         val st = SearchRequestState()
         st.searchRequest = req
         st.completed = completed
         req.state = st
+        if (loops != null) {
+            val details = RecreationGovSearchRequestDetails()
+            details.searchRequest = req
+            details.loops = loops
+            req.recreationGovDetails = details
+        }
         return req
     }
 }

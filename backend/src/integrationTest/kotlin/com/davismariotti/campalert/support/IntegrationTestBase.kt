@@ -3,6 +3,7 @@ package com.davismariotti.campalert.support
 import com.davismariotti.campalert.api.model.LoginBody
 import com.davismariotti.campalert.api.model.RegisterBody
 import com.davismariotti.campalert.api.model.VerifyEmailBody
+import com.davismariotti.campalert.camplife.CampLifeApi
 import com.davismariotti.campalert.recreation.RecreationApi
 import com.davismariotti.campalert.recreation.RidbApi
 import com.davismariotti.campalert.service.sms.TwilioVerifyService
@@ -82,6 +83,12 @@ open class IntegrationTestBase {
 
     @MockitoBean
     protected lateinit var recreationApi: RecreationApi
+
+    // Unstubbed calls return null Retrofit Call objects, which CampLifeCatalogCache/CampLifeCatalogSearchProvider
+    // already treat as a failed fetch (caught, logged, empty result) — so no test hits the real CampLife API
+    // unless it explicitly stubs this, mirroring how ridbApi/recreationApi are mocked above.
+    @MockitoBean
+    protected lateinit var campLifeApi: CampLifeApi
 
     // Replaces the library's real EmailSender so no real email is sent during tests.
     @MockitoBean

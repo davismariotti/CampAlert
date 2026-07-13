@@ -101,11 +101,24 @@ class CampgroundsIntegrationTest : IntegrationTestBase() {
     // --- 4.5 searchCampgrounds RIDB error ---
 
     @Test
-    fun `searchCampgrounds with RIDB error response returns 502`() {
+    fun `unscoped searchCampgrounds with RIDB error degrades to 200 with empty list`() {
+        // Unscoped search merges every registered provider; one provider's failure doesn't fail the
+        // whole request (design.md decision 7) — RIDB contributes nothing, CampLife (mocked, unstubbed)
+        // contributes nothing either, so the merged result is an empty list, not an error.
         val session = loginSession()
         val call = errorCall<RidbFacilitiesResponse>(500)
         Mockito.`when`(ridbApi.getFacilities(anyString(), anyInt())).thenReturn(call)
         val result = mockMvc.perform(get("/api/campground-search?q=yosemite").cookie(session)).andReturn()
+        assertThat(result.response.status).isEqualTo(200)
+        assertThat(result.response.contentAsString).isEqualTo("[]")
+    }
+
+    @Test
+    fun `searchCampgrounds scoped to RECREATION_GOV with RIDB error response returns 502`() {
+        val session = loginSession()
+        val call = errorCall<RidbFacilitiesResponse>(500)
+        Mockito.`when`(ridbApi.getFacilities(anyString(), anyInt())).thenReturn(call)
+        val result = mockMvc.perform(get("/api/campground-search?q=yosemite&provider=RECREATION_GOV").cookie(session)).andReturn()
         assertThat(result.response.status).isEqualTo(502)
     }
 
