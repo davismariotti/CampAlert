@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.service.permit
 
+import com.davismariotti.campalert.model.AvailabilityState
 import com.davismariotti.campalert.model.PermitItineraryLeg
 import com.davismariotti.campalert.model.PermitItineraryTarget
 import com.davismariotti.campalert.model.PermitSearchRequest
@@ -8,6 +9,8 @@ import com.davismariotti.campalert.model.PermitZoneTarget
 import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.provider.CallProtection
 import com.davismariotti.campalert.provider.recreation.PermitContentResponse
+import com.davismariotti.campalert.provider.recreation.PermitDivisionAvailabilityPayload
+import com.davismariotti.campalert.provider.recreation.PermitDivisionAvailabilityResponse
 import com.davismariotti.campalert.provider.recreation.PermitDivisionType
 import com.davismariotti.campalert.provider.recreation.PermitItineraryAvailabilityCell
 import com.davismariotti.campalert.provider.recreation.PermitItineraryAvailabilityPayload
@@ -148,6 +151,29 @@ class PermitAvailabilityMatcherTest {
         `when`(recreationApi.getZonePermitAvailability(eqK(permitId), anyString(), anyBoolean(), anyBoolean())).thenReturn(call)
     }
 
+    // Stubs the independent corroboration endpoint hit for a fresh (non-AVAILABLE) transition's
+    // candidate match. Tests asserting a fresh match must stub this or the unstubbed Call mock returns
+    // null, corroboration fails closed, and the real match gets rejected.
+    private fun stubDivisionAvailability(
+        permitId: String,
+        divisionId: String,
+        date: LocalDate,
+        remaining: Int,
+        total: Int = 25
+    ) {
+        val call = mockCall(
+            PermitDivisionAvailabilityResponse(
+                PermitDivisionAvailabilityPayload(
+                    permitId = permitId,
+                    dateAvailability = mapOf(date.atStartOfDay(ZoneOffset.UTC) to PermitZoneAvailabilityCell(total = total, remaining = remaining)),
+                ),
+            ),
+        )
+        `when`(
+            recreationApi.getDivisionAvailability(eqK(permitId), eqK(divisionId), anyString(), anyString(), anyBoolean(), anyBoolean()),
+        ).thenReturn(call)
+    }
+
     private fun stubItineraryAvailability(
         permitId: String,
         divisionId: String,
@@ -171,6 +197,7 @@ class PermitAvailabilityMatcherTest {
                 "343" to PermitZoneDivisionAvailability("343", mapOf(LocalDate.of(2026, 7, 13).atStartOfDay(ZoneOffset.UTC) to zoneCell(3))),
             ),
         )
+        stubDivisionAvailability("233261", "343", LocalDate.of(2026, 7, 13), remaining = 3)
 
         val result = matcher.check(request, zoneCache, itineraryCache)
 
@@ -216,6 +243,7 @@ class PermitAvailabilityMatcherTest {
             "233261",
             mapOf("343" to PermitZoneDivisionAvailability("343", mapOf(LocalDate.of(2026, 7, 17).atStartOfDay(ZoneOffset.UTC) to zoneCell(4)))),
         )
+        stubDivisionAvailability("233261", "343", LocalDate.of(2026, 7, 17), remaining = 4)
 
         val result = matcher.check(request, zoneCache, itineraryCache)
 
@@ -278,6 +306,7 @@ class PermitAvailabilityMatcherTest {
             ),
             nextAvailableDate = LocalDate.of(2026, 7, 11).atStartOfDay(ZoneOffset.UTC),
         )
+        stubDivisionAvailability("233261", "343", LocalDate.of(2026, 7, 11), remaining = 5)
 
         val result = matcher.check(request, zoneCache, itineraryCache)
 
@@ -298,6 +327,62 @@ class PermitAvailabilityMatcherTest {
         val result = matcher.check(request, zoneCache, itineraryCache)
 
         assertFalse(result.hasAvailability)
+    }
+
+    @Test
+    fun `zone matcher rejects an otherwise-clean division when two sibling target divisions look suspicious in the same tick`() {
+        // 343 itself passes both individual checks, but 100 and 200 (also targeted by this request)
+        // both flip suspicious in this same response — a rotating, payload-wide glitch pattern
+        // confirmed live, not a single bad division — so 343's own clean-looking match is distrusted too.
+        val request = zoneRequest(divisionIds = listOf("100", "200", "343"), LocalDate.of(2026, 7, 10), LocalDate.of(2026, 7, 15))
+        stubZoneAvailability(
+            "233261",
+            mapOf(
+                "100" to PermitZoneDivisionAvailability("100", mapOf(LocalDate.of(2026, 7, 12).atStartOfDay(ZoneOffset.UTC) to zoneCell(0))),
+                "200" to PermitZoneDivisionAvailability("200", mapOf(LocalDate.of(2026, 7, 12).atStartOfDay(ZoneOffset.UTC) to zoneCell(0))),
+                "343" to PermitZoneDivisionAvailability("343", mapOf(LocalDate.of(2026, 7, 13).atStartOfDay(ZoneOffset.UTC) to zoneCell(3))),
+            ),
+        )
+        `when`(zoneAvailabilityBaselineService.looksSuspicious(eqK("233261"), eqK("100"), anyK(), anyK())).thenReturn(true)
+        `when`(zoneAvailabilityBaselineService.looksSuspicious(eqK("233261"), eqK("200"), anyK(), anyK())).thenReturn(true)
+
+        val result = matcher.check(request, zoneCache, itineraryCache)
+
+        assertFalse(result.hasAvailability)
+    }
+
+    @Test
+    fun `zone matcher rejects a candidate match that fails independent per-division corroboration`() {
+        val request = zoneRequest(divisionIds = listOf("343"), LocalDate.of(2026, 7, 10), LocalDate.of(2026, 7, 15))
+        stubZoneAvailability(
+            "233261",
+            mapOf("343" to PermitZoneDivisionAvailability("343", mapOf(LocalDate.of(2026, 7, 13).atStartOfDay(ZoneOffset.UTC) to zoneCell(3)))),
+        )
+        // The zone endpoint says 343 has room on 7/13, but the independent per-division endpoint
+        // disagrees (remaining=0) — this is exactly the disagreement pattern a real ghost-availability
+        // response would produce, since the two endpoints are confirmed live to be computed independently.
+        stubDivisionAvailability("233261", "343", LocalDate.of(2026, 7, 13), remaining = 0)
+
+        val result = matcher.check(request, zoneCache, itineraryCache)
+
+        assertFalse(result.hasAvailability)
+    }
+
+    @Test
+    fun `zone matcher skips corroboration when the request is already AVAILABLE (steady state, no fresh notification)`() {
+        val request = zoneRequest(divisionIds = listOf("343"), LocalDate.of(2026, 7, 10), LocalDate.of(2026, 7, 15))
+        request.state.lastAvailabilityState = AvailabilityState.AVAILABLE
+        stubZoneAvailability(
+            "233261",
+            mapOf("343" to PermitZoneDivisionAvailability("343", mapOf(LocalDate.of(2026, 7, 13).atStartOfDay(ZoneOffset.UTC) to zoneCell(3)))),
+        )
+        // Deliberately not stubbing getDivisionAvailability — if the matcher called it, the unstubbed
+        // Call mock would return null and corroboration would fail closed, so this only passes if the
+        // match short-circuits corroboration for an already-AVAILABLE request.
+
+        val result = matcher.check(request, zoneCache, itineraryCache)
+
+        assertTrue(result.hasAvailability)
     }
 
     // --- itinerary matcher ---

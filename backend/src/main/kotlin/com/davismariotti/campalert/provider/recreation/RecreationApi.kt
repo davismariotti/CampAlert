@@ -69,6 +69,21 @@ interface RecreationApi {
         @Query("year") year: Int,
     ): Call<PermitItineraryAvailabilityResponse>
 
+    /**
+     * Single-division view over an arbitrary date range, confirmed live to be computed independently
+     * from [getZonePermitAvailability] (same cell shape, but not just a slice of the same payload) —
+     * used to corroborate a candidate zone match before trusting a fresh availability transition.
+     */
+    @GET("permits/{permitId}/divisions/{divisionId}/availability")
+    fun getDivisionAvailability(
+        @Path("permitId") permitId: String,
+        @Path("divisionId") divisionId: String,
+        @Query("start_date") startDate: String,
+        @Query("end_date") endDate: String,
+        @Query("commercial_acct") commercialAcct: Boolean = false,
+        @Query("is_lottery") isLottery: Boolean = false,
+    ): Call<PermitDivisionAvailabilityResponse>
+
     /** Mixed inventory typeahead (rec areas, campgrounds, permits, activity passes) — filter results to `entity_type == "permit"`. */
     @GET("search/suggest")
     fun searchSuggest(

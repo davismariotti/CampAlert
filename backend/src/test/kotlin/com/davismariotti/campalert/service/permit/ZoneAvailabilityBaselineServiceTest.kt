@@ -35,8 +35,8 @@ class ZoneAvailabilityBaselineServiceTest {
     }
 
     @Test
-    fun `flags a date that flips from partially-booked to fully-open since the last tick`() {
-        val previous = ZoneBaselineSnapshot(mapOf(date.toString() to PermitZoneAvailabilityCell(total = 25, remaining = 3)))
+    fun `flags a date that flips from partially-booked to fully-open since the last confirmed tick`() {
+        val previous = ZoneBaselineSnapshot(confirmed = mapOf(date.toString() to PermitZoneAvailabilityCell(total = 25, remaining = 3)))
         `when`(redisJsonCache.get(key, ZoneBaselineSnapshot::class.java)).thenReturn(previous)
 
         val result = service.looksSuspicious("233261", "343", month, mapOf(date to PermitZoneAvailabilityCell(total = 25, remaining = 25)))
@@ -46,7 +46,8 @@ class ZoneAvailabilityBaselineServiceTest {
 
     @Test
     fun `does not flag a date that was already fully-open and stays fully-open`() {
-        val previous = ZoneBaselineSnapshot(mapOf(date.toString() to PermitZoneAvailabilityCell(total = 25, remaining = 25)))
+        val open = mapOf(date.toString() to PermitZoneAvailabilityCell(total = 25, remaining = 25))
+        val previous = ZoneBaselineSnapshot(confirmed = open, pending = open)
         `when`(redisJsonCache.get(key, ZoneBaselineSnapshot::class.java)).thenReturn(previous)
 
         val result = service.looksSuspicious("233261", "343", month, mapOf(date to PermitZoneAvailabilityCell(total = 25, remaining = 25)))
@@ -55,9 +56,9 @@ class ZoneAvailabilityBaselineServiceTest {
     }
 
     @Test
-    fun `does not flag a date with no corresponding entry in the previous baseline`() {
+    fun `does not flag a date with no corresponding entry in the previous confirmed baseline`() {
         val otherDate = ZonedDateTime.of(2026, 7, 1, 0, 0, 0, 0, ZoneOffset.UTC)
-        val previous = ZoneBaselineSnapshot(mapOf(otherDate.toString() to PermitZoneAvailabilityCell(total = 25, remaining = 3)))
+        val previous = ZoneBaselineSnapshot(confirmed = mapOf(otherDate.toString() to PermitZoneAvailabilityCell(total = 25, remaining = 3)))
         `when`(redisJsonCache.get(key, ZoneBaselineSnapshot::class.java)).thenReturn(previous)
 
         val result = service.looksSuspicious("233261", "343", month, mapOf(date to PermitZoneAvailabilityCell(total = 25, remaining = 25)))
@@ -67,11 +68,52 @@ class ZoneAvailabilityBaselineServiceTest {
 
     @Test
     fun `a partial-to-partial change is not flagged, only a jump straight to fully-open`() {
-        val previous = ZoneBaselineSnapshot(mapOf(date.toString() to PermitZoneAvailabilityCell(total = 25, remaining = 3)))
+        val previous = ZoneBaselineSnapshot(confirmed = mapOf(date.toString() to PermitZoneAvailabilityCell(total = 25, remaining = 3)))
         `when`(redisJsonCache.get(key, ZoneBaselineSnapshot::class.java)).thenReturn(previous)
 
         val result = service.looksSuspicious("233261", "343", month, mapOf(date to PermitZoneAvailabilityCell(total = 25, remaining = 5)))
 
         assertFalse(result)
+    }
+
+    @Test
+    fun `a ghost reading that persists into the next tick is still flagged, not promoted to trusted after one repeat`() {
+        val depleted = mapOf(date.toString() to PermitZoneAvailabilityCell(total = 25, remaining = 3))
+        val full = mapOf(date.toString() to PermitZoneAvailabilityCell(total = 25, remaining = 25))
+        // Tick N: still confirmed depleted, but a full reading was just seen and stashed as pending.
+        val afterFirstFlip = ZoneBaselineSnapshot(confirmed = depleted, pending = full)
+        `when`(redisJsonCache.get(key, ZoneBaselineSnapshot::class.java)).thenReturn(afterFirstFlip)
+
+        // Tick N+1: the same full reading persists. This must still be flagged, because the confirmed
+        // baseline is only promoted to `full` as a side effect of this call, not before it.
+        val result = service.looksSuspicious("233261", "343", month, mapOf(date to PermitZoneAvailabilityCell(total = 25, remaining = 25)))
+
+        assertTrue(result)
+        verify(redisJsonCache).set(eq(key), eq(ZoneBaselineSnapshot(confirmed = full, pending = full)), eq(30L), eq(TimeUnit.MINUTES))
+    }
+
+    @Test
+    fun `does not flag a jump to a different total, since that signals a legitimate quota-definition change`() {
+        // Confirmed live: dates past a division's permit season report a sentinel total (e.g. 900000)
+        // instead of the real quota — remaining goes from 3-of-25 to 900000-of-900000, which looks like
+        // a flip but is really the season boundary, not the same 25-seat quota resetting to full.
+        val previous = ZoneBaselineSnapshot(confirmed = mapOf(date.toString() to PermitZoneAvailabilityCell(total = 25, remaining = 3)))
+        `when`(redisJsonCache.get(key, ZoneBaselineSnapshot::class.java)).thenReturn(previous)
+
+        val result = service.looksSuspicious("233261", "343", month, mapOf(date to PermitZoneAvailabilityCell(total = 900000, remaining = 900000)))
+
+        assertFalse(result)
+    }
+
+    @Test
+    fun `a ghost reading that reverts before being confirmed is not promoted to trusted`() {
+        val depleted = mapOf(date.toString() to PermitZoneAvailabilityCell(total = 25, remaining = 3))
+        val full = mapOf(date.toString() to PermitZoneAvailabilityCell(total = 25, remaining = 25))
+        val afterFirstFlip = ZoneBaselineSnapshot(confirmed = depleted, pending = full)
+        `when`(redisJsonCache.get(key, ZoneBaselineSnapshot::class.java)).thenReturn(afterFirstFlip)
+
+        service.looksSuspicious("233261", "343", month, mapOf(date to PermitZoneAvailabilityCell(total = 25, remaining = 3)))
+
+        verify(redisJsonCache).set(eq(key), eq(ZoneBaselineSnapshot(confirmed = depleted, pending = depleted)), eq(30L), eq(TimeUnit.MINUTES))
     }
 }
