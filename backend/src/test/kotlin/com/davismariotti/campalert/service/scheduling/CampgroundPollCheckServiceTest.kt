@@ -27,10 +27,10 @@ class CampgroundPollCheckServiceTest {
     private val searchRequestRepository = mock(SearchRequestRepository::class.java)
     private val userRepository = mock(UserRepository::class.java)
     private val provider = Provider.RECREATION_GOV
-    private val recreationService = mock(CampgroundAvailabilityProvider::class.java).also {
+    private val availabilityProvider = mock(CampgroundAvailabilityProvider::class.java).also {
         `when`(it.provider).thenReturn(provider)
     }
-    private val registry = CampgroundAvailabilityProviderRegistry(listOf(recreationService))
+    private val registry = CampgroundAvailabilityProviderRegistry(listOf(availabilityProvider))
     private val availabilityStateService = mock(AvailabilityStateService::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
 
@@ -81,7 +81,7 @@ class CampgroundPollCheckServiceTest {
         val evaluated = service.check(provider, campsiteId)
 
         assertEquals(0, evaluated)
-        verify(recreationService, never()).checkAvailability(any(), any(), any())
+        verify(availabilityProvider, never()).checkAvailability(any(), any(), any())
     }
 
     @Test
@@ -92,7 +92,7 @@ class CampgroundPollCheckServiceTest {
         val evaluated = service.check(provider, campsiteId)
 
         assertEquals(0, evaluated)
-        verify(recreationService, never()).checkAvailability(any(), any(), any())
+        verify(availabilityProvider, never()).checkAvailability(any(), any(), any())
     }
 
     @Test
@@ -110,7 +110,7 @@ class CampgroundPollCheckServiceTest {
         val req = request()
         `when`(searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, provider)).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser))
-        `when`(recreationService.checkAvailability(any(), any(), any())).thenReturn(result(req))
+        `when`(availabilityProvider.checkAvailability(any(), any(), any())).thenReturn(result(req))
 
         val evaluated = service.check(provider, campsiteId)
 
@@ -133,7 +133,7 @@ class CampgroundPollCheckServiceTest {
         val req2 = request(id = 2, userId = 2L)
         `when`(searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, provider)).thenReturn(listOf(req1, req2))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser, User(id = 2L, email = "b@example.com", passwordHash = "h")))
-        `when`(recreationService.checkAvailability(any(), any(), any()))
+        `when`(availabilityProvider.checkAvailability(any(), any(), any()))
             .thenReturn(result(req1))
             .thenReturn(result(req2))
 
@@ -148,7 +148,7 @@ class CampgroundPollCheckServiceTest {
         val req = request()
         `when`(searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, provider)).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser))
-        `when`(recreationService.checkAvailability(any(), any(), any())).thenThrow(RuntimeException("Recreation.gov unavailable"))
+        `when`(availabilityProvider.checkAvailability(any(), any(), any())).thenThrow(RuntimeException("provider unavailable"))
 
         service.check(provider, campsiteId)
 
@@ -167,7 +167,7 @@ class CampgroundPollCheckServiceTest {
         val req = request()
         `when`(searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, provider)).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser))
-        `when`(recreationService.checkAvailability(any(), any(), any())).thenReturn(result(req))
+        `when`(availabilityProvider.checkAvailability(any(), any(), any())).thenReturn(result(req))
         doThrow(RuntimeException("DB failure")).`when`(availabilityStateService).processUserResults(any(), any())
 
         service.check(provider, campsiteId)

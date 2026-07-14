@@ -32,7 +32,7 @@ class CampgroundPollCheckService(
 
     /** Returns the number of active requests evaluated this cycle (for instrumentation). */
     fun check(provider: Provider, campsiteId: Int): Int {
-        val recreationService = campgroundAvailabilityProviderRegistry.forProvider(provider)
+        val availabilityProvider = campgroundAvailabilityProviderRegistry.forProvider(provider)
         val allRequests = searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, provider)
         if (allRequests.isEmpty()) return 0
 
@@ -54,7 +54,7 @@ class CampgroundPollCheckService(
         val valid = active.filter { userMap.containsKey(it.userId) }
         if (valid.isEmpty()) return 0
 
-        val cache = recreationService.newCheckCycleCache()
+        val cache = availabilityProvider.newCheckCycleCache()
         val resultsByUser = valid
             .mapNotNull { it.userId }
             .distinct()
@@ -65,7 +65,7 @@ class CampgroundPollCheckService(
             val uid = request.userId!!
             try {
                 val user = userMap[uid]!!
-                val result = recreationService.checkAvailability(request, user, cache)
+                val result = availabilityProvider.checkAvailability(request, user, cache)
                 resultsByUser[uid]!!.add(result)
             } catch (e: Exception) {
                 log.error("Error processing requestId={}", request.id, e)
