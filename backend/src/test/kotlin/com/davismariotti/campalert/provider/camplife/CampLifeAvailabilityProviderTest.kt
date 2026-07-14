@@ -4,6 +4,7 @@ import com.davismariotti.campalert.model.CampLifeSearchRequestDetails
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.provider.CallProtection
 import com.davismariotti.campalert.provider.Provider
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
@@ -27,11 +28,12 @@ import kotlin.test.assertTrue
 class CampLifeAvailabilityProviderTest {
     private val campLifeApi = mock(CampLifeApi::class.java)
     private val campLifeCatalogCache = mock(CampLifeCatalogCache::class.java)
-    private val callProtection =
-        CampLifeCallProtection(
-            CircuitBreakerRegistry.of(CircuitBreakerConfig.ofDefaults()),
-            RetryRegistry.of(RetryConfig.ofDefaults()),
-        )
+    private val callProtection: CallProtection =
+        CallProtection
+            .Builder("camplife")
+            .circuitBreaker(CircuitBreakerRegistry.of(CircuitBreakerConfig.ofDefaults()))
+            .retry(RetryRegistry.of(RetryConfig.ofDefaults()))
+            .build()
 
     private val provider =
         CampLifeAvailabilityProvider(

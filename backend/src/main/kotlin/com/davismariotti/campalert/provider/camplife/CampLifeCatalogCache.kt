@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.provider.camplife
 
+import com.davismariotti.campalert.provider.CallProtection
 import com.davismariotti.campalert.service.redis.RedisJsonCache
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
@@ -28,7 +29,7 @@ data class CampLifeCachedEntry<T>(
 class CampLifeCatalogCache(
     private val campLifeApi: CampLifeApi,
     private val redisJsonCache: RedisJsonCache,
-    private val callProtection: CampLifeCallProtection,
+    @Qualifier("campLifeCallProtection") private val callProtection: CallProtection,
     private val properties: CampLifeCatalogProperties,
     @Qualifier("campLifeCatalogExecutor") private val executor: TaskExecutor,
 ) {

@@ -6,6 +6,7 @@ import com.davismariotti.campalert.model.PermitSearchRequest
 import com.davismariotti.campalert.model.PermitSearchRequestState
 import com.davismariotti.campalert.model.PermitZoneTarget
 import com.davismariotti.campalert.model.SearchType
+import com.davismariotti.campalert.provider.CallProtection
 import com.davismariotti.campalert.provider.recreation.PermitContentResponse
 import com.davismariotti.campalert.provider.recreation.PermitDivisionType
 import com.davismariotti.campalert.provider.recreation.PermitItineraryAvailabilityCell
@@ -18,7 +19,6 @@ import com.davismariotti.campalert.provider.recreation.PermitZoneAvailabilityPay
 import com.davismariotti.campalert.provider.recreation.PermitZoneAvailabilityResponse
 import com.davismariotti.campalert.provider.recreation.PermitZoneDivisionAvailability
 import com.davismariotti.campalert.provider.recreation.RecreationApi
-import com.davismariotti.campalert.provider.recreation.RecreationGovCallProtection
 import com.davismariotti.campalert.provider.recreation.SearchEntityType
 import com.davismariotti.campalert.provider.recreation.SearchSuggestResponse
 import com.fasterxml.jackson.databind.DeserializationFeature
@@ -61,7 +61,12 @@ class PermitAvailabilityMatcherTest {
             .timeoutDuration(java.time.Duration.ofSeconds(5))
             .build(),
     )
-    private val callProtection = RecreationGovCallProtection(circuitBreakerRegistry, retryRegistry, rateLimiterRegistry)
+    private val callProtection: CallProtection = CallProtection
+        .Builder("recreation-gov")
+        .circuitBreaker(circuitBreakerRegistry)
+        .retry(retryRegistry)
+        .rateLimiter(rateLimiterRegistry)
+        .build()
 
     // Unstubbed Boolean-returning methods default to false in Mockito, so every existing test here
     // sees "not suspicious" unless a test explicitly stubs looksSuspicious to return true.

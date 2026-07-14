@@ -2,6 +2,7 @@ package com.davismariotti.campalert.provider.recreation
 
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.provider.CallProtection
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.provider.recreation.Campsite.Companion.mergeWith
 import com.davismariotti.campalert.service.availability.AvailabilityResult
@@ -9,6 +10,7 @@ import com.davismariotti.campalert.service.availability.CampgroundAvailabilityPr
 import com.davismariotti.campalert.service.availability.CheckCycleCache
 import com.davismariotti.campalert.util.sleepJitter
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.time.LocalDate
@@ -22,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap
 @Service
 class RecreationServiceImpl(
     val recreationApi: RecreationApi,
-    private val callProtection: RecreationGovCallProtection,
+    @Qualifier("recreationGovCallProtection") private val callProtection: CallProtection,
     @param:Value($$"${campfinder.polling.request-jitter-ms:0}") private val requestJitterMs: Long = 0,
 ) : CampgroundAvailabilityProvider {
     private val log = LoggerFactory.getLogger(javaClass)

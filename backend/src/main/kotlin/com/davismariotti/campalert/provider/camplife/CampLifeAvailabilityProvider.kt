@@ -2,6 +2,7 @@ package com.davismariotti.campalert.provider.camplife
 
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.provider.CallProtection
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.service.availability.AvailabilityResult
 import com.davismariotti.campalert.service.availability.CampgroundAvailabilityProvider
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -25,7 +27,7 @@ import java.time.format.DateTimeFormatter
 @Service
 class CampLifeAvailabilityProvider(
     private val campLifeApi: CampLifeApi,
-    private val callProtection: CampLifeCallProtection,
+    @Qualifier("campLifeCallProtection") private val callProtection: CallProtection,
     private val campLifeCatalogCache: CampLifeCatalogCache,
 ) : CampgroundAvailabilityProvider {
     private val log = LoggerFactory.getLogger(javaClass)
