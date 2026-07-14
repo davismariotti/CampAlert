@@ -1,4 +1,4 @@
-package com.davismariotti.campalert.camplife
+package com.davismariotti.campalert.provider.camplife
 
 import com.davismariotti.campalert.model.CampLifeSearchRequestDetails
 import com.davismariotti.campalert.model.SearchRequest
@@ -25,16 +25,16 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CampLifeAvailabilityProviderTest {
-    private val campLifeApi = mock(_root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeApi::class.java)
-    private val campLifeCatalogCache = mock(_root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeCatalogCache::class.java)
+    private val campLifeApi = mock(CampLifeApi::class.java)
+    private val campLifeCatalogCache = mock(CampLifeCatalogCache::class.java)
     private val callProtection =
-        _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeCallProtection(
+        CampLifeCallProtection(
             CircuitBreakerRegistry.of(CircuitBreakerConfig.ofDefaults()),
             RetryRegistry.of(RetryConfig.ofDefaults()),
         )
 
     private val provider =
-        _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeAvailabilityProvider(
+        CampLifeAvailabilityProvider(
             campLifeApi,
             callProtection,
             campLifeCatalogCache
@@ -74,14 +74,14 @@ class CampLifeAvailabilityProviderTest {
     }
 
     private fun catalog() =
-        _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeSessionResponse(
+        CampLifeSessionResponse(
             siteMap = mapOf(
-                "101" to _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeSite(
+                "101" to CampLifeSite(
                     id = 101,
                     typeName = "RV Hookups",
                     maxOccupants = 6
                 ),
-                "102" to _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeSite(
+                "102" to CampLifeSite(
                     id = 102,
                     typeName = "Tent Only",
                     maxOccupants = 4
@@ -89,15 +89,15 @@ class CampLifeAvailabilityProviderTest {
             ),
         )
 
-    private fun mockAvailabilityCall(response: Response<com.davismariotti.campalert.provider.camplife.CampLifeAvailabilityResponse>) {
+    private fun mockAvailabilityCall(response: Response<CampLifeAvailabilityResponse>) {
         @Suppress("UNCHECKED_CAST")
-        val call = mock(Call::class.java) as Call<com.davismariotti.campalert.provider.camplife.CampLifeAvailabilityResponse>
+        val call = mock(Call::class.java) as Call<CampLifeAvailabilityResponse>
         `when`(call.execute()).thenReturn(response)
         `when`(campLifeApi.getAvailability(org.mockito.kotlin.eq(campgroundId.toString()), org.mockito.kotlin.any())).thenReturn(call)
     }
 
-    private fun capturedRequestBody(): com.davismariotti.campalert.provider.camplife.CampLifeAvailabilityRequest {
-        val captor = argumentCaptor<com.davismariotti.campalert.provider.camplife.CampLifeAvailabilityRequest>()
+    private fun capturedRequestBody(): CampLifeAvailabilityRequest {
+        val captor = argumentCaptor<CampLifeAvailabilityRequest>()
         verify(campLifeApi).getAvailability(org.mockito.kotlin.eq(campgroundId.toString()), captor.capture())
         return captor.firstValue
     }
@@ -106,11 +106,10 @@ class CampLifeAvailabilityProviderTest {
     fun `sites available and not excluded by isFiltered are returned`() {
         mockAvailabilityCall(
             Response.success(
-                _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeAvailabilityResponse(
+                CampLifeAvailabilityResponse(
                     sites = listOf(
-                        _root_ide_package_.com.davismariotti.campalert.provider.camplife
-                            .CampLifeAvailableSite(101),
-                        _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeAvailableSite(
+                        CampLifeAvailableSite(101),
+                        CampLifeAvailableSite(
                             102,
                             isFiltered = true
                         )
@@ -131,12 +130,10 @@ class CampLifeAvailabilityProviderTest {
     fun `site_ids scoping is authoritative and omits siteTypeId from the request`() {
         mockAvailabilityCall(
             Response.success(
-                _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeAvailabilityResponse(
+                CampLifeAvailabilityResponse(
                     sites = listOf(
-                        _root_ide_package_.com.davismariotti.campalert.provider.camplife
-                            .CampLifeAvailableSite(101),
-                        _root_ide_package_.com.davismariotti.campalert.provider.camplife
-                            .CampLifeAvailableSite(102)
+                        CampLifeAvailableSite(101),
+                        CampLifeAvailableSite(102)
                     )
                 )
             )
@@ -154,9 +151,9 @@ class CampLifeAvailabilityProviderTest {
     fun `siteTypeId and amenityIds are sent through to the availability request when no site_ids are set`() {
         mockAvailabilityCall(
             Response.success(
-                _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeAvailabilityResponse(
+                CampLifeAvailabilityResponse(
                     sites = listOf(
-                        _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeAvailableSite(
+                        CampLifeAvailableSite(
                             101
                         )
                     )
@@ -176,9 +173,9 @@ class CampLifeAvailabilityProviderTest {
     fun `group size above max occupancy is excluded`() {
         mockAvailabilityCall(
             Response.success(
-                _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeAvailabilityResponse(
+                CampLifeAvailabilityResponse(
                     sites = listOf(
-                        _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeAvailableSite(
+                        CampLifeAvailableSite(
                             102
                         )
                     )
@@ -196,7 +193,7 @@ class CampLifeAvailabilityProviderTest {
     fun `empty sites with no warnings resolves to zero availability`() {
         mockAvailabilityCall(
             Response.success(
-                _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeAvailabilityResponse(
+                CampLifeAvailabilityResponse(
                     sites = emptyList()
                 )
             )
@@ -212,7 +209,7 @@ class CampLifeAvailabilityProviderTest {
     @Test
     fun `HTTP 400 same-day error resolves to zero availability without throwing`() {
         val errorJson = """{"sites":[],"errors":{"general":[{"message":"Same Day reservations are not allowed online."}]}}"""
-        val errorResponse = Response.error<com.davismariotti.campalert.provider.camplife.CampLifeAvailabilityResponse>(
+        val errorResponse = Response.error<CampLifeAvailabilityResponse>(
             400,
             errorJson.toResponseBody("application/json".toMediaType()),
         )
@@ -228,12 +225,11 @@ class CampLifeAvailabilityProviderTest {
     fun `HTTP 200 with minimum-stay warning resolves to zero availability`() {
         mockAvailabilityCall(
             Response.success(
-                _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeAvailabilityResponse(
+                CampLifeAvailabilityResponse(
                     sites = emptyList(),
-                    warnings = _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeMessages(
+                    warnings = CampLifeMessages(
                         general = listOf(
-                            _root_ide_package_.com.davismariotti.campalert.provider.camplife
-                                .CampLifeMessage("Additional sites may be available with a 2 night minimum")
+                            CampLifeMessage("Additional sites may be available with a 2 night minimum")
                         )
                     ),
                 ),
@@ -248,7 +244,7 @@ class CampLifeAvailabilityProviderTest {
     @Test
     fun `exception during availability call resolves to zero availability`() {
         @Suppress("UNCHECKED_CAST")
-        val call = mock(Call::class.java) as Call<com.davismariotti.campalert.provider.camplife.CampLifeAvailabilityResponse>
+        val call = mock(Call::class.java) as Call<CampLifeAvailabilityResponse>
         `when`(call.execute()).thenThrow(RuntimeException("network error"))
         `when`(campLifeApi.getAvailability(org.mockito.kotlin.eq(campgroundId.toString()), org.mockito.kotlin.any())).thenReturn(call)
 

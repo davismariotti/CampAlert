@@ -1,4 +1,4 @@
-package com.davismariotti.campalert.camplife
+package com.davismariotti.campalert.provider.camplife
 
 import com.davismariotti.campalert.service.redis.RedisJsonCache
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
@@ -23,14 +23,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CampLifeCatalogCacheTest {
-    private val campLifeApi = mock(_root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeApi::class.java)
+    private val campLifeApi = mock(CampLifeApi::class.java)
     private val redisJsonCache = mock(RedisJsonCache::class.java)
     private val callProtection =
-        _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeCallProtection(
+        CampLifeCallProtection(
             CircuitBreakerRegistry.of(CircuitBreakerConfig.ofDefaults()),
             RetryRegistry.of(RetryConfig.ofDefaults()),
         )
-    private val properties = _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeCatalogProperties(
+    private val properties = CampLifeCatalogProperties(
         ttlDays = 7,
         staleAfterDays = 3
     )
@@ -40,7 +40,7 @@ class CampLifeCatalogCacheTest {
         initialize()
     }
 
-    private val cache = _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeCatalogCache(
+    private val cache = CampLifeCatalogCache(
         campLifeApi,
         redisJsonCache,
         callProtection,
@@ -48,9 +48,9 @@ class CampLifeCatalogCacheTest {
         executor
     )
 
-    private fun mockDirectoryCall(entries: List<com.davismariotti.campalert.provider.camplife.CampLifeDirectoryEntry>, latch: CountDownLatch? = null) {
+    private fun mockDirectoryCall(entries: List<CampLifeDirectoryEntry>, latch: CountDownLatch? = null) {
         @Suppress("UNCHECKED_CAST")
-        val call = mock(Call::class.java) as Call<List<com.davismariotti.campalert.provider.camplife.CampLifeDirectoryEntry>>
+        val call = mock(Call::class.java) as Call<List<CampLifeDirectoryEntry>>
         `when`(call.execute()).thenAnswer {
             latch?.countDown()
             Response.success(entries)
@@ -62,13 +62,13 @@ class CampLifeCatalogCacheTest {
     fun `cold cache fetches and stores the directory`() {
         mockDirectoryCall(
             listOf(
-                _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeDirectoryEntry(
+                CampLifeDirectoryEntry(
                     id = 1,
                     name = "A"
                 )
             )
         )
-        `when`(redisJsonCache.get(any<String>(), any<tools.jackson.core.type.TypeReference<com.davismariotti.campalert.provider.camplife.CampLifeCachedEntry<List<com.davismariotti.campalert.provider.camplife.CampLifeDirectoryEntry>>>>())).thenReturn(null)
+        `when`(redisJsonCache.get(any<String>(), any<tools.jackson.core.type.TypeReference<CampLifeCachedEntry<List<CampLifeDirectoryEntry>>>>())).thenReturn(null)
 
         val result = cache.getDirectory()
 
@@ -80,29 +80,29 @@ class CampLifeCatalogCacheTest {
     fun `fresh cache is served without triggering a refresh`() {
         mockDirectoryCall(
             listOf(
-                _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeDirectoryEntry(
+                CampLifeDirectoryEntry(
                     id = 1,
                     name = "A"
                 )
             )
         )
-        val fresh = _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeCachedEntry(
+        val fresh = CampLifeCachedEntry(
             Instant.now().minus(1, java.time.temporal.ChronoUnit.DAYS),
             listOf(
-                _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeDirectoryEntry(
+                CampLifeDirectoryEntry(
                     id = 2,
                     name = "cached"
                 )
             )
         )
-        `when`(redisJsonCache.get(any<String>(), any<tools.jackson.core.type.TypeReference<com.davismariotti.campalert.provider.camplife.CampLifeCachedEntry<List<com.davismariotti.campalert.provider.camplife.CampLifeDirectoryEntry>>>>())).thenReturn(fresh)
+        `when`(redisJsonCache.get(any<String>(), any<tools.jackson.core.type.TypeReference<CampLifeCachedEntry<List<CampLifeDirectoryEntry>>>>())).thenReturn(fresh)
 
         val result = cache.getDirectory()
         executor.threadPoolExecutor.awaitTermination(200, TimeUnit.MILLISECONDS)
 
         assertEquals(
             listOf(
-                _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeDirectoryEntry(
+                CampLifeDirectoryEntry(
                     id = 2,
                     name = "cached"
                 )
@@ -117,23 +117,23 @@ class CampLifeCatalogCacheTest {
         val fetchLatch = CountDownLatch(1)
         mockDirectoryCall(
             listOf(
-                _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeDirectoryEntry(
+                CampLifeDirectoryEntry(
                     id = 1,
                     name = "refreshed"
                 )
             ),
             fetchLatch
         )
-        val stale = _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeCachedEntry(
+        val stale = CampLifeCachedEntry(
             Instant.now().minus(4, java.time.temporal.ChronoUnit.DAYS),
             listOf(
-                _root_ide_package_.com.davismariotti.campalert.provider.camplife.CampLifeDirectoryEntry(
+                CampLifeDirectoryEntry(
                     id = 2,
                     name = "stale-cached"
                 )
             )
         )
-        `when`(redisJsonCache.get(any<String>(), any<tools.jackson.core.type.TypeReference<com.davismariotti.campalert.provider.camplife.CampLifeCachedEntry<List<com.davismariotti.campalert.provider.camplife.CampLifeDirectoryEntry>>>>())).thenReturn(stale)
+        `when`(redisJsonCache.get(any<String>(), any<tools.jackson.core.type.TypeReference<CampLifeCachedEntry<List<CampLifeDirectoryEntry>>>>())).thenReturn(stale)
 
         val guard = AtomicLong(0)
         `when`(redisJsonCache.increment(any(), org.mockito.kotlin.any(), org.mockito.kotlin.any())).thenAnswer { guard.incrementAndGet() }
@@ -158,7 +158,7 @@ class CampLifeCatalogCacheTest {
     @Test
     fun `failed refresh leaves the prior cached value in place`() {
         @Suppress("UNCHECKED_CAST")
-        val call = mock(Call::class.java) as Call<List<com.davismariotti.campalert.provider.camplife.CampLifeDirectoryEntry>>
+        val call = mock(Call::class.java) as Call<List<CampLifeDirectoryEntry>>
         `when`(call.execute()).thenThrow(RuntimeException("network error"))
         `when`(campLifeApi.getDirectory(any(), any())).thenReturn(call)
 

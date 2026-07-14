@@ -21,4 +21,11 @@ class HttpHealthIndicatorTest {
         assertEquals(Status.DOWN, health.status)
         assertEquals(true, health.details.containsKey("reason"))
     }
+
+    @Test
+    fun `CampLife DOWN on connection error includes reason detail`() {
+        val health = CampLifeHealthIndicator(unreachableUrl).health()
+        assertEquals(Status.DOWN, health.status)
+        assertEquals(true, health.details.containsKey("reason"))
+    }
 }
