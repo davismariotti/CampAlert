@@ -2,12 +2,12 @@ package com.davismariotti.campalert.delegate
 
 import com.davismariotti.campalert.api.model.CreateSearchRequestBody
 import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
-import com.davismariotti.campalert.camplife.CampLifeCatalogCache
 import com.davismariotti.campalert.model.PhoneNumberStatus
-import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.provider.Provider
+import com.davismariotti.campalert.provider.camplife.CampLifeCatalogCache
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository

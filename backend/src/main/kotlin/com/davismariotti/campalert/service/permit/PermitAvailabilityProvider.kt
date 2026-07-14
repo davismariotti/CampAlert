@@ -1,7 +1,7 @@
 package com.davismariotti.campalert.service.permit
 
 import com.davismariotti.campalert.model.PermitSearchRequest
-import com.davismariotti.campalert.model.Provider
+import com.davismariotti.campalert.provider.Provider
 
 interface PermitAvailabilityProvider {
     val provider: Provider

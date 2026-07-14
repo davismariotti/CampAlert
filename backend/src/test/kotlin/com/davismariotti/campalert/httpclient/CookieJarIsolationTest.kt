@@ -1,7 +1,7 @@
 package com.davismariotti.campalert.httpclient
 
-import com.davismariotti.campalert.camplife.CampLifeConfiguration
-import com.davismariotti.campalert.recreation.RecreationConfiguration
+import com.davismariotti.campalert.provider.camplife.CampLifeConfiguration
+import com.davismariotti.campalert.provider.recreation.RecreationConfiguration
 import org.junit.jupiter.api.Test
 import kotlin.test.assertNotSame
 import kotlin.test.assertTrue

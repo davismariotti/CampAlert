@@ -1,7 +1,7 @@
 package com.davismariotti.campalert.service.permit
 
-import com.davismariotti.campalert.recreation.PermitContentPayload
-import com.davismariotti.campalert.recreation.PermitDivisionContent
+import com.davismariotti.campalert.provider.recreation.PermitContentPayload
+import com.davismariotti.campalert.provider.recreation.PermitDivisionContent
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test

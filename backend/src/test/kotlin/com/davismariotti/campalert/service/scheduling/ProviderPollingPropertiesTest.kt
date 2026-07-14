@@ -2,7 +2,7 @@ package com.davismariotti.campalert.service.scheduling
 
 import com.davismariotti.campalert.config.ProviderPollingInterval
 import com.davismariotti.campalert.config.ProviderPollingIntervalsProperties
-import com.davismariotti.campalert.model.Provider
+import com.davismariotti.campalert.provider.Provider
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 

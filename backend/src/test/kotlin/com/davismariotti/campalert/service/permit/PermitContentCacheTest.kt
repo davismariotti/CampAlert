@@ -1,11 +1,11 @@
 package com.davismariotti.campalert.service.permit
 
-import com.davismariotti.campalert.recreation.PermitContentPayload
-import com.davismariotti.campalert.recreation.PermitContentResponse
-import com.davismariotti.campalert.recreation.PermitDivisionContent
-import com.davismariotti.campalert.recreation.PermitDivisionType
-import com.davismariotti.campalert.recreation.PermitRuleContent
-import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.provider.recreation.PermitContentPayload
+import com.davismariotti.campalert.provider.recreation.PermitContentResponse
+import com.davismariotti.campalert.provider.recreation.PermitDivisionContent
+import com.davismariotti.campalert.provider.recreation.PermitDivisionType
+import com.davismariotti.campalert.provider.recreation.PermitRuleContent
+import com.davismariotti.campalert.provider.recreation.RecreationApi
 import com.davismariotti.campalert.service.redis.RedisJsonCache
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry

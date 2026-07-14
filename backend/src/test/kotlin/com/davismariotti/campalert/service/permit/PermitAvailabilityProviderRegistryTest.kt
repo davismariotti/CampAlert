@@ -1,7 +1,7 @@
 package com.davismariotti.campalert.service.permit
 
 import com.davismariotti.campalert.model.PermitSearchRequest
-import com.davismariotti.campalert.model.Provider
+import com.davismariotti.campalert.provider.Provider
 import org.junit.jupiter.api.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame

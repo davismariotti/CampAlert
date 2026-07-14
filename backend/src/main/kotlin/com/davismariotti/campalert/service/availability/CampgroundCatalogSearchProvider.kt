@@ -1,7 +1,7 @@
 package com.davismariotti.campalert.service.availability
 
 import com.davismariotti.campalert.api.model.CampgroundSearchResult
-import com.davismariotti.campalert.model.Provider
+import com.davismariotti.campalert.provider.Provider
 
 /**
  * A provider's own catalog search strategy (design.md decision 7 / catalog-search-provider-scoping)

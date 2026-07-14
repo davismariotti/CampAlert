@@ -3,9 +3,9 @@ package com.davismariotti.campalert.support
 import com.davismariotti.campalert.api.model.LoginBody
 import com.davismariotti.campalert.api.model.RegisterBody
 import com.davismariotti.campalert.api.model.VerifyEmailBody
-import com.davismariotti.campalert.camplife.CampLifeApi
-import com.davismariotti.campalert.recreation.RecreationApi
-import com.davismariotti.campalert.recreation.RidbApi
+import com.davismariotti.campalert.provider.camplife.CampLifeApi
+import com.davismariotti.campalert.provider.recreation.RecreationApi
+import com.davismariotti.campalert.provider.recreation.RidbApi
 import com.davismariotti.campalert.service.sms.TwilioVerifyService
 import com.davismariotti.notifications.EmailSender
 import com.davismariotti.notifications.PushoverSender

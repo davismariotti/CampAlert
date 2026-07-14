@@ -1,6 +1,6 @@
 package com.davismariotti.campalert.service.permit
 
-import com.davismariotti.campalert.recreation.PermitZoneAvailabilityCell
+import com.davismariotti.campalert.provider.recreation.PermitZoneAvailabilityCell
 import com.davismariotti.campalert.service.redis.RedisJsonCache
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
