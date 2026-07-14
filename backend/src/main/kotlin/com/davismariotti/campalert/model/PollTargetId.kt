@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.model
 
+import com.davismariotti.campalert.provider.Provider
 import jakarta.persistence.Column
 import jakarta.persistence.Embeddable
 import jakarta.persistence.EnumType

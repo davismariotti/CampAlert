@@ -1,12 +1,12 @@
 package com.davismariotti.campalert.campground
 
-import com.davismariotti.campalert.recreation.AvailabilityType
-import com.davismariotti.campalert.recreation.Campground
-import com.davismariotti.campalert.recreation.Campsite
-import com.davismariotti.campalert.recreation.RidbCampsite
-import com.davismariotti.campalert.recreation.RidbCampsitesResponse
-import com.davismariotti.campalert.recreation.RidbFacilitiesResponse
-import com.davismariotti.campalert.recreation.RidbFacility
+import com.davismariotti.campalert.provider.recreation.AvailabilityType
+import com.davismariotti.campalert.provider.recreation.Campground
+import com.davismariotti.campalert.provider.recreation.Campsite
+import com.davismariotti.campalert.provider.recreation.RidbCampsite
+import com.davismariotti.campalert.provider.recreation.RidbCampsitesResponse
+import com.davismariotti.campalert.provider.recreation.RidbFacilitiesResponse
+import com.davismariotti.campalert.provider.recreation.RidbFacility
 import com.davismariotti.campalert.support.IntegrationTestBase
 import jakarta.servlet.http.Cookie
 import okhttp3.ResponseBody.Companion.toResponseBody

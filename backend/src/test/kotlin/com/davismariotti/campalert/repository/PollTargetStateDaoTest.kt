@@ -1,8 +1,8 @@
 package com.davismariotti.campalert.repository
 
 import com.davismariotti.campalert.model.PollTargetId
-import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.TargetType
+import com.davismariotti.campalert.provider.Provider
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock

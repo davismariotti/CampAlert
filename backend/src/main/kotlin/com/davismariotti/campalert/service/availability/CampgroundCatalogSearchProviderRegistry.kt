@@ -1,6 +1,6 @@
 package com.davismariotti.campalert.service.availability
 
-import com.davismariotti.campalert.model.Provider
+import com.davismariotti.campalert.provider.Provider
 import org.springframework.stereotype.Service
 
 @Service

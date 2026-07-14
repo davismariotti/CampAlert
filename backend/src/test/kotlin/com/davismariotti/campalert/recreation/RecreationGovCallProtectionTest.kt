@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.recreation
 
+import com.davismariotti.campalert.provider.recreation.RecreationGovCallProtection
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.github.resilience4j.ratelimiter.RateLimiterConfig

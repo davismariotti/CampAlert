@@ -2,10 +2,10 @@ package com.davismariotti.campalert.delegate
 
 import com.davismariotti.campalert.api.model.CampgroundSearchResult
 import com.davismariotti.campalert.api.model.ProviderType
-import com.davismariotti.campalert.camplife.CampLifeCatalogCache
-import com.davismariotti.campalert.model.Provider
-import com.davismariotti.campalert.recreation.RecreationApi
-import com.davismariotti.campalert.recreation.RidbApi
+import com.davismariotti.campalert.provider.Provider
+import com.davismariotti.campalert.provider.camplife.CampLifeCatalogCache
+import com.davismariotti.campalert.provider.recreation.RecreationApi
+import com.davismariotti.campalert.provider.recreation.RidbApi
 import com.davismariotti.campalert.service.availability.CampgroundCatalogSearchProvider
 import com.davismariotti.campalert.service.availability.CampgroundCatalogSearchProviderRegistry
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig

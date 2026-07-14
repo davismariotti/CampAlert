@@ -1,7 +1,7 @@
 package com.davismariotti.campalert.service.permit
 
-import com.davismariotti.campalert.recreation.PermitContentPayload
-import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.provider.recreation.PermitContentPayload
+import com.davismariotti.campalert.provider.recreation.RecreationApi
 import com.davismariotti.campalert.service.redis.RedisJsonCache
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.github.resilience4j.retry.RetryRegistry

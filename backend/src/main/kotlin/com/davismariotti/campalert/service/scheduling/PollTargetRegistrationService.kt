@@ -1,7 +1,7 @@
 package com.davismariotti.campalert.service.scheduling
 
-import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.TargetType
+import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.repository.PollTargetStateDao
 import org.springframework.stereotype.Service
 

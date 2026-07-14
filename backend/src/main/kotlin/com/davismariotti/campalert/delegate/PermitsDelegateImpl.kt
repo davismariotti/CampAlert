@@ -9,12 +9,12 @@ import com.davismariotti.campalert.api.model.PermitResponse
 import com.davismariotti.campalert.api.model.PermitSearchResult
 import com.davismariotti.campalert.api.model.PermitZoneAvailabilityPreviewResponse
 import com.davismariotti.campalert.api.model.ProviderType
-import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchType
-import com.davismariotti.campalert.recreation.PermitRuleContent
-import com.davismariotti.campalert.recreation.PermitRuleName
-import com.davismariotti.campalert.recreation.RecreationApi
-import com.davismariotti.campalert.recreation.SearchEntityType
+import com.davismariotti.campalert.provider.Provider
+import com.davismariotti.campalert.provider.recreation.PermitRuleContent
+import com.davismariotti.campalert.provider.recreation.PermitRuleName
+import com.davismariotti.campalert.provider.recreation.RecreationApi
+import com.davismariotti.campalert.provider.recreation.SearchEntityType
 import com.davismariotti.campalert.service.permit.PermitClassificationService
 import com.davismariotti.campalert.service.permit.PermitContentCache
 import com.davismariotti.campalert.util.naturalOrder

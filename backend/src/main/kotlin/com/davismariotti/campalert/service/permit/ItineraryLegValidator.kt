@@ -1,6 +1,6 @@
 package com.davismariotti.campalert.service.permit
 
-import com.davismariotti.campalert.recreation.PermitContentPayload
+import com.davismariotti.campalert.provider.recreation.PermitContentPayload
 
 sealed interface LegValidationResult {
     data object Valid : LegValidationResult

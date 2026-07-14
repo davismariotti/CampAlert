@@ -1,11 +1,11 @@
 package com.davismariotti.campalert.service.notification
 
 import com.davismariotti.campalert.model.OutboxType
-import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.notification.CampsiteAlertNotification
 import com.davismariotti.campalert.notification.PendingNotification
+import com.davismariotti.campalert.provider.Provider
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test

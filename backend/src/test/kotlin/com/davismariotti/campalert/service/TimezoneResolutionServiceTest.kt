@@ -1,11 +1,11 @@
 package com.davismariotti.campalert.service
 
-import com.davismariotti.campalert.camplife.CampLifeCatalogCache
-import com.davismariotti.campalert.camplife.CampLifeDirectoryEntry
-import com.davismariotti.campalert.model.Provider
-import com.davismariotti.campalert.recreation.RidbApi
-import com.davismariotti.campalert.recreation.RidbFacility
-import com.davismariotti.campalert.recreation.RidbFacilityResponse
+import com.davismariotti.campalert.provider.Provider
+import com.davismariotti.campalert.provider.camplife.CampLifeCatalogCache
+import com.davismariotti.campalert.provider.camplife.CampLifeDirectoryEntry
+import com.davismariotti.campalert.provider.recreation.RidbApi
+import com.davismariotti.campalert.provider.recreation.RidbFacility
+import com.davismariotti.campalert.provider.recreation.RidbFacilityResponse
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry

@@ -2,11 +2,11 @@ package com.davismariotti.campalert.repository
 
 import com.davismariotti.campalert.model.PollTargetId
 import com.davismariotti.campalert.model.PollTargetState
-import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.TargetType
 import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.support.IntegrationTestBase
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach

@@ -1,14 +1,14 @@
 package com.davismariotti.campalert.service.permit
 
 import com.davismariotti.campalert.model.PermitSearchRequest
-import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchType
-import com.davismariotti.campalert.recreation.PermitItineraryAvailabilityPayload
-import com.davismariotti.campalert.recreation.PermitQuotaType
-import com.davismariotti.campalert.recreation.PermitZoneAvailabilityPayload
-import com.davismariotti.campalert.recreation.RawResponseCapture
-import com.davismariotti.campalert.recreation.RecreationApi
-import com.davismariotti.campalert.recreation.RecreationGovCallProtection
+import com.davismariotti.campalert.provider.Provider
+import com.davismariotti.campalert.provider.recreation.PermitItineraryAvailabilityPayload
+import com.davismariotti.campalert.provider.recreation.PermitQuotaType
+import com.davismariotti.campalert.provider.recreation.PermitZoneAvailabilityPayload
+import com.davismariotti.campalert.provider.recreation.RawResponseCapture
+import com.davismariotti.campalert.provider.recreation.RecreationApi
+import com.davismariotti.campalert.provider.recreation.RecreationGovCallProtection
 import com.davismariotti.campalert.util.sleepJitter
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -32,7 +32,7 @@ typealias ItineraryAvailabilityCache = ConcurrentHashMap<Triple<String, String, 
  * Implements the two permit matching semantics from design decision 3: zone is OR-across-accepted-
  * divisions-and-dates-in-window; itinerary is AND-across-every-ordered-leg. Both caches are scoped to
  * one check cycle and passed in by the caller (see [PermitPollCheckService]), mirroring
- * [com.davismariotti.campalert.recreation.RecreationServiceImpl]'s `(campsiteId, YearMonth)`
+ * [com.davismariotti.campalert.provider.recreation.RecreationServiceImpl]'s `(campsiteId, YearMonth)`
  * dedup cache — one fetch per (permit, month) or (permit, division, month) across every request being
  * processed in a cycle, not one per request.
  */

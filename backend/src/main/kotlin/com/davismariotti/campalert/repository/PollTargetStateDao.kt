@@ -1,8 +1,8 @@
 package com.davismariotti.campalert.repository
 
 import com.davismariotti.campalert.model.PollTargetId
-import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.TargetType
+import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.service.scheduling.PollTargetPhase
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository

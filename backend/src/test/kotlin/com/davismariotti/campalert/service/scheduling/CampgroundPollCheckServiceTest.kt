@@ -1,9 +1,9 @@
 package com.davismariotti.campalert.service.scheduling
 
-import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.availability.AvailabilityResult

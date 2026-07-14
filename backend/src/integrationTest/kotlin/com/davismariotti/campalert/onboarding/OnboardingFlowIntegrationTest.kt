@@ -3,8 +3,8 @@ package com.davismariotti.campalert.onboarding
 import com.davismariotti.campalert.api.model.AddPhoneNumberBody
 import com.davismariotti.campalert.api.model.CreateSearchRequestBody
 import com.davismariotti.campalert.api.model.VerifyPhoneNumberBody
-import com.davismariotti.campalert.recreation.RidbFacility
-import com.davismariotti.campalert.recreation.RidbFacilityResponse
+import com.davismariotti.campalert.provider.recreation.RidbFacility
+import com.davismariotti.campalert.provider.recreation.RidbFacilityResponse
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository

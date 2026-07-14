@@ -1,6 +1,6 @@
 package com.davismariotti.campalert.service.permit
 
-import com.davismariotti.campalert.recreation.PermitZoneAvailabilityCell
+import com.davismariotti.campalert.provider.recreation.PermitZoneAvailabilityCell
 import com.davismariotti.campalert.service.redis.RedisJsonCache
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service

@@ -9,8 +9,8 @@ import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.RequestType
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
-import com.davismariotti.campalert.recreation.RidbFacility
-import com.davismariotti.campalert.recreation.RidbFacilityResponse
+import com.davismariotti.campalert.provider.recreation.RidbFacility
+import com.davismariotti.campalert.provider.recreation.RidbFacilityResponse
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository

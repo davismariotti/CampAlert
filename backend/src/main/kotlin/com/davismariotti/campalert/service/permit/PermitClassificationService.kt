@@ -1,9 +1,9 @@
 package com.davismariotti.campalert.service.permit
 
 import com.davismariotti.campalert.model.SearchType
-import com.davismariotti.campalert.recreation.PermitDivisionType
-import com.davismariotti.campalert.recreation.PermitMappingPayload
-import com.davismariotti.campalert.recreation.RecreationApi
+import com.davismariotti.campalert.provider.recreation.PermitDivisionType
+import com.davismariotti.campalert.provider.recreation.PermitMappingPayload
+import com.davismariotti.campalert.provider.recreation.RecreationApi
 import com.davismariotti.campalert.service.redis.RedisJsonCache
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.github.resilience4j.retry.RetryRegistry

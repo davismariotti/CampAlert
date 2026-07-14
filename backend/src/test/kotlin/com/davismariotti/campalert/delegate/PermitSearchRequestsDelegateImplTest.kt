@@ -8,9 +8,9 @@ import com.davismariotti.campalert.model.PermitSearchRequest
 import com.davismariotti.campalert.model.PermitSearchRequestState
 import com.davismariotti.campalert.model.PermitZoneTarget
 import com.davismariotti.campalert.model.PhoneNumberStatus
-import com.davismariotti.campalert.model.Provider
 import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PermitSearchRequestRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository

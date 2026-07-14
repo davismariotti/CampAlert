@@ -1,6 +1,6 @@
 package com.davismariotti.campalert.service.permit
 
-import com.davismariotti.campalert.recreation.PermitZoneAvailabilityCell
+import com.davismariotti.campalert.provider.recreation.PermitZoneAvailabilityCell
 import com.davismariotti.campalert.support.IntegrationTestBase
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
