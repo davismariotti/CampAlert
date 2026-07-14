@@ -1,16 +1,14 @@
-package com.davismariotti.campalert.provider.camplife
+package com.davismariotti.campalert.health
 
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.health.contributor.Health
 import org.springframework.boot.health.contributor.HealthIndicator
-import org.springframework.stereotype.Component
 import java.util.concurrent.TimeUnit
 
-@Component("campLife")
-class CampLifeHealthIndicator(
-    @Value("\${camplife.baseUrl}") private val baseUrl: String,
+/** Reports UP/DOWN based on whether [baseUrl] is reachable, shared by every provider's health indicator. */
+abstract class HttpHealthIndicator(
+    private val baseUrl: String
 ) : HealthIndicator {
     private val client = OkHttpClient
         .Builder()

@@ -1,4 +1,4 @@
-package com.davismariotti.campalert.recreation
+package com.davismariotti.campalert.service
 
 import net.iakovlev.timeshape.TimeZoneEngine
 import org.junit.jupiter.api.BeforeAll
