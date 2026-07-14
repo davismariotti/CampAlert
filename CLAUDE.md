@@ -127,9 +127,24 @@ The webhook validates `X-Twilio-Signature`. Twilio signs requests with your `twi
 
 ## Tests
 
-Run the suite:
+Unit tests (`src/test/`) — fast, mocked collaborators:
 ```bash
 cd backend
 ./gradlew test
 ```
+
+Integration tests (`src/integrationTest/`) — a separate Gradle source set/task, run against real
+Postgres and Redis via Testcontainers (spun up automatically by `IntegrationTestBase`, no manual
+`docker compose` needed). Requires Docker running locally. `./gradlew check` runs both `test` and
+`integrationTest`.
+```bash
+cd backend
+./gradlew integrationTest
+```
+
+A class belongs in `integrationTest` instead of `test` when it needs the real Spring context, a real
+DB/Redis round-trip, or MockMvc against real endpoints — e.g. anything extending `IntegrationTestBase`.
+Prefer mocked unit tests for pure logic; reach for an integration test when the behavior only shows up
+through real serialization, persistence, or wiring (as `ZoneAvailabilityBaselineServiceIntegrationTest`
+does for the real Redis JSON round-trip that a mocked `RedisJsonCache` can't catch).
 
