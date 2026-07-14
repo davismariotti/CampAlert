@@ -2,7 +2,6 @@ package com.davismariotti.campalert.notification
 
 import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.SearchRequest
-import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.notifications.Notification
 import com.davismariotti.notifications.SmsContent
 
@@ -31,18 +30,12 @@ class CampsiteAlertNotification(
         notifications.forEach { n ->
             val endDay = n.request.startDay.plusDays(n.request.nights.toLong())
             sb.appendLine("${n.request.campgroundName} — ${n.request.startDay} to $endDay")
-            sb.appendLine(bookingLink(n.request))
+            sb.appendLine(n.request.provider.bookingLink(n.request.campsiteId))
             sb.appendLine()
         }
         sb.append("Reply PAUSE to snooze. Reply STOP to unsubscribe.")
         return sb.toString().trimEnd()
     }
-
-    private fun bookingLink(request: SearchRequest): String =
-        when (request.provider) {
-            Provider.RECREATION_GOV -> "recreation.gov/camping/campgrounds/${request.campsiteId}"
-            Provider.CAMPLIFE -> "https://www.camplife.com/${request.campsiteId}/reservation/step1"
-        }
 
     private fun buildGoneMessage(notifications: List<PendingNotification>): String {
         val sb = StringBuilder()
