@@ -2,15 +2,16 @@ package com.davismariotti.campalert.service.permit
 
 import com.davismariotti.campalert.model.PermitSearchRequest
 import com.davismariotti.campalert.model.SearchType
+import com.davismariotti.campalert.provider.CallProtection
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.provider.recreation.PermitItineraryAvailabilityPayload
 import com.davismariotti.campalert.provider.recreation.PermitQuotaType
 import com.davismariotti.campalert.provider.recreation.PermitZoneAvailabilityPayload
 import com.davismariotti.campalert.provider.recreation.RawResponseCapture
 import com.davismariotti.campalert.provider.recreation.RecreationApi
-import com.davismariotti.campalert.provider.recreation.RecreationGovCallProtection
 import com.davismariotti.campalert.util.sleepJitter
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.time.YearMonth
@@ -39,7 +40,7 @@ typealias ItineraryAvailabilityCache = ConcurrentHashMap<Triple<String, String, 
 @Service
 class PermitAvailabilityMatcher(
     private val recreationApi: RecreationApi,
-    private val callProtection: RecreationGovCallProtection,
+    @Qualifier("recreationGovCallProtection") private val callProtection: CallProtection,
     private val zoneAvailabilityBaselineService: ZoneAvailabilityBaselineService,
     @param:Value($$"${campfinder.polling.request-jitter-ms:0}") private val requestJitterMs: Long = 0,
 ) : PermitAvailabilityProvider {
