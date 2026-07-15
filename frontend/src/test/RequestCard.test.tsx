@@ -103,4 +103,51 @@ describe('RequestCard', () => {
 
     expect(screen.getByText('North Loop')).toBeInTheDocument()
   })
+
+  describe('flexible date window', () => {
+    it('shows the configured range for a flexible request with no current match', () => {
+      const flexRequest: SearchRequestResponse = { ...request, searchEndDay: '2026-07-18' }
+
+      render(<RequestCard request={flexRequest} />, { wrapper: Wrapper })
+
+      expect(screen.getByText(/Any 2 nights/)).toBeInTheDocument()
+      expect(screen.getByText(/Jul 10-Jul 18/)).toBeInTheDocument()
+      expect(screen.queryByText(/^Matched/)).not.toBeInTheDocument()
+    })
+
+    it('shows the matched dates prominently for a flexible request with a current match', () => {
+      const matchedRequest: SearchRequestResponse = {
+        ...request,
+        searchEndDay: '2026-07-18',
+        matchedStartDay: '2026-07-14',
+        matchedEndDay: '2026-07-16'
+      }
+
+      render(<RequestCard request={matchedRequest} />, { wrapper: Wrapper })
+
+      expect(screen.getByText(/Matched Jul 14.*Jul 16/)).toBeInTheDocument()
+    })
+
+    it('shows the compact exact-date meta line unchanged when searchEndDay is absent', () => {
+      render(<RequestCard request={request} />, { wrapper: Wrapper })
+
+      expect(screen.queryByText(/^Any/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/^Matched/)).not.toBeInTheDocument()
+    })
+
+    it('shows flexible range and matched-date context in the stats modal for a completed flexible request', async () => {
+      const completedFlexRequest: SearchRequestResponse = {
+        ...request,
+        completed: true,
+        searchEndDay: '2026-07-18',
+        matchedStartDay: '2026-07-14',
+        matchedEndDay: '2026-07-16'
+      }
+
+      render(<RequestCard request={completedFlexRequest} />, { wrapper: Wrapper })
+      await userEvent.click(screen.getByRole('button', { name: /stats/i }))
+
+      expect(screen.getByText(/Any 2 nights, Jul 10-Jul 18.*Matched Jul 14.*Jul 16/)).toBeInTheDocument()
+    })
+  })
 })

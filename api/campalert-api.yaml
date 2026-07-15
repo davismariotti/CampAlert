@@ -1254,6 +1254,7 @@ components:
         nights:
           type: integer
           minimum: 1
+          maximum: 21
         groupSize:
           type: integer
           minimum: 1
@@ -1288,6 +1289,21 @@ components:
           $ref: '#/components/schemas/SearchRequestStats'
         provider:
           $ref: '#/components/schemas/Provider'
+        searchEndDay:
+          type: string
+          format: date
+          nullable: true
+          description: Latest acceptable checkout date for a flexible search. Null means an exact-date search for startDay through startDay + nights.
+        matchedStartDay:
+          type: string
+          format: date
+          nullable: true
+          description: Arrival date of the candidate stay currently matched within the configured range. Null when unavailable or when the request is exact-date.
+        matchedEndDay:
+          type: string
+          format: date
+          nullable: true
+          description: Checkout date of the candidate stay currently matched within the configured range. Null when unavailable or when the request is exact-date.
 
     SearchRequestStats:
       type: object
@@ -1363,6 +1379,7 @@ components:
         nights:
           type: integer
           minimum: 1
+          maximum: 21
         groupSize:
           type: integer
           minimum: 1
@@ -1391,6 +1408,11 @@ components:
           allOf:
             - $ref: '#/components/schemas/Provider'
           nullable: true
+        searchEndDay:
+          type: string
+          format: date
+          nullable: true
+          description: Latest acceptable checkout date for a flexible search. Omit for an exact-date search.
 
     LoopInfo:
       type: object
@@ -1419,6 +1441,7 @@ components:
         nights:
           type: integer
           minimum: 1
+          maximum: 21
         groupSize:
           type: integer
           minimum: 1
@@ -1447,6 +1470,11 @@ components:
           allOf:
             - $ref: '#/components/schemas/Provider'
           nullable: true
+        searchEndDay:
+          type: string
+          format: date
+          nullable: true
+          description: Latest acceptable checkout date for a flexible search. Omit or set to null to clear it and revert to an exact-date search.
 
     CampgroundSearchResult:
       type: object

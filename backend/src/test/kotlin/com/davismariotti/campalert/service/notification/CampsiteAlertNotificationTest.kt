@@ -12,20 +12,38 @@ import org.junit.jupiter.api.Test
 import java.time.LocalDate
 
 class CampsiteAlertNotificationTest {
-    private val request = SearchRequest(
-        id = 1L,
-        startDay = LocalDate.now().plusDays(10),
-        nights = 2,
-        groupSize = 2,
-        campsiteId = 99,
-        name = "Test Trip",
-        campgroundName = "Upper Pines",
-    ).also { req ->
+    private fun buildRequest(
+        id: Long = 1L,
+        campsiteId: Int = 99,
+        campgroundName: String = "Upper Pines",
+        startDay: LocalDate = LocalDate.now().plusDays(10),
+        nights: Int = 2,
+        provider: Provider = Provider.RECREATION_GOV,
+        searchEndDay: LocalDate? = null,
+        matchedStartDay: LocalDate? = null,
+        matchedEndDay: LocalDate? = null,
+    ): SearchRequest {
+        val req = SearchRequest(
+            id = id,
+            startDay = startDay,
+            nights = nights,
+            groupSize = 2,
+            campsiteId = campsiteId,
+            name = "Test Trip",
+            campgroundName = campgroundName,
+            provider = provider,
+            searchEndDay = searchEndDay,
+        )
         val st = SearchRequestState()
         st.searchRequest = req
-        st.searchRequestId = 1L
+        st.searchRequestId = id
+        st.matchedStartDay = matchedStartDay
+        st.matchedEndDay = matchedEndDay
         req.state = st
+        return req
     }
+
+    private val request = buildRequest()
 
     @Test
     fun `sms includes campground name, date range, and URL for available alert`() {
@@ -70,7 +88,7 @@ class CampsiteAlertNotificationTest {
 
     @Test
     fun `sms includes count header for multiple available alerts`() {
-        val req2 = request.copy(id = 2, campsiteId = 100, campgroundName = "Yosemite Valley")
+        val req2 = buildRequest(id = 2, campsiteId = 100, campgroundName = "Yosemite Valley")
         val notifications = listOf(
             PendingNotification(request = request, type = OutboxType.AVAILABLE, outboxId = 1L),
             PendingNotification(request = req2, type = OutboxType.AVAILABLE, outboxId = 2L),
@@ -97,6 +115,51 @@ class CampsiteAlertNotificationTest {
     }
 
     @Test
+    fun `sms uses matched dates when present instead of the configured exact stay`() {
+        val startDay = LocalDate.now().plusDays(10)
+        val flexRequest = buildRequest(
+            startDay = startDay,
+            nights = 2,
+            searchEndDay = startDay.plusDays(8),
+            matchedStartDay = startDay.plusDays(3),
+            matchedEndDay = startDay.plusDays(5),
+        )
+        val notifications = listOf(PendingNotification(request = flexRequest, type = OutboxType.AVAILABLE, outboxId = 1L))
+        val notification = CampsiteAlertNotification(available = notifications, gone = emptyList())
+
+        val body = notification.sms()!!.text
+
+        assertTrue(body.contains("${startDay.plusDays(3)} to ${startDay.plusDays(5)}"))
+        assertTrue(!body.contains("$startDay to ${startDay.plusDays(2)}"))
+    }
+
+    @Test
+    fun `sms falls back to the exact stay when no matched dates are recorded`() {
+        val startDay = LocalDate.now().plusDays(10)
+        val exactRequest = buildRequest(startDay = startDay, nights = 2)
+        val notifications = listOf(PendingNotification(request = exactRequest, type = OutboxType.AVAILABLE, outboxId = 1L))
+        val notification = CampsiteAlertNotification(available = notifications, gone = emptyList())
+
+        val body = notification.sms()!!.text
+
+        assertTrue(body.contains("$startDay to ${startDay.plusDays(2)}"))
+    }
+
+    @Test
+    fun `gone message describes the configured flexible range, not the cleared match`() {
+        val startDay = LocalDate.now().plusDays(10)
+        // Matched dates are already null here — AvailabilityStateService clears them on the same
+        // transition that queues this notification, before this ever runs.
+        val flexRequest = buildRequest(startDay = startDay, nights = 2, searchEndDay = startDay.plusDays(8))
+        val notifications = listOf(PendingNotification(request = flexRequest, type = OutboxType.UNAVAILABLE, outboxId = 1L))
+        val notification = CampsiteAlertNotification(available = emptyList(), gone = notifications)
+
+        val body = notification.sms()!!.text
+
+        assertTrue(body.contains("$startDay to ${startDay.plusDays(8)}"))
+    }
+
+    @Test
     fun `sms returns null for empty available and gone lists`() {
         val notification = CampsiteAlertNotification(available = emptyList(), gone = emptyList())
 
@@ -105,8 +168,8 @@ class CampsiteAlertNotificationTest {
 
     @Test
     fun `sms combines available and gone sections with double newline`() {
-        val availableReq = request.copy(id = 1, campgroundName = "Upper Pines")
-        val goneReq = request.copy(id = 2, campgroundName = "Lower Pines")
+        val availableReq = buildRequest(id = 1, campgroundName = "Upper Pines")
+        val goneReq = buildRequest(id = 2, campgroundName = "Lower Pines")
         val notification = CampsiteAlertNotification(
             available = listOf(PendingNotification(request = availableReq, type = OutboxType.AVAILABLE, outboxId = 1L)),
             gone = listOf(PendingNotification(request = goneReq, type = OutboxType.UNAVAILABLE, outboxId = 2L)),

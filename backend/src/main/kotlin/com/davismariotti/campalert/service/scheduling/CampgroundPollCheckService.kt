@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.service.scheduling
 
+import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
@@ -36,14 +37,14 @@ class CampgroundPollCheckService(
         val allRequests = searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, provider)
         if (allRequests.isEmpty()) return 0
 
-        val toComplete = allRequests.filter { it.startDay < today(it.campgroundTimezone) }
+        val toComplete = allRequests.filter { lastCandidateArrival(it) < today(it.campgroundTimezone) }
         toComplete.forEach { req ->
             req.state.completed = true
             searchRequestRepository.save(req)
         }
 
         val active = allRequests.filter { req ->
-            req.startDay >= today(req.campgroundTimezone) && req.state.pauseReason == null && req.userId != null
+            lastCandidateArrival(req) >= today(req.campgroundTimezone) && req.state.pauseReason == null && req.userId != null
         }
         log.info("Campground poll check campsiteId={} active={} autoCompleted={}", campsiteId, active.size, toComplete.size)
         if (active.isEmpty()) return 0
@@ -86,4 +87,12 @@ class CampgroundPollCheckService(
     }
 
     private fun today(campgroundTimezone: String?): LocalDate = LocalDate.now(campgroundTimezone?.let { ZoneId.of(it) } ?: ZoneOffset.UTC)
+
+    /**
+     * The last arrival date any candidate stay could still use — for an exact-date request this is
+     * just `startDay` (unchanged from before flexible search), and for a flexible request it's the
+     * last candidate's arrival date (`searchEndDay - nights`), since arrival dates after that can
+     * never be booked once they're in the past, regardless of how far out `searchEndDay` still is.
+     */
+    private fun lastCandidateArrival(request: SearchRequest): LocalDate = request.searchEndDay?.minusDays(request.nights.toLong()) ?: request.startDay
 }

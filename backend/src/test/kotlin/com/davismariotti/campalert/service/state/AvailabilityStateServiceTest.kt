@@ -54,12 +54,18 @@ class AvailabilityStateServiceTest {
         return req
     }
 
-    private fun result(request: SearchRequest, available: Boolean) =
-        AvailabilityResult(
-            searchRequest = request,
-            hasAvailableSites = available,
-            availableSiteCount = if (available) 1 else 0,
-        )
+    private fun result(
+        request: SearchRequest,
+        available: Boolean,
+        matchedStartDay: LocalDate? = null,
+        matchedEndDay: LocalDate? = null
+    ) = AvailabilityResult(
+        searchRequest = request,
+        hasAvailableSites = available,
+        availableSiteCount = if (available) 1 else 0,
+        matchedStartDay = matchedStartDay,
+        matchedEndDay = matchedEndDay,
+    )
 
     @Test
     fun `null to AVAILABLE inserts AVAILABLE outbox row`() {
@@ -139,6 +145,53 @@ class AvailabilityStateServiceTest {
         org.mockito.Mockito
             .verify(outboxRepository, org.mockito.Mockito.never())
             .save(any(NotificationOutbox::class.java))
+    }
+
+    @Test
+    fun `available result persists matched dates onto state`() {
+        val req = request(state = AvailabilityState.UNAVAILABLE)
+        val matchedStart = req.startDay.plusDays(1)
+        val matchedEnd = req.startDay.plusDays(3)
+        `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
+        `when`(outboxRepository.save(any(NotificationOutbox::class.java))).thenAnswer { it.arguments[0] }
+
+        service.processUserResults(listOf(result(req, true, matchedStart, matchedEnd)), user)
+
+        assertEquals(matchedStart, req.state.matchedStartDay)
+        assertEquals(matchedEnd, req.state.matchedEndDay)
+    }
+
+    @Test
+    fun `unavailable result clears previously matched dates`() {
+        val req = request(state = AvailabilityState.AVAILABLE)
+        req.state.matchedStartDay = req.startDay.plusDays(1)
+        req.state.matchedEndDay = req.startDay.plusDays(3)
+        `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
+        `when`(outboxRepository.save(any(NotificationOutbox::class.java))).thenAnswer { it.arguments[0] }
+
+        service.processUserResults(listOf(result(req, false)), user)
+
+        assertNull(req.state.matchedStartDay)
+        assertNull(req.state.matchedEndDay)
+    }
+
+    @Test
+    fun `matched dates changing while continuously available does not by itself add a second outbox row`() {
+        val thirtyMinutesAgo = Instant.now().minus(Duration.ofMinutes(10))
+        val req = request(state = AvailabilityState.AVAILABLE, lastNotified = thirtyMinutesAgo)
+        req.state.matchedStartDay = req.startDay.plusDays(1)
+        req.state.matchedEndDay = req.startDay.plusDays(3)
+        `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
+
+        // Different matched dates than what's already on state, but still available and within the
+        // reminder cooldown — no REMINDER should fire, and matched dates should still update.
+        service.processUserResults(listOf(result(req, true, req.startDay.plusDays(4), req.startDay.plusDays(6))), user)
+
+        org.mockito.Mockito
+            .verify(outboxRepository, org.mockito.Mockito.never())
+            .save(any(NotificationOutbox::class.java))
+        assertEquals(req.startDay.plusDays(4), req.state.matchedStartDay)
+        assertEquals(req.startDay.plusDays(6), req.state.matchedEndDay)
     }
 
     @Test

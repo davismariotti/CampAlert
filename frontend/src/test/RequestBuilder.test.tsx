@@ -152,4 +152,75 @@ describe('RequestBuilder', () => {
       })
     )
   })
+
+  describe('flexible date window', () => {
+    it('exact mode omits searchEndDay from the create payload', async () => {
+      const createSpy = vi.spyOn(sdk, 'createSearchRequest').mockResolvedValue({
+        data: { id: 1 },
+        error: undefined
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any)
+
+      render(<Wrapper />)
+      await userEvent.type(screen.getByPlaceholderText('Alert name'), 'My Trip')
+      const dateInput = screen.getAllByDisplayValue('')[0] as HTMLInputElement
+      await userEvent.type(dateInput, '2026-07-01')
+      await userEvent.click(screen.getByRole('button', { name: /set alert/i }))
+
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({ searchEndDay: undefined })
+        })
+      )
+    })
+
+    it('switching to flexible mode shows earliest arrival and latest checkout fields', async () => {
+      render(<Wrapper />)
+      await userEvent.click(screen.getByRole('button', { name: 'Flexible window' }))
+
+      expect(screen.getByLabelText('Earliest arrival')).toBeInTheDocument()
+      expect(screen.getByLabelText('Latest checkout')).toBeInTheDocument()
+    })
+
+    it('Set Alert is disabled with an incomplete flexible range', async () => {
+      render(<Wrapper />)
+      await userEvent.type(screen.getByPlaceholderText('Alert name'), 'My Trip')
+      await userEvent.type(screen.getByLabelText(/earliest arrival|arrival date/i), '2026-07-01')
+      await userEvent.click(screen.getByRole('button', { name: 'Flexible window' }))
+
+      expect(screen.getByRole('button', { name: /set alert/i })).toBeDisabled()
+    })
+
+    it('a valid flexible range is included in the create payload', async () => {
+      const createSpy = vi.spyOn(sdk, 'createSearchRequest').mockResolvedValue({
+        data: { id: 1 },
+        error: undefined
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any)
+
+      render(<Wrapper />)
+      await userEvent.type(screen.getByPlaceholderText('Alert name'), 'My Trip')
+      await userEvent.click(screen.getByRole('button', { name: 'Flexible window' }))
+      await userEvent.type(screen.getByLabelText('Earliest arrival'), '2026-07-01')
+      await userEvent.type(screen.getByLabelText('Latest checkout'), '2026-07-08')
+      await userEvent.click(screen.getByRole('button', { name: /set alert/i }))
+
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({ startDay: '2026-07-01', searchEndDay: '2026-07-08' })
+        })
+      )
+    })
+
+    it('a range exceeding the CampLife max width is rejected', async () => {
+      render(<Wrapper campground={campLifeCampground} />)
+      await userEvent.type(screen.getByPlaceholderText('Alert name'), 'My Trip')
+      await userEvent.click(screen.getByRole('button', { name: 'Flexible window' }))
+      await userEvent.type(screen.getByLabelText('Earliest arrival'), '2026-07-01')
+      await userEvent.type(screen.getByLabelText('Latest checkout'), '2026-07-15')
+
+      expect(screen.getByText(/9 days/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /set alert/i })).toBeDisabled()
+    })
+  })
 })

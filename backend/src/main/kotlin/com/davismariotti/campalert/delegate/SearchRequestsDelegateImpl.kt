@@ -20,12 +20,15 @@ import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.TimezoneResolutionService
 import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
+import com.davismariotti.campalert.service.scheduling.ProviderSearchWindowProperties
 import com.davismariotti.campalert.util.currentUserId
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 @Service
 class SearchRequestsDelegateImpl(
@@ -36,6 +39,7 @@ class SearchRequestsDelegateImpl(
     private val timezoneResolutionService: TimezoneResolutionService,
     private val pollTargetRegistrationService: PollTargetRegistrationService,
     private val campLifeCatalogCache: CampLifeCatalogCache,
+    private val providerSearchWindowProperties: ProviderSearchWindowProperties,
 ) : SearchRequestsApiDelegate {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -90,6 +94,9 @@ class SearchRequestsDelegateImpl(
             ) as ResponseEntity<SearchRequestResponse>
         }
         val provider = createSearchRequestBody.provider?.type?.toModel() ?: Provider.RECREATION_GOV
+        validateSearchEndDay(createSearchRequestBody.startDay, createSearchRequestBody.nights, createSearchRequestBody.searchEndDay, provider)?.let {
+            return ResponseEntity.badRequest().body(it) as ResponseEntity<SearchRequestResponse>
+        }
         val entity = SearchRequest(
             startDay = createSearchRequestBody.startDay,
             nights = createSearchRequestBody.nights,
@@ -100,6 +107,7 @@ class SearchRequestsDelegateImpl(
             name = createSearchRequestBody.name,
             userId = userId,
             provider = provider,
+            searchEndDay = createSearchRequestBody.searchEndDay,
         )
         val state = SearchRequestState()
         state.searchRequest = entity
@@ -123,6 +131,7 @@ class SearchRequestsDelegateImpl(
         return ResponseEntity.ok(entity.toResponse(fetchStats(entity)))
     }
 
+    @Suppress("UNCHECKED_CAST")
     @PreAuthorize("isAuthenticated()")
     override fun updateSearchRequest(
         id: Long,
@@ -135,6 +144,9 @@ class SearchRequestsDelegateImpl(
             ?.takeIf { it.userId == userId }
             ?: return ResponseEntity.notFound().build()
         val provider = updateSearchRequestBody.provider?.type?.toModel() ?: existing.provider
+        validateSearchEndDay(updateSearchRequestBody.startDay, updateSearchRequestBody.nights, updateSearchRequestBody.searchEndDay, provider)?.let {
+            return ResponseEntity.badRequest().body(it) as ResponseEntity<SearchRequestResponse>
+        }
         val updated = existing.copy(
             startDay = updateSearchRequestBody.startDay,
             nights = updateSearchRequestBody.nights,
@@ -143,6 +155,7 @@ class SearchRequestsDelegateImpl(
             siteIds = updateSearchRequestBody.siteIds,
             name = updateSearchRequestBody.name,
             provider = provider,
+            searchEndDay = updateSearchRequestBody.searchEndDay,
         )
         // state/recreationGovDetails/campLifeDetails are body properties excluded from copy(); transfer
         // references before applyProviderDetails() so it mutates the existing rows in place rather than
@@ -169,6 +182,41 @@ class SearchRequestsDelegateImpl(
         notificationOutboxRepository.deleteByRequestTypeAndRequestId(RequestType.CAMPGROUND, id)
         searchRequestRepository.deleteById(id)
         return ResponseEntity.noContent().build()
+    }
+
+    /**
+     * Validates an optional flexible-search `searchEndDay`: it must leave room for at least one
+     * `nights`-length stay, and the resulting range width must fit within the provider's configured
+     * `max-range-width-days` (a provider with no configured max does not support flexible search at
+     * all). Returns null when valid, or an [ErrorResponse] describing the first violation.
+     */
+    private fun validateSearchEndDay(
+        startDay: LocalDate,
+        nights: Int,
+        searchEndDay: LocalDate?,
+        provider: Provider
+    ): ErrorResponse? {
+        if (searchEndDay == null) return null
+        val minSearchEndDay = startDay.plusDays(nights.toLong())
+        if (searchEndDay.isBefore(minSearchEndDay)) {
+            return ErrorResponse(
+                message = "searchEndDay must be on or after $minSearchEndDay (startDay + nights), so the range contains at least one $nights-night stay.",
+                code = "SEARCH_END_DAY_TOO_EARLY",
+            )
+        }
+        val maxRangeWidthDays = providerSearchWindowProperties.maxRangeWidthDaysFor(provider)
+            ?: return ErrorResponse(
+                message = "Flexible search is not supported for ${provider.friendlyName}.",
+                code = "FLEXIBLE_SEARCH_UNSUPPORTED",
+            )
+        val rangeWidthDays = ChronoUnit.DAYS.between(startDay, searchEndDay)
+        if (rangeWidthDays > maxRangeWidthDays) {
+            return ErrorResponse(
+                message = "The flexible date range ($rangeWidthDays days) exceeds the maximum of $maxRangeWidthDays days for ${provider.friendlyName}.",
+                code = "SEARCH_RANGE_TOO_WIDE",
+            )
+        }
+        return null
     }
 
     private fun fetchStats(request: SearchRequest): SearchRequestStats {
@@ -268,5 +316,8 @@ class SearchRequestsDelegateImpl(
             pauseReason = this.state.pauseReason,
             stats = stats,
             provider = this.provider.toApi(),
+            searchEndDay = this.searchEndDay,
+            matchedStartDay = this.state.matchedStartDay,
+            matchedEndDay = this.state.matchedEndDay,
         )
 }
