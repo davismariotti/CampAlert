@@ -30,6 +30,7 @@ CREATE TABLE "public"."search_requests" (
   "campground_name" character varying(255) NOT NULL DEFAULT '',
   "campground_timezone" character varying(64) NULL,
   "provider" character varying(32) NOT NULL DEFAULT 'RECREATION_GOV',
+  "search_end_day" date NULL,
   PRIMARY KEY ("id"),
   -- atlas:renamed_from fk_search_requests_v2_user
   CONSTRAINT "fk_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
@@ -87,6 +88,8 @@ CREATE TABLE "public"."search_request_state" (
   "window_count" integer NOT NULL DEFAULT 0,
   "total_window_seconds" integer NOT NULL DEFAULT 0,
   "became_available_at" timestamptz NULL,
+  "matched_start_day" date NULL,
+  "matched_end_day" date NULL,
   PRIMARY KEY ("search_request_id"),
   CONSTRAINT "fk_search_request_state_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests" ("id") ON DELETE CASCADE,
   CONSTRAINT "chk_search_request_state_last_availability_state" CHECK (last_availability_state IN ('AVAILABLE', 'UNAVAILABLE'))

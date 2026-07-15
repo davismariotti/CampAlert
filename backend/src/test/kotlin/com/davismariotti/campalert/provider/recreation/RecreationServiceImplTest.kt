@@ -1,0 +1,185 @@
+package com.davismariotti.campalert.provider.recreation
+
+import com.davismariotti.campalert.model.RecreationGovSearchRequestDetails
+import com.davismariotti.campalert.model.SearchRequest
+import com.davismariotti.campalert.model.SearchRequestState
+import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.provider.CallProtection
+import com.davismariotti.campalert.provider.Provider
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
+import io.github.resilience4j.retry.RetryConfig
+import io.github.resilience4j.retry.RetryRegistry
+import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
+import retrofit2.Call
+import retrofit2.Response
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.ZonedDateTime
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class RecreationServiceImplTest {
+    private val recreationApi = mock(RecreationApi::class.java)
+    private val callProtection: CallProtection =
+        CallProtection
+            .Builder("recreation-gov")
+            .circuitBreaker(CircuitBreakerRegistry.of(CircuitBreakerConfig.ofDefaults()))
+            .retry(RetryRegistry.of(RetryConfig.ofDefaults()))
+            .build()
+
+    private val service = RecreationServiceImpl(recreationApi, callProtection, requestJitterMs = 0)
+
+    private val user = User(id = 1L, email = "user@example.com", passwordHash = "hash")
+    private val campsiteId = 233359
+
+    private fun request(
+        startDay: LocalDate,
+        nights: Int,
+        searchEndDay: LocalDate? = null,
+        loops: List<String>? = null,
+        siteIds: List<String>? = null,
+        groupSize: Int = 2,
+    ): SearchRequest {
+        val req = SearchRequest(
+            id = 1L,
+            startDay = startDay,
+            nights = nights,
+            groupSize = groupSize,
+            campsiteId = campsiteId,
+            siteIds = siteIds,
+            name = "test",
+            userId = 1L,
+            provider = Provider.RECREATION_GOV,
+            searchEndDay = searchEndDay,
+        )
+        val state = SearchRequestState()
+        state.searchRequest = req
+        req.state = state
+        if (!loops.isNullOrEmpty()) {
+            val details = RecreationGovSearchRequestDetails()
+            details.searchRequest = req
+            details.loops = loops
+            req.recreationGovDetails = details
+        }
+        return req
+    }
+
+    /** One campsite whose `AVAILABLE` nights are exactly [availableDates]; every other date in [allDates] is `RESERVED`. */
+    private fun campgroundWith(
+        allDates: List<LocalDate>,
+        availableDates: Set<LocalDate>,
+        siteId: Int = 5001,
+        loop: String = "A Loop"
+    ): Campground {
+        val availabilities = allDates.associate { date ->
+            ZonedDateTime.of(date.atStartOfDay(), ZoneOffset.UTC) to (if (date in availableDates) AvailabilityType.AVAILABLE else AvailabilityType.RESERVED)
+        }
+        val site = Campsite(
+            campsiteId = siteId,
+            site = "A1",
+            loop = loop,
+            campsiteReserveType = "Site-Specific",
+            availabilities = availabilities,
+            quantities = emptyMap(),
+            minimumNumberOfPeople = 1,
+            maximumNumberOfPeople = 8,
+        )
+        return Campground(campsites = mapOf(siteId to site))
+    }
+
+    /** Every month call returns the same full-range campground — sufficient since matching happens locally after merge. */
+    private fun mockMonthlyFetch(campground: Campground) {
+        @Suppress("UNCHECKED_CAST")
+        val call = mock(Call::class.java) as Call<Campground>
+        `when`(call.execute()).thenReturn(Response.success(campground))
+        `when`(recreationApi.getCampgroundAvailability(org.mockito.kotlin.eq(campsiteId), org.mockito.kotlin.any())).thenReturn(call)
+    }
+
+    @Test
+    fun `exact-date match requires every night available and sets matchedStartDay to startDay`() {
+        val startDay = LocalDate.now().plusDays(10)
+        val allDates = listOf(startDay, startDay.plusDays(1))
+        mockMonthlyFetch(campgroundWith(allDates, availableDates = allDates.toSet()))
+
+        val result = service.checkAvailability(request(startDay, nights = 2), user, null)
+
+        assertTrue(result.hasAvailableSites)
+        assertEquals(startDay, result.matchedStartDay)
+        assertEquals(startDay.plusDays(2), result.matchedEndDay)
+    }
+
+    @Test
+    fun `exact-date request with one unavailable night in the stay is unavailable`() {
+        val startDay = LocalDate.now().plusDays(10)
+        val allDates = listOf(startDay, startDay.plusDays(1))
+        mockMonthlyFetch(campgroundWith(allDates, availableDates = setOf(startDay)))
+
+        val result = service.checkAvailability(request(startDay, nights = 2), user, null)
+
+        assertFalse(result.hasAvailableSites)
+        assertNull(result.matchedStartDay)
+    }
+
+    @Test
+    fun `flexible search selects the earliest matching candidate window`() {
+        val startDay = LocalDate.now().plusDays(10)
+        // Range: startDay..startDay+4 (searchEndDay), nights=2 -> candidates startDay, +1, +2.
+        // Only the +1/+2 pair is fully available, so the second candidate (startDay+1) should win.
+        val allDates = (0..4).map { startDay.plusDays(it.toLong()) }
+        mockMonthlyFetch(campgroundWith(allDates, availableDates = setOf(startDay.plusDays(1), startDay.plusDays(2))))
+
+        val result = service.checkAvailability(request(startDay, nights = 2, searchEndDay = startDay.plusDays(4)), user, null)
+
+        assertTrue(result.hasAvailableSites)
+        assertEquals(startDay.plusDays(1), result.matchedStartDay)
+        assertEquals(startDay.plusDays(3), result.matchedEndDay)
+    }
+
+    @Test
+    fun `flexible search spanning multiple months still finds a match`() {
+        val startDay = LocalDate
+            .now()
+            .withDayOfMonth(1)
+            .plusMonths(1)
+            .minusDays(1) // last day of a month
+        val searchEndDay = startDay.plusDays(5)
+        val allDates = (0..5).map { startDay.plusDays(it.toLong()) }
+        // Only the last candidate's two nights (crossing into the next month) are available.
+        mockMonthlyFetch(campgroundWith(allDates, availableDates = setOf(startDay.plusDays(3), startDay.plusDays(4))))
+
+        val result = service.checkAvailability(request(startDay, nights = 2, searchEndDay = searchEndDay), user, null)
+
+        assertTrue(result.hasAvailableSites)
+        assertEquals(startDay.plusDays(3), result.matchedStartDay)
+        assertEquals(startDay.plusDays(5), result.matchedEndDay)
+    }
+
+    @Test
+    fun `flexible search with no matching candidate anywhere in the range is unavailable`() {
+        val startDay = LocalDate.now().plusDays(10)
+        val allDates = (0..4).map { startDay.plusDays(it.toLong()) }
+        mockMonthlyFetch(campgroundWith(allDates, availableDates = emptySet()))
+
+        val result = service.checkAvailability(request(startDay, nights = 2, searchEndDay = startDay.plusDays(4)), user, null)
+
+        assertFalse(result.hasAvailableSites)
+        assertNull(result.matchedStartDay)
+        assertNull(result.matchedEndDay)
+    }
+
+    @Test
+    fun `loop filter still applies per candidate in flexible mode`() {
+        val startDay = LocalDate.now().plusDays(10)
+        val allDates = (0..2).map { startDay.plusDays(it.toLong()) }
+        mockMonthlyFetch(campgroundWith(allDates, availableDates = allDates.toSet(), loop = "B Loop"))
+
+        val result = service.checkAvailability(request(startDay, nights = 1, searchEndDay = startDay.plusDays(2), loops = listOf("A Loop")), user, null)
+
+        assertFalse(result.hasAvailableSites)
+    }
+}

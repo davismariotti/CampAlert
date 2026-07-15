@@ -14,8 +14,10 @@ import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.TimezoneResolutionService
 import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
+import com.davismariotti.campalert.service.scheduling.ProviderSearchWindowProperties
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -36,6 +38,10 @@ class SearchRequestsDelegateImplTest {
     private val timezoneResolutionService = mock(TimezoneResolutionService::class.java)
     private val pollTargetRegistrationService = mock(PollTargetRegistrationService::class.java)
     private val campLifeCatalogCache = mock(CampLifeCatalogCache::class.java)
+    private val providerSearchWindowProperties = mock(ProviderSearchWindowProperties::class.java).also {
+        `when`(it.maxRangeWidthDaysFor(Provider.RECREATION_GOV)).thenReturn(30)
+        `when`(it.maxRangeWidthDaysFor(Provider.CAMPLIFE)).thenReturn(9)
+    }
 
     private val delegate = SearchRequestsDelegateImpl(
         searchRequestRepository,
@@ -45,6 +51,7 @@ class SearchRequestsDelegateImplTest {
         timezoneResolutionService,
         pollTargetRegistrationService,
         campLifeCatalogCache,
+        providerSearchWindowProperties,
     )
 
     private val user = User(id = 1L, email = "user@example.com", passwordHash = "hash")
@@ -119,7 +126,91 @@ class SearchRequestsDelegateImplTest {
         assertEquals(ApiProviderType.RECREATION_GOV, result.body!!.provider.type)
     }
 
-    private fun existingRequest(): SearchRequest {
+    @Test
+    fun `creating with a valid flexible range is accepted and mapped back`() {
+        val startDay = LocalDate.now().plusDays(5)
+        val searchEndDay = startDay.plusDays(10)
+        val result = delegate.createSearchRequest(createBody().copy(searchEndDay = searchEndDay))
+
+        assertEquals(201, result.statusCode.value())
+        assertEquals(searchEndDay, result.body!!.searchEndDay)
+        assertNull(result.body!!.matchedStartDay)
+        assertNull(result.body!!.matchedEndDay)
+    }
+
+    @Test
+    fun `creating with searchEndDay earlier than startDay plus nights is rejected`() {
+        val startDay = LocalDate.now().plusDays(5)
+        val result = delegate.createSearchRequest(createBody().copy(startDay = startDay, nights = 2, searchEndDay = startDay.plusDays(1)))
+
+        assertEquals(400, result.statusCode.value())
+        verify(searchRequestRepository, org.mockito.Mockito.never()).save(anyKt())
+    }
+
+    @Test
+    fun `creating with searchEndDay equal to startDay plus nights is accepted as a single-window flex request`() {
+        val startDay = LocalDate.now().plusDays(5)
+        val result = delegate.createSearchRequest(createBody().copy(startDay = startDay, nights = 2, searchEndDay = startDay.plusDays(2)))
+
+        assertEquals(201, result.statusCode.value())
+    }
+
+    @Test
+    fun `creating with a range wider than the provider max is rejected`() {
+        val startDay = LocalDate.now().plusDays(5)
+        val result = delegate.createSearchRequest(createBody().copy(startDay = startDay, nights = 2, searchEndDay = startDay.plusDays(31)))
+
+        assertEquals(400, result.statusCode.value())
+    }
+
+    @Test
+    fun `creating with searchEndDay for a provider with no configured max is rejected`() {
+        `when`(providerSearchWindowProperties.maxRangeWidthDaysFor(Provider.CAMPLIFE)).thenReturn(null)
+        val startDay = LocalDate.now().plusDays(5)
+        val result = delegate.createSearchRequest(
+            createBody(provider = ApiProvider(type = ApiProviderType.CAMPLIFE, name = "CampLife"))
+                .copy(startDay = startDay, nights = 2, searchEndDay = startDay.plusDays(4)),
+        )
+
+        assertEquals(400, result.statusCode.value())
+    }
+
+    @Test
+    fun `updating to clear searchEndDay reverts to an exact-date search`() {
+        val existing = existingRequest(searchEndDay = existingRequest().startDay.plusDays(5))
+        `when`(searchRequestRepository.findById(10L)).thenReturn(java.util.Optional.of(existing))
+
+        val result = delegate.updateSearchRequest(
+            10L,
+            UpdateSearchRequestBody(
+                startDay = existing.startDay,
+                nights = existing.nights,
+                groupSize = existing.groupSize,
+                campsiteId = existing.campsiteId,
+                name = existing.name,
+                completed = false,
+                searchEndDay = null,
+            ),
+        )
+
+        assertEquals(200, result.statusCode.value())
+        assertNull(result.body!!.searchEndDay)
+    }
+
+    @Test
+    fun `response exposes matched dates from state`() {
+        val existing = existingRequest()
+        existing.state.matchedStartDay = existing.startDay.plusDays(1)
+        existing.state.matchedEndDay = existing.startDay.plusDays(3)
+        `when`(searchRequestRepository.findById(10L)).thenReturn(java.util.Optional.of(existing))
+
+        val result = delegate.getSearchRequest(10L)
+
+        assertEquals(existing.startDay.plusDays(1), result.body!!.matchedStartDay)
+        assertEquals(existing.startDay.plusDays(3), result.body!!.matchedEndDay)
+    }
+
+    private fun existingRequest(searchEndDay: LocalDate? = null): SearchRequest {
         val req = SearchRequest(
             id = 10L,
             startDay = LocalDate.now().plusDays(5),
@@ -129,6 +220,7 @@ class SearchRequestsDelegateImplTest {
             name = "Test",
             userId = user.id,
             provider = Provider.RECREATION_GOV,
+            searchEndDay = searchEndDay,
         )
         val state = SearchRequestState()
         state.searchRequest = req

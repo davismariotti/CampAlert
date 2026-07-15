@@ -52,16 +52,19 @@ class CampgroundPollCheckServiceTest {
         userId: Long? = 1L,
         pauseReason: String? = null,
         startDay: LocalDate = futureDay,
+        nights: Int = 1,
+        searchEndDay: LocalDate? = null,
     ): SearchRequest {
         val req = SearchRequest(
             id = id,
             startDay = startDay,
-            nights = 1,
+            nights = nights,
             groupSize = 2,
             campsiteId = campsiteId,
             name = "test",
             userId = userId,
             provider = provider,
+            searchEndDay = searchEndDay,
         )
         val st = SearchRequestState()
         st.searchRequest = req
@@ -181,6 +184,35 @@ class CampgroundPollCheckServiceTest {
     fun `past-date request is auto-completed and not evaluated`() {
         val yesterday = LocalDate.now(ZoneOffset.UTC).minusDays(1)
         val req = request(startDay = yesterday)
+        `when`(searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, provider)).thenReturn(listOf(req))
+
+        val evaluated = service.check(provider, campsiteId)
+
+        assertEquals(0, evaluated)
+        assertTrue(req.state.completed)
+        verify(searchRequestRepository).save(req)
+    }
+
+    @Test
+    fun `flexible request whose startDay has passed but searchEndDay has not stays active`() {
+        val yesterday = LocalDate.now(ZoneOffset.UTC).minusDays(1)
+        // nights=2, searchEndDay=+10 -> last candidate arrival is +8, still in the future.
+        val req = request(startDay = yesterday, nights = 2, searchEndDay = LocalDate.now(ZoneOffset.UTC).plusDays(10))
+        `when`(searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, provider)).thenReturn(listOf(req))
+        `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser))
+        `when`(availabilityProvider.checkAvailability(any(), any(), any())).thenReturn(result(req))
+
+        val evaluated = service.check(provider, campsiteId)
+
+        assertEquals(1, evaluated)
+        assertTrue(!req.state.completed)
+        verify(searchRequestRepository, org.mockito.Mockito.never()).save(req)
+    }
+
+    @Test
+    fun `flexible request whose last candidate arrival has passed is auto-completed`() {
+        // nights=2, searchEndDay=today+1 -> last candidate arrival is yesterday, already passed.
+        val req = request(startDay = LocalDate.now(ZoneOffset.UTC).minusDays(3), nights = 2, searchEndDay = LocalDate.now(ZoneOffset.UTC).plusDays(1))
         `when`(searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, provider)).thenReturn(listOf(req))
 
         val evaluated = service.check(provider, campsiteId)

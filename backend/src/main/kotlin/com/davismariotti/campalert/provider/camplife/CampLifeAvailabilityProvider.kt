@@ -6,6 +6,7 @@ import com.davismariotti.campalert.provider.CallProtection
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.service.availability.AvailabilityResult
 import com.davismariotti.campalert.service.availability.CampgroundAvailabilityProvider
+import com.davismariotti.campalert.service.availability.CandidateWindows
 import com.davismariotti.campalert.service.availability.CheckCycleCache
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.module.kotlin.KotlinModule
@@ -15,6 +16,7 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.CompletableFuture
 
 /**
  * CampLife's [CampgroundAvailabilityProvider] implementation. CampLife's availability endpoint
@@ -46,8 +48,6 @@ class CampLifeAvailabilityProvider(
         campgroundCache: CheckCycleCache<*, *>?,
     ): AvailabilityResult {
         val campgroundId = searchRequest.campsiteId
-        val checkin = searchRequest.startDay
-        val checkout = searchRequest.startDay.plusDays(searchRequest.nights.toLong())
         val siteIds = searchRequest.siteIds
             ?.filter { it.isNotBlank() }
             ?.toSet()
@@ -56,7 +56,53 @@ class CampLifeAvailabilityProvider(
         // Site-ID scoping is authoritative when present — siteTypeId (grouping) is not separately enforced (design.md decision 4). Amenity filtering is independent of that precedence and always applies when set.
         val siteTypeId = if (siteIds == null) details?.siteTypeId else null
         val amenityIds = details?.amenityIds ?: emptyList()
+        val siteMap = campLifeCatalogCache.getCampgroundCatalog(campgroundId)?.siteMap ?: emptyMap()
 
+        val candidates = CandidateWindows.arrivalDates(searchRequest.startDay, searchRequest.nights, searchRequest.searchEndDay)
+
+        // CampLife has no per-day availability calendar, so every candidate needs its own network
+        // call — fire them all in parallel rather than short-circuiting (every candidate is already
+        // in flight before any result is known, so there's no savings from stopping early). Each call
+        // still goes through campLifeCallProtection.execute individually, so pacing beyond the
+        // provider's rate limit is handled entirely by CallProtection (see CampLifeConfiguration),
+        // not here. Worst case is bounded by campfinder.search.providers.camplife.max-range-width-days
+        // (see design.md decision 3/5). When searchEndDay is null, candidates is just [startDay], so
+        // this is exactly one call, matching prior behavior.
+        val futuresByCandidate = candidates.associateWith { candidateStart ->
+            val candidateEnd = candidateStart.plusDays(searchRequest.nights.toLong())
+            CompletableFuture.supplyAsync {
+                matchedSitesFor(campgroundId, candidateStart, candidateEnd, amenityIds, siteTypeId, siteIds, searchRequest.groupSize, siteMap)
+            }
+        }
+
+        for (candidateStart in candidates) {
+            val matched = futuresByCandidate.getValue(candidateStart).get()
+            if (matched.isNotEmpty()) {
+                return AvailabilityResult(
+                    searchRequest = searchRequest,
+                    hasAvailableSites = true,
+                    availableSiteCount = matched.size,
+                    availableSiteIds = matched,
+                    matchedStartDay = candidateStart,
+                    matchedEndDay = candidateStart.plusDays(searchRequest.nights.toLong()),
+                )
+            }
+        }
+
+        return AvailabilityResult(searchRequest = searchRequest, hasAvailableSites = false, availableSiteCount = 0)
+    }
+
+    /** Fetches and matches sites for a single candidate stay — one CampLife API call. */
+    private fun matchedSitesFor(
+        campgroundId: Int,
+        checkin: LocalDate,
+        checkout: LocalDate,
+        amenityIds: List<Int>,
+        siteTypeId: Int?,
+        siteIds: Set<String>?,
+        groupSize: Int,
+        siteMap: Map<String, CampLifeSite>,
+    ): Set<String> {
         val response = fetchAvailability(campgroundId, checkin, checkout, amenityIds, siteTypeId)
         // isFiltered=true means CampLife excluded the site from the requested cgAmenity/siteTypeId
         // filters — never a match, regardless of what our own catalog says about it.
@@ -65,24 +111,13 @@ class CampLifeAvailabilityProvider(
             ?.filterNot { it.isFiltered }
             ?.map { it.id.toString() }
             ?.toSet() ?: emptySet()
-        if (rawSiteIds.isEmpty()) {
-            return AvailabilityResult(searchRequest, hasAvailableSites = false, availableSiteCount = 0)
-        }
+        if (rawSiteIds.isEmpty()) return emptySet()
 
-        val siteMap = campLifeCatalogCache.getCampgroundCatalog(campgroundId)?.siteMap ?: emptyMap()
-
-        val matched = rawSiteIds
+        return rawSiteIds
             .filter { id ->
                 val site = siteMap[id] ?: return@filter false
-                matchesRequest(site, siteIds, searchRequest.groupSize)
+                matchesRequest(site, siteIds, groupSize)
             }.toSet()
-
-        return AvailabilityResult(
-            searchRequest = searchRequest,
-            hasAvailableSites = matched.isNotEmpty(),
-            availableSiteCount = matched.size,
-            availableSiteIds = matched,
-        )
     }
 
     private fun matchesRequest(

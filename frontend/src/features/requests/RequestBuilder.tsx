@@ -9,8 +9,10 @@ import { LoopPicker } from './LoopPicker'
 import { EquipmentTypeFilter } from './EquipmentTypeFilter'
 import { AmenityFilter } from './AmenityFilter'
 import { CampsitePickerModal } from './CampsitePickerModal'
+import { DateWindowFields } from './DateWindowFields'
 import type { CampgroundResponse, CampgroundSearchResult } from '../../api/generated/types.gen'
 import type { AxiosError } from 'axios'
+import { validateDateWindow, type DateMode } from '../../utils/dateWindow'
 
 interface Props {
   campground: CampgroundSearchResult
@@ -31,7 +33,9 @@ function defaultAlertName(campgroundName: string): string {
 export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
   const navigate = useNavigate()
   const [name, setName] = useState(() => defaultAlertName(campground.name))
+  const [dateMode, setDateMode] = useState<DateMode>('exact')
   const [startDay, setStartDay] = useState('')
+  const [searchEndDay, setSearchEndDay] = useState('')
   const [nights, setNights] = useState(1)
   const [groupSize, setGroupSize] = useState(1)
   const [loops, setLoops] = useState<string[] | null>(null)
@@ -68,6 +72,14 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
     return Array.from(groupings)
   }, [equipmentType, catalog])
 
+  const dateWindowError = validateDateWindow({
+    mode: dateMode,
+    startDay,
+    nights,
+    searchEndDay,
+    providerType: campground.provider.type
+  })
+
   const mutation = useApiMutation({
     mutationFn: async () => {
       const result = await createSearchRequest({
@@ -81,7 +93,8 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
           loops,
           siteIds,
           amenityIds,
-          provider: campground.provider
+          provider: campground.provider,
+          searchEndDay: dateMode === 'flexible' ? searchEndDay : undefined
         }
       })
       if (result.error) throw result
@@ -100,14 +113,13 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
   function validate() {
     const e: Record<string, string> = {}
     if (!name.trim()) e.name = 'Alert name is required'
-    if (!startDay) e.startDay = 'Start date is required'
-    if (nights < 1) e.nights = 'Nights must be at least 1'
+    if (dateWindowError) e.startDay = dateWindowError
     if (groupSize < 1) e.groupSize = 'Group size must be at least 1'
     setErrors(e)
     return Object.keys(e).length === 0
   }
 
-  const canSubmit = name.trim() !== '' && startDay !== '' && nights >= 1 && groupSize >= 1
+  const canSubmit = name.trim() !== '' && !dateWindowError && groupSize >= 1
 
   return (
     <div className="mt-4 overflow-hidden transition-all duration-250">
@@ -133,10 +145,17 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
             {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
           </div>
 
-          <div>
-            <Input type="date" value={startDay} onChange={(e) => setStartDay(e.target.value)} />
-            {errors.startDay && <p className="mt-1 text-xs text-red-600">{errors.startDay}</p>}
-          </div>
+          <DateWindowFields
+            mode={dateMode}
+            onModeChange={setDateMode}
+            startDay={startDay}
+            onStartDayChange={setStartDay}
+            searchEndDay={searchEndDay}
+            onSearchEndDayChange={setSearchEndDay}
+            nights={nights}
+            providerType={campground.provider.type}
+            error={dateWindowError}
+          />
 
           <div className="grid grid-cols-2 gap-4">
             <div>

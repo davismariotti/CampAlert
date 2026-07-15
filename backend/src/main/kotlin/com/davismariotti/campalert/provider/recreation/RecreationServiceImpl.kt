@@ -7,6 +7,7 @@ import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.provider.recreation.Campsite.Companion.mergeWith
 import com.davismariotti.campalert.service.availability.AvailabilityResult
 import com.davismariotti.campalert.service.availability.CampgroundAvailabilityProvider
+import com.davismariotti.campalert.service.availability.CandidateWindows
 import com.davismariotti.campalert.service.availability.CheckCycleCache
 import com.davismariotti.campalert.util.sleepJitter
 import org.slf4j.LoggerFactory
@@ -47,11 +48,13 @@ class RecreationServiceImpl(
     ): AvailabilityResult {
         @Suppress("UNCHECKED_CAST")
         val cache = campgroundCache as? CheckCycleCache<Pair<Int, YearMonth>, Campground>
-        val endNight = searchRequest.startDay.plusDays(searchRequest.nights.toLong())
+        // Effective range end covers every candidate's checkout — searchEndDay when flexible, otherwise
+        // the single exact-date stay's checkout (startDay + nights).
+        val effectiveEnd = searchRequest.searchEndDay ?: searchRequest.startDay.plusDays(searchRequest.nights.toLong())
         var monthStart = searchRequest.startDay.withDayOfMonth(1)
         var campground: Campground? = null
 
-        while (monthStart.isBeforeMonth(endNight.plusMonths(1))) {
+        while (monthStart.isBeforeMonth(effectiveEnd.plusMonths(1))) {
             val month = YearMonth.from(monthStart)
             val capturedMonthStart = monthStart
 
@@ -73,17 +76,31 @@ class RecreationServiceImpl(
             ?.takeIf { it.isNotEmpty() }
         // Site-ID scoping is authoritative when present — loops is not separately enforced (design.md decision 4).
         val loops = if (siteIds == null) searchRequest.recreationGovDetails?.loops?.map { it.lowercase() } else null
-        val availableSites = (campground ?: Campground(emptyMap()))
-            .campsites
-            .filterValues { site ->
-                matchesRequest(site, loops, siteIds, searchRequest.groupSize, searchRequest.startDay, endNight)
+        val campsites = (campground ?: Campground(emptyMap())).campsites
+
+        // The whole merged calendar is already in memory, so every candidate is evaluated locally —
+        // no extra network calls regardless of how wide the flexible range is (see design.md decision 3).
+        for (candidateStart in CandidateWindows.arrivalDates(searchRequest.startDay, searchRequest.nights, searchRequest.searchEndDay)) {
+            val candidateEnd = candidateStart.plusDays(searchRequest.nights.toLong())
+            val availableSites = campsites.filterValues { site ->
+                matchesRequest(site, loops, siteIds, searchRequest.groupSize, candidateStart, candidateEnd)
             }
+            if (availableSites.isNotEmpty()) {
+                return AvailabilityResult(
+                    searchRequest = searchRequest,
+                    hasAvailableSites = true,
+                    availableSiteCount = availableSites.size,
+                    availableSiteIds = availableSites.keys.map { it.toString() }.toSet(),
+                    matchedStartDay = candidateStart,
+                    matchedEndDay = candidateEnd,
+                )
+            }
+        }
 
         return AvailabilityResult(
             searchRequest = searchRequest,
-            hasAvailableSites = availableSites.isNotEmpty(),
-            availableSiteCount = availableSites.size,
-            availableSiteIds = availableSites.keys.map { it.toString() }.toSet(),
+            hasAvailableSites = false,
+            availableSiteCount = 0,
         )
     }
 

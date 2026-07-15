@@ -38,6 +38,12 @@ class AvailabilityStateService(
         state.totalChecks++
         if (hasAvailable) state.availableChecks++
 
+        // Persisted so delayed outbox sends/reminders can include the dates that caused the AVAILABLE
+        // state without recomputing; a matched-date change alone (while continuously available) is
+        // deliberately not its own notification trigger — see design.md decision 6.
+        state.matchedStartDay = if (hasAvailable) result.matchedStartDay else null
+        state.matchedEndDay = if (hasAvailable) result.matchedEndDay else null
+
         if (!hasAvailable && currentState == AvailabilityState.AVAILABLE) {
             val becameAt = state.becameAvailableAt
             if (becameAt != null) {

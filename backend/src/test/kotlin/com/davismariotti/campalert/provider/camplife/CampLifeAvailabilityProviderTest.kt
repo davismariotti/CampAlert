@@ -49,18 +49,22 @@ class CampLifeAvailabilityProviderTest {
         siteTypeId: Int? = null,
         amenityIds: List<Int>? = null,
         siteIds: List<String>? = null,
-        groupSize: Int = 4
+        groupSize: Int = 4,
+        startDay: LocalDate = LocalDate.now().plusDays(10),
+        nights: Int = 2,
+        searchEndDay: LocalDate? = null,
     ): SearchRequest {
         val req = SearchRequest(
             id = 1L,
-            startDay = LocalDate.now().plusDays(10),
-            nights = 2,
+            startDay = startDay,
+            nights = nights,
             groupSize = groupSize,
             campsiteId = campgroundId,
             siteIds = siteIds,
             name = "test",
             userId = 1L,
             provider = Provider.CAMPLIFE,
+            searchEndDay = searchEndDay,
         )
         val state = SearchRequestState()
         state.searchRequest = req
@@ -102,6 +106,18 @@ class CampLifeAvailabilityProviderTest {
         val captor = argumentCaptor<CampLifeAvailabilityRequest>()
         verify(campLifeApi).getAvailability(org.mockito.kotlin.eq(campgroundId.toString()), captor.capture())
         return captor.firstValue
+    }
+
+    /** Mocks a distinct response per candidate window, keyed by the request's `checkinDate` string. */
+    private fun mockAvailabilityForCheckins(responsesByCheckin: Map<String, Response<CampLifeAvailabilityResponse>>) {
+        `when`(campLifeApi.getAvailability(org.mockito.kotlin.eq(campgroundId.toString()), org.mockito.kotlin.any())).thenAnswer { invocation ->
+            val body = invocation.arguments[1] as CampLifeAvailabilityRequest
+
+            @Suppress("UNCHECKED_CAST")
+            val call = mock(Call::class.java) as Call<CampLifeAvailabilityResponse>
+            `when`(call.execute()).thenReturn(responsesByCheckin.getValue(body.checkinDate))
+            call
+        }
     }
 
     @Test
@@ -241,6 +257,58 @@ class CampLifeAvailabilityProviderTest {
         val result = provider.checkAvailability(request(), user)
 
         assertFalse(result.hasAvailableSites)
+    }
+
+    @Test
+    fun `exact-date match sets matchedStartDay and matchedEndDay to the exact stay`() {
+        val startDay = LocalDate.now().plusDays(10)
+        mockAvailabilityCall(Response.success(CampLifeAvailabilityResponse(sites = listOf(CampLifeAvailableSite(101)))))
+        `when`(campLifeCatalogCache.getCampgroundCatalog(campgroundId)).thenReturn(catalog())
+
+        val result = provider.checkAvailability(request(startDay = startDay, nights = 2), user)
+
+        assertEquals(startDay, result.matchedStartDay)
+        assertEquals(startDay.plusDays(2), result.matchedEndDay)
+    }
+
+    @Test
+    fun `flexible search returns the earliest matching candidate window`() {
+        val startDay = LocalDate.now().plusDays(10)
+        val fmt = CampLifeAvailabilityProvider.dateFormatter
+        mockAvailabilityForCheckins(
+            mapOf(
+                startDay.format(fmt) to Response.success(CampLifeAvailabilityResponse(sites = emptyList())),
+                startDay.plusDays(1).format(fmt) to Response.success(CampLifeAvailabilityResponse(sites = listOf(CampLifeAvailableSite(101)))),
+                startDay.plusDays(2).format(fmt) to Response.success(CampLifeAvailabilityResponse(sites = listOf(CampLifeAvailableSite(101)))),
+            ),
+        )
+        `when`(campLifeCatalogCache.getCampgroundCatalog(campgroundId)).thenReturn(catalog())
+
+        val result = provider.checkAvailability(request(startDay = startDay, nights = 2, searchEndDay = startDay.plusDays(4)), user)
+
+        assertTrue(result.hasAvailableSites)
+        assertEquals(startDay.plusDays(1), result.matchedStartDay)
+        assertEquals(startDay.plusDays(3), result.matchedEndDay)
+    }
+
+    @Test
+    fun `flexible search with no match anywhere in the range calls once per candidate and returns unavailable`() {
+        val startDay = LocalDate.now().plusDays(10)
+        val fmt = CampLifeAvailabilityProvider.dateFormatter
+        mockAvailabilityForCheckins(
+            mapOf(
+                startDay.format(fmt) to Response.success(CampLifeAvailabilityResponse(sites = emptyList())),
+                startDay.plusDays(1).format(fmt) to Response.success(CampLifeAvailabilityResponse(sites = emptyList())),
+                startDay.plusDays(2).format(fmt) to Response.success(CampLifeAvailabilityResponse(sites = emptyList())),
+            ),
+        )
+
+        val result = provider.checkAvailability(request(startDay = startDay, nights = 2, searchEndDay = startDay.plusDays(4)), user)
+
+        assertFalse(result.hasAvailableSites)
+        assertNull(result.matchedStartDay)
+        assertNull(result.matchedEndDay)
+        verify(campLifeApi, org.mockito.Mockito.times(3)).getAvailability(org.mockito.kotlin.eq(campgroundId.toString()), org.mockito.kotlin.any())
     }
 
     @Test

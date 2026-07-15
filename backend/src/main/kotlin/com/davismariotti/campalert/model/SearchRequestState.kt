@@ -10,6 +10,7 @@ import jakarta.persistence.MapsId
 import jakarta.persistence.OneToOne
 import jakarta.persistence.Table
 import java.time.Instant
+import java.time.LocalDate
 
 @Entity
 @Table(name = "search_request_state")
@@ -56,4 +57,11 @@ class SearchRequestState {
 
     @Column(name = "became_available_at")
     var becameAvailableAt: Instant? = null
+
+    /** The specific candidate stay currently matched within a flexible request's range; null when unavailable or exact-date. */
+    @Column(name = "matched_start_day")
+    var matchedStartDay: LocalDate? = null
+
+    @Column(name = "matched_end_day")
+    var matchedEndDay: LocalDate? = null
 }

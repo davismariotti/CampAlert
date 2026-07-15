@@ -4,6 +4,7 @@ import com.davismariotti.campalert.httpclient.baseProviderObjectMapper
 import com.davismariotti.campalert.httpclient.buildBrowserOkHttpClient
 import com.davismariotti.campalert.provider.CallProtection
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry
 import io.github.resilience4j.retry.RetryRegistry
 import okhttp3.OkHttpClient
 import org.springframework.beans.factory.annotation.Value
@@ -22,19 +23,24 @@ class CampLifeConfiguration(
     internal fun buildOkHttpClient(): OkHttpClient = buildBrowserOkHttpClient(refererOrigin = CAMPLIFE_ORIGIN, metricName = "Custom/CampLife/Request")
 
     /**
-     * CampLife-specific call protection (circuit breaker + retry, no rate limiter), kept entirely
+     * CampLife-specific call protection (circuit breaker + retry + rate limiter), kept entirely
      * independent from [recreationGovCallProtection][com.davismariotti.campalert.provider.recreation.RecreationConfiguration.recreationGovCallProtection]
-     * so a CampLife outage or future rate-limiting can never open Recreation.gov's circuit (or vice versa).
+     * so a CampLife outage can never open Recreation.gov's circuit (or vice versa). The rate limiter
+     * was added alongside flexible-window search: a flexible CampLife check now fires one call per
+     * candidate window in parallel (see [CampLifeAvailabilityProvider]), so CampLife's own API needs
+     * the same self-imposed ceiling Recreation.gov already has.
      */
     @Bean
     fun campLifeCallProtection(
         circuitBreakerRegistry: CircuitBreakerRegistry,
         retryRegistry: RetryRegistry,
+        rateLimiterRegistry: RateLimiterRegistry,
     ): CallProtection =
         CallProtection
             .Builder("camplife")
             .circuitBreaker(circuitBreakerRegistry)
             .retry(retryRegistry)
+            .rateLimiter(rateLimiterRegistry, timeoutEventName = "CampLifeRateLimitTimeout")
             .build()
 
     @Bean
