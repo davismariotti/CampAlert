@@ -129,28 +129,28 @@ class SearchRequestsDelegateImplTest {
     @Test
     fun `creating with a valid flexible range is accepted and mapped back`() {
         val startDay = LocalDate.now().plusDays(5)
-        val searchEndDay = startDay.plusDays(10)
-        val result = delegate.createSearchRequest(createBody().copy(searchEndDay = searchEndDay))
+        val latestStartDay = startDay.plusDays(10)
+        val result = delegate.createSearchRequest(createBody().copy(latestStartDay = latestStartDay))
 
         assertEquals(201, result.statusCode.value())
-        assertEquals(searchEndDay, result.body!!.searchEndDay)
+        assertEquals(latestStartDay, result.body!!.latestStartDay)
         assertNull(result.body!!.matchedStartDay)
         assertNull(result.body!!.matchedEndDay)
     }
 
     @Test
-    fun `creating with searchEndDay earlier than startDay plus nights is rejected`() {
+    fun `creating with latestStartDay earlier than startDay is rejected`() {
         val startDay = LocalDate.now().plusDays(5)
-        val result = delegate.createSearchRequest(createBody().copy(startDay = startDay, nights = 2, searchEndDay = startDay.plusDays(1)))
+        val result = delegate.createSearchRequest(createBody().copy(startDay = startDay, latestStartDay = startDay.minusDays(1)))
 
         assertEquals(400, result.statusCode.value())
         verify(searchRequestRepository, org.mockito.Mockito.never()).save(anyKt())
     }
 
     @Test
-    fun `creating with searchEndDay equal to startDay plus nights is accepted as a single-window flex request`() {
+    fun `creating with latestStartDay equal to startDay is accepted as a single-candidate flex request`() {
         val startDay = LocalDate.now().plusDays(5)
-        val result = delegate.createSearchRequest(createBody().copy(startDay = startDay, nights = 2, searchEndDay = startDay.plusDays(2)))
+        val result = delegate.createSearchRequest(createBody().copy(startDay = startDay, latestStartDay = startDay))
 
         assertEquals(201, result.statusCode.value())
     }
@@ -158,26 +158,26 @@ class SearchRequestsDelegateImplTest {
     @Test
     fun `creating with a range wider than the provider max is rejected`() {
         val startDay = LocalDate.now().plusDays(5)
-        val result = delegate.createSearchRequest(createBody().copy(startDay = startDay, nights = 2, searchEndDay = startDay.plusDays(31)))
+        val result = delegate.createSearchRequest(createBody().copy(startDay = startDay, latestStartDay = startDay.plusDays(31)))
 
         assertEquals(400, result.statusCode.value())
     }
 
     @Test
-    fun `creating with searchEndDay for a provider with no configured max is rejected`() {
+    fun `creating with latestStartDay for a provider with no configured max is rejected`() {
         `when`(providerSearchWindowProperties.maxRangeWidthDaysFor(Provider.CAMPLIFE)).thenReturn(null)
         val startDay = LocalDate.now().plusDays(5)
         val result = delegate.createSearchRequest(
             createBody(provider = ApiProvider(type = ApiProviderType.CAMPLIFE, name = "CampLife"))
-                .copy(startDay = startDay, nights = 2, searchEndDay = startDay.plusDays(4)),
+                .copy(startDay = startDay, latestStartDay = startDay.plusDays(4)),
         )
 
         assertEquals(400, result.statusCode.value())
     }
 
     @Test
-    fun `updating to clear searchEndDay reverts to an exact-date search`() {
-        val existing = existingRequest(searchEndDay = existingRequest().startDay.plusDays(5))
+    fun `updating to clear latestStartDay reverts to an exact-date search`() {
+        val existing = existingRequest(latestStartDay = existingRequest().startDay.plusDays(5))
         `when`(searchRequestRepository.findById(10L)).thenReturn(java.util.Optional.of(existing))
 
         val result = delegate.updateSearchRequest(
@@ -189,12 +189,12 @@ class SearchRequestsDelegateImplTest {
                 campsiteId = existing.campsiteId,
                 name = existing.name,
                 completed = false,
-                searchEndDay = null,
+                latestStartDay = null,
             ),
         )
 
         assertEquals(200, result.statusCode.value())
-        assertNull(result.body!!.searchEndDay)
+        assertNull(result.body!!.latestStartDay)
     }
 
     @Test
@@ -210,7 +210,7 @@ class SearchRequestsDelegateImplTest {
         assertEquals(existing.startDay.plusDays(3), result.body!!.matchedEndDay)
     }
 
-    private fun existingRequest(searchEndDay: LocalDate? = null): SearchRequest {
+    private fun existingRequest(latestStartDay: LocalDate? = null): SearchRequest {
         val req = SearchRequest(
             id = 10L,
             startDay = LocalDate.now().plusDays(5),
@@ -220,7 +220,7 @@ class SearchRequestsDelegateImplTest {
             name = "Test",
             userId = user.id,
             provider = Provider.RECREATION_GOV,
-            searchEndDay = searchEndDay,
+            latestStartDay = latestStartDay,
         )
         val state = SearchRequestState()
         state.searchRequest = req

@@ -9,17 +9,16 @@ import java.time.LocalDate
  */
 object CandidateWindows {
     /**
-     * Ordered candidate arrival dates for a `nights`-length stay within `[startDay, searchEndDay]`.
-     * When `searchEndDay` is null, returns just `[startDay]` (exact-date search). Otherwise returns
-     * every date from `startDay` through `searchEndDay - nights` inclusive, ascending — the latest
-     * candidate still checks out on or before `searchEndDay`.
+     * Ordered candidate arrival dates within `[startDay, latestStartDay]`. When `latestStartDay` is
+     * null, returns just `[startDay]` (exact-date search). `nights` plays no part here — each
+     * candidate's own checkout is `candidate + nights`, computed separately by the caller when
+     * matching; this only enumerates possible arrival dates.
      */
-    fun arrivalDates(startDay: LocalDate, nights: Int, searchEndDay: LocalDate?): List<LocalDate> {
-        if (searchEndDay == null) return listOf(startDay)
-        val lastArrival = searchEndDay.minusDays(nights.toLong())
-        if (lastArrival.isBefore(startDay)) return emptyList()
+    fun arrivalDates(startDay: LocalDate, latestStartDay: LocalDate?): List<LocalDate> {
+        if (latestStartDay == null) return listOf(startDay)
+        if (latestStartDay.isBefore(startDay)) return emptyList()
         return generateSequence(startDay) { it.plusDays(1) }
-            .takeWhile { !it.isAfter(lastArrival) }
+            .takeWhile { !it.isAfter(latestStartDay) }
             .toList()
     }
 }

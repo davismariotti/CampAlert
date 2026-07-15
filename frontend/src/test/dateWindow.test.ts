@@ -25,28 +25,34 @@ describe('dateWindow helpers', () => {
 
   describe('candidateArrivalCount', () => {
     it('returns null when inputs are incomplete', () => {
-      expect(candidateArrivalCount('', 2, '2026-07-08')).toBeNull()
-      expect(candidateArrivalCount('2026-07-01', 2, '')).toBeNull()
+      expect(candidateArrivalCount('', '2026-07-08')).toBeNull()
+      expect(candidateArrivalCount('2026-07-01', '')).toBeNull()
     })
 
-    it('computes the number of candidate arrival dates', () => {
-      // startDay..searchEndDay-nights inclusive: Jul 1, 2, 3 -> 3 candidates
-      expect(candidateArrivalCount('2026-07-01', 2, '2026-07-08')).toBe(6)
+    it('computes the number of candidate arrival dates, independent of nights', () => {
+      // startDay..latestStartDay inclusive: Jul 1 through Jul 8 -> 8 candidates
+      expect(candidateArrivalCount('2026-07-01', '2026-07-08')).toBe(8)
     })
 
-    it('returns 1 for a single-window range (searchEndDay == startDay + nights)', () => {
-      expect(candidateArrivalCount('2026-07-01', 2, '2026-07-03')).toBe(1)
+    it('returns 1 for a single-candidate range (latestStartDay == startDay)', () => {
+      expect(candidateArrivalCount('2026-07-01', '2026-07-01')).toBe(1)
     })
 
-    it('returns null for an invalid (too-narrow) range', () => {
-      expect(candidateArrivalCount('2026-07-01', 3, '2026-07-02')).toBeNull()
+    it('returns null when latestStartDay is before startDay', () => {
+      expect(candidateArrivalCount('2026-07-05', '2026-07-01')).toBeNull()
     })
   })
 
   describe('validateDateWindow', () => {
     it('requires a start date', () => {
       expect(
-        validateDateWindow({ mode: 'exact', startDay: '', nights: 2, searchEndDay: '', providerType: 'RECREATION_GOV' })
+        validateDateWindow({
+          mode: 'exact',
+          startDay: '',
+          nights: 2,
+          latestStartDay: '',
+          providerType: 'RECREATION_GOV'
+        })
       ).toMatch(/start date/i)
     })
 
@@ -56,7 +62,7 @@ describe('dateWindow helpers', () => {
           mode: 'exact',
           startDay: '2026-07-01',
           nights: MAX_NIGHTS + 1,
-          searchEndDay: '',
+          latestStartDay: '',
           providerType: 'RECREATION_GOV'
         })
       ).toMatch(new RegExp(String(MAX_NIGHTS)))
@@ -68,43 +74,43 @@ describe('dateWindow helpers', () => {
           mode: 'exact',
           startDay: '2026-07-01',
           nights: 2,
-          searchEndDay: '',
+          latestStartDay: '',
           providerType: 'RECREATION_GOV'
         })
       ).toBeNull()
     })
 
-    it('flexible mode requires a searchEndDay', () => {
+    it('flexible mode requires a latestStartDay', () => {
       expect(
         validateDateWindow({
           mode: 'flexible',
           startDay: '2026-07-01',
           nights: 2,
-          searchEndDay: '',
+          latestStartDay: '',
           providerType: 'RECREATION_GOV'
         })
-      ).toMatch(/checkout/i)
+      ).toMatch(/arrival/i)
     })
 
-    it('rejects a searchEndDay earlier than startDay + nights', () => {
+    it('rejects a latestStartDay earlier than startDay', () => {
       expect(
         validateDateWindow({
           mode: 'flexible',
-          startDay: '2026-07-01',
+          startDay: '2026-07-05',
           nights: 2,
-          searchEndDay: '2026-07-02',
+          latestStartDay: '2026-07-01',
           providerType: 'RECREATION_GOV'
         })
-      ).toMatch(/checkout/i)
+      ).toMatch(/arrival/i)
     })
 
-    it('accepts a searchEndDay exactly at startDay + nights', () => {
+    it('accepts a latestStartDay equal to startDay, regardless of nights', () => {
       expect(
         validateDateWindow({
           mode: 'flexible',
           startDay: '2026-07-01',
-          nights: 2,
-          searchEndDay: '2026-07-03',
+          nights: 5,
+          latestStartDay: '2026-07-01',
           providerType: 'RECREATION_GOV'
         })
       ).toBeNull()
@@ -116,7 +122,7 @@ describe('dateWindow helpers', () => {
           mode: 'flexible',
           startDay: '2026-07-01',
           nights: 2,
-          searchEndDay: '2026-08-15',
+          latestStartDay: '2026-08-15',
           providerType: 'RECREATION_GOV'
         })
       ).toMatch(/30 days/)
@@ -125,7 +131,7 @@ describe('dateWindow helpers', () => {
           mode: 'flexible',
           startDay: '2026-07-01',
           nights: 2,
-          searchEndDay: '2026-07-15',
+          latestStartDay: '2026-07-15',
           providerType: 'CAMPLIFE'
         })
       ).toMatch(/9 days/)
@@ -137,7 +143,7 @@ describe('dateWindow helpers', () => {
           mode: 'flexible',
           startDay: '2026-07-01',
           nights: 2,
-          searchEndDay: '2026-07-30',
+          latestStartDay: '2026-07-31',
           providerType: 'RECREATION_GOV'
         })
       ).toBeNull()
@@ -146,7 +152,7 @@ describe('dateWindow helpers', () => {
           mode: 'flexible',
           startDay: '2026-07-01',
           nights: 2,
-          searchEndDay: '2026-07-10',
+          latestStartDay: '2026-07-10',
           providerType: 'CAMPLIFE'
         })
       ).toBeNull()
@@ -159,30 +165,30 @@ describe('dateWindow helpers', () => {
         mode: 'exact',
         startDay: '2026-07-01',
         nights: 2,
-        searchEndDay: '',
+        latestStartDay: '',
         providerType: 'RECREATION_GOV'
       })
       expect(summary).toBe('Watching Jul 1 to Jul 3')
     })
 
-    it('summarizes a flexible request', () => {
+    it('summarizes a flexible request using only arrival dates', () => {
       const summary = dateWindowSummary({
         mode: 'flexible',
         startDay: '2026-07-01',
         nights: 2,
-        searchEndDay: '2026-07-08',
+        latestStartDay: '2026-07-08',
         providerType: 'RECREATION_GOV'
       })
-      expect(summary).toBe('Watching any 2-night stay between Jul 1 and Jul 8')
+      expect(summary).toBe('Watching any 2-night stay, arriving between Jul 1 and Jul 8')
     })
 
-    it('returns null for a flexible request with no searchEndDay yet', () => {
+    it('returns null for a flexible request with no latestStartDay yet', () => {
       expect(
         dateWindowSummary({
           mode: 'flexible',
           startDay: '2026-07-01',
           nights: 2,
-          searchEndDay: '',
+          latestStartDay: '',
           providerType: 'RECREATION_GOV'
         })
       ).toBeNull()

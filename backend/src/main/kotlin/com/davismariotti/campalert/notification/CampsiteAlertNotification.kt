@@ -43,8 +43,9 @@ class CampsiteAlertNotification(
         notifications.forEach { n ->
             // The specific matched dates that disappeared are already cleared from state by the time
             // this is built (AvailabilityStateService nulls them on the same transition that queues
-            // this notification), so this describes the configured window, not the vanished match.
-            val effectiveEnd = n.request.searchEndDay ?: n.request.startDay.plusDays(n.request.nights.toLong())
+            // this notification), so this describes the configured window's widest possible checkout,
+            // not the vanished match.
+            val effectiveEnd = (n.request.latestStartDay ?: n.request.startDay).plusDays(n.request.nights.toLong())
             sb.appendLine("${n.request.campgroundName} — ${n.request.startDay} to $effectiveEnd is no longer available.")
         }
         sb.append("We'll alert you if it reopens.")

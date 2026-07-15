@@ -118,10 +118,10 @@ function StatsModal({
           <div>
             <h2 className="font-semibold text-forest-900">Alert stats</h2>
             <p className="mt-0.5 text-sm text-forest-500">{request.name}</p>
-            {!isPermitRequest(request) && request.searchEndDay && (
+            {!isPermitRequest(request) && request.latestStartDay && (
               <p className="mt-0.5 text-xs text-forest-400">
-                Any {request.nights} night{request.nights !== 1 ? 's' : ''}, {formatShortDate(request.startDay)}-
-                {formatShortDate(request.searchEndDay)}
+                Any {request.nights} night{request.nights !== 1 ? 's' : ''}, arriving{' '}
+                {formatShortDate(request.startDay)}-{formatShortDate(request.latestStartDay)}
                 {request.matchedStartDay && request.matchedEndDay
                   ? ` · Matched ${formatShortDate(request.matchedStartDay)}–${formatShortDate(request.matchedEndDay)}`
                   : ''}
@@ -216,10 +216,10 @@ export function RequestCard({ request }: Props) {
             `${request.groupSize} ${request.groupSize !== 1 ? 'people' : 'person'}`
           ].join(' · ')
         : ''
-    : request.searchEndDay
+    : request.latestStartDay
       ? [
           `Any ${request.nights} night${request.nights !== 1 ? 's' : ''}`,
-          `${formatShortDate(request.startDay)}-${formatShortDate(request.searchEndDay)}`,
+          `arriving ${formatShortDate(request.startDay)}-${formatShortDate(request.latestStartDay)}`,
           `${request.groupSize} ${request.groupSize !== 1 ? 'people' : 'person'}`
         ].join(' · ')
       : [
@@ -290,7 +290,7 @@ export function RequestCard({ request }: Props) {
         )}
 
         {/* Flexible campground match state */}
-        {!isPermit && request.searchEndDay && request.matchedStartDay && request.matchedEndDay && (
+        {!isPermit && request.latestStartDay && request.matchedStartDay && request.matchedEndDay && (
           <p className="mt-2 text-xs font-medium text-forest-700">
             Matched {formatShortDate(request.matchedStartDay)}–{formatShortDate(request.matchedEndDay)}
           </p>

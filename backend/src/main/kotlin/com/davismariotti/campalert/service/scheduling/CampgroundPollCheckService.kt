@@ -90,9 +90,9 @@ class CampgroundPollCheckService(
 
     /**
      * The last arrival date any candidate stay could still use — for an exact-date request this is
-     * just `startDay` (unchanged from before flexible search), and for a flexible request it's the
-     * last candidate's arrival date (`searchEndDay - nights`), since arrival dates after that can
-     * never be booked once they're in the past, regardless of how far out `searchEndDay` still is.
+     * just `startDay` (unchanged from before flexible search), and for a flexible request it's
+     * `latestStartDay` directly, since arrival dates after that can never be booked once they're in
+     * the past.
      */
-    private fun lastCandidateArrival(request: SearchRequest): LocalDate = request.searchEndDay?.minusDays(request.nights.toLong()) ?: request.startDay
+    private fun lastCandidateArrival(request: SearchRequest): LocalDate = request.latestStartDay ?: request.startDay
 }

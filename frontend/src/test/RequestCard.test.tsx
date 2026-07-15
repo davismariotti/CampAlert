@@ -106,7 +106,7 @@ describe('RequestCard', () => {
 
   describe('flexible date window', () => {
     it('shows the configured range for a flexible request with no current match', () => {
-      const flexRequest: SearchRequestResponse = { ...request, searchEndDay: '2026-07-18' }
+      const flexRequest: SearchRequestResponse = { ...request, latestStartDay: '2026-07-18' }
 
       render(<RequestCard request={flexRequest} />, { wrapper: Wrapper })
 
@@ -118,7 +118,7 @@ describe('RequestCard', () => {
     it('shows the matched dates prominently for a flexible request with a current match', () => {
       const matchedRequest: SearchRequestResponse = {
         ...request,
-        searchEndDay: '2026-07-18',
+        latestStartDay: '2026-07-18',
         matchedStartDay: '2026-07-14',
         matchedEndDay: '2026-07-16'
       }
@@ -128,7 +128,7 @@ describe('RequestCard', () => {
       expect(screen.getByText(/Matched Jul 14.*Jul 16/)).toBeInTheDocument()
     })
 
-    it('shows the compact exact-date meta line unchanged when searchEndDay is absent', () => {
+    it('shows the compact exact-date meta line unchanged when latestStartDay is absent', () => {
       render(<RequestCard request={request} />, { wrapper: Wrapper })
 
       expect(screen.queryByText(/^Any/)).not.toBeInTheDocument()
@@ -139,7 +139,7 @@ describe('RequestCard', () => {
       const completedFlexRequest: SearchRequestResponse = {
         ...request,
         completed: true,
-        searchEndDay: '2026-07-18',
+        latestStartDay: '2026-07-18',
         matchedStartDay: '2026-07-14',
         matchedEndDay: '2026-07-16'
       }
@@ -147,7 +147,7 @@ describe('RequestCard', () => {
       render(<RequestCard request={completedFlexRequest} />, { wrapper: Wrapper })
       await userEvent.click(screen.getByRole('button', { name: /stats/i }))
 
-      expect(screen.getByText(/Any 2 nights, Jul 10-Jul 18.*Matched Jul 14.*Jul 16/)).toBeInTheDocument()
+      expect(screen.getByText(/Any 2 nights, arriving Jul 10-Jul 18.*Matched Jul 14.*Jul 16/)).toBeInTheDocument()
     })
   })
 })

@@ -94,7 +94,7 @@ class SearchRequestsDelegateImpl(
             ) as ResponseEntity<SearchRequestResponse>
         }
         val provider = createSearchRequestBody.provider?.type?.toModel() ?: Provider.RECREATION_GOV
-        validateSearchEndDay(createSearchRequestBody.startDay, createSearchRequestBody.nights, createSearchRequestBody.searchEndDay, provider)?.let {
+        validateLatestStartDay(createSearchRequestBody.startDay, createSearchRequestBody.latestStartDay, provider)?.let {
             return ResponseEntity.badRequest().body(it) as ResponseEntity<SearchRequestResponse>
         }
         val entity = SearchRequest(
@@ -107,7 +107,7 @@ class SearchRequestsDelegateImpl(
             name = createSearchRequestBody.name,
             userId = userId,
             provider = provider,
-            searchEndDay = createSearchRequestBody.searchEndDay,
+            latestStartDay = createSearchRequestBody.latestStartDay,
         )
         val state = SearchRequestState()
         state.searchRequest = entity
@@ -144,7 +144,7 @@ class SearchRequestsDelegateImpl(
             ?.takeIf { it.userId == userId }
             ?: return ResponseEntity.notFound().build()
         val provider = updateSearchRequestBody.provider?.type?.toModel() ?: existing.provider
-        validateSearchEndDay(updateSearchRequestBody.startDay, updateSearchRequestBody.nights, updateSearchRequestBody.searchEndDay, provider)?.let {
+        validateLatestStartDay(updateSearchRequestBody.startDay, updateSearchRequestBody.latestStartDay, provider)?.let {
             return ResponseEntity.badRequest().body(it) as ResponseEntity<SearchRequestResponse>
         }
         val updated = existing.copy(
@@ -155,7 +155,7 @@ class SearchRequestsDelegateImpl(
             siteIds = updateSearchRequestBody.siteIds,
             name = updateSearchRequestBody.name,
             provider = provider,
-            searchEndDay = updateSearchRequestBody.searchEndDay,
+            latestStartDay = updateSearchRequestBody.latestStartDay,
         )
         // state/recreationGovDetails/campLifeDetails are body properties excluded from copy(); transfer
         // references before applyProviderDetails() so it mutates the existing rows in place rather than
@@ -185,23 +185,22 @@ class SearchRequestsDelegateImpl(
     }
 
     /**
-     * Validates an optional flexible-search `searchEndDay`: it must leave room for at least one
-     * `nights`-length stay, and the resulting range width must fit within the provider's configured
-     * `max-range-width-days` (a provider with no configured max does not support flexible search at
-     * all). Returns null when valid, or an [ErrorResponse] describing the first violation.
+     * Validates an optional flexible-search `latestStartDay`: it must be on or after `startDay` (every
+     * date in between is a legitimate candidate arrival, regardless of `nights`), and the resulting
+     * range width must fit within the provider's configured `max-range-width-days` (a provider with no
+     * configured max does not support flexible search at all). Returns null when valid, or an
+     * [ErrorResponse] describing the first violation.
      */
-    private fun validateSearchEndDay(
+    private fun validateLatestStartDay(
         startDay: LocalDate,
-        nights: Int,
-        searchEndDay: LocalDate?,
+        latestStartDay: LocalDate?,
         provider: Provider
     ): ErrorResponse? {
-        if (searchEndDay == null) return null
-        val minSearchEndDay = startDay.plusDays(nights.toLong())
-        if (searchEndDay.isBefore(minSearchEndDay)) {
+        if (latestStartDay == null) return null
+        if (latestStartDay.isBefore(startDay)) {
             return ErrorResponse(
-                message = "searchEndDay must be on or after $minSearchEndDay (startDay + nights), so the range contains at least one $nights-night stay.",
-                code = "SEARCH_END_DAY_TOO_EARLY",
+                message = "latestStartDay must be on or after startDay.",
+                code = "LATEST_START_DAY_TOO_EARLY",
             )
         }
         val maxRangeWidthDays = providerSearchWindowProperties.maxRangeWidthDaysFor(provider)
@@ -209,7 +208,7 @@ class SearchRequestsDelegateImpl(
                 message = "Flexible search is not supported for ${provider.friendlyName}.",
                 code = "FLEXIBLE_SEARCH_UNSUPPORTED",
             )
-        val rangeWidthDays = ChronoUnit.DAYS.between(startDay, searchEndDay)
+        val rangeWidthDays = ChronoUnit.DAYS.between(startDay, latestStartDay)
         if (rangeWidthDays > maxRangeWidthDays) {
             return ErrorResponse(
                 message = "The flexible date range ($rangeWidthDays days) exceeds the maximum of $maxRangeWidthDays days for ${provider.friendlyName}.",
@@ -316,7 +315,7 @@ class SearchRequestsDelegateImpl(
             pauseReason = this.state.pauseReason,
             stats = stats,
             provider = this.provider.toApi(),
-            searchEndDay = this.searchEndDay,
+            latestStartDay = this.latestStartDay,
             matchedStartDay = this.state.matchedStartDay,
             matchedEndDay = this.state.matchedEndDay,
         )

@@ -48,9 +48,9 @@ class RecreationServiceImpl(
     ): AvailabilityResult {
         @Suppress("UNCHECKED_CAST")
         val cache = campgroundCache as? CheckCycleCache<Pair<Int, YearMonth>, Campground>
-        // Effective range end covers every candidate's checkout — searchEndDay when flexible, otherwise
-        // the single exact-date stay's checkout (startDay + nights).
-        val effectiveEnd = searchRequest.searchEndDay ?: searchRequest.startDay.plusDays(searchRequest.nights.toLong())
+        // Effective range end covers every candidate's checkout — the last candidate's arrival
+        // (latestStartDay, or startDay for an exact-date search) plus nights.
+        val effectiveEnd = (searchRequest.latestStartDay ?: searchRequest.startDay).plusDays(searchRequest.nights.toLong())
         var monthStart = searchRequest.startDay.withDayOfMonth(1)
         var campground: Campground? = null
 
@@ -80,7 +80,7 @@ class RecreationServiceImpl(
 
         // The whole merged calendar is already in memory, so every candidate is evaluated locally —
         // no extra network calls regardless of how wide the flexible range is (see design.md decision 3).
-        for (candidateStart in CandidateWindows.arrivalDates(searchRequest.startDay, searchRequest.nights, searchRequest.searchEndDay)) {
+        for (candidateStart in CandidateWindows.arrivalDates(searchRequest.startDay, searchRequest.latestStartDay)) {
             val candidateEnd = candidateStart.plusDays(searchRequest.nights.toLong())
             val availableSites = campsites.filterValues { site ->
                 matchesRequest(site, loops, siteIds, searchRequest.groupSize, candidateStart, candidateEnd)

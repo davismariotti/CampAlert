@@ -20,9 +20,9 @@ interface Props {
 export function RequestEditModal({ request, onClose }: Props) {
   const queryClient = useQueryClient()
   const [name, setName] = useState(request.name)
-  const [dateMode, setDateMode] = useState<DateMode>(request.searchEndDay ? 'flexible' : 'exact')
+  const [dateMode, setDateMode] = useState<DateMode>(request.latestStartDay ? 'flexible' : 'exact')
   const [startDay, setStartDay] = useState(request.startDay)
-  const [searchEndDay, setSearchEndDay] = useState(request.searchEndDay ?? '')
+  const [latestStartDay, setLatestStartDay] = useState(request.latestStartDay ?? '')
   const [nights, setNights] = useState(request.nights)
   const [groupSize, setGroupSize] = useState(request.groupSize)
   const [loops, setLoops] = useState<string[] | null>(request.loops ?? null)
@@ -37,7 +37,7 @@ export function RequestEditModal({ request, onClose }: Props) {
     mode: dateMode,
     startDay,
     nights,
-    searchEndDay,
+    latestStartDay,
     providerType: request.provider.type
   })
 
@@ -83,7 +83,7 @@ export function RequestEditModal({ request, onClose }: Props) {
           siteIds: siteIds ?? undefined,
           amenityIds: amenityIds ?? undefined,
           completed,
-          searchEndDay: dateMode === 'flexible' ? searchEndDay : undefined
+          latestStartDay: dateMode === 'flexible' ? latestStartDay : undefined
         }
       })
       if (result.error) throw result
@@ -108,8 +108,8 @@ export function RequestEditModal({ request, onClose }: Props) {
             onModeChange={setDateMode}
             startDay={startDay}
             onStartDayChange={setStartDay}
-            searchEndDay={searchEndDay}
-            onSearchEndDayChange={setSearchEndDay}
+            latestStartDay={latestStartDay}
+            onLatestStartDayChange={setLatestStartDay}
             nights={nights}
             providerType={request.provider.type}
             error={dateWindowError}

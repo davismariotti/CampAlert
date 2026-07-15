@@ -6,9 +6,10 @@ export type DateMode = 'exact' | 'flexible'
 // Mirrors the backend's campfinder.search.max-nights (all providers, exact or flexible).
 export const MAX_NIGHTS = 21
 
-// Mirrors the backend's campfinder.search.providers.<key>.max-range-width-days — CampLife has no
-// per-day availability calendar, so every candidate window costs its own API call (fired in
-// parallel), hence the much tighter cap than Recreation.gov's month-cached, in-memory scan.
+// Mirrors the backend's campfinder.search.providers.<key>.max-range-width-days — latestStartDay -
+// startDay, i.e. candidate count minus one, independent of nights. CampLife has no per-day
+// availability calendar, so every candidate window costs its own API call (fired in parallel),
+// hence the much tighter cap than Recreation.gov's month-cached, in-memory scan.
 const MAX_RANGE_WIDTH_DAYS: Record<ProviderType, number> = {
   RECREATION_GOV: 30,
   CAMPLIFE: 9
@@ -46,10 +47,13 @@ export function formatShortDate(dateStr: string): string {
   return new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-/** Number of candidate arrival dates in a flexible range, or null when the inputs can't produce one yet. */
-export function candidateArrivalCount(startDay: string, nights: number, searchEndDay: string): number | null {
-  if (!startDay || !searchEndDay || nights < 1) return null
-  const count = daysBetween(startDay, searchEndDay) - nights + 1
+/**
+ * Number of candidate arrival dates in a flexible range (every date from startDay through
+ * latestStartDay inclusive), or null when the inputs can't produce one yet. Independent of nights.
+ */
+export function candidateArrivalCount(startDay: string, latestStartDay: string): number | null {
+  if (!startDay || !latestStartDay) return null
+  const count = daysBetween(startDay, latestStartDay) + 1
   return count > 0 ? count : null
 }
 
@@ -57,7 +61,7 @@ export interface DateWindowInput {
   mode: DateMode
   startDay: string
   nights: number
-  searchEndDay: string
+  latestStartDay: string
   providerType: ProviderType
 }
 
@@ -66,33 +70,32 @@ export function validateDateWindow({
   mode,
   startDay,
   nights,
-  searchEndDay,
+  latestStartDay,
   providerType
 }: DateWindowInput): string | null {
   if (!startDay) return 'Start date is required'
   if (nights < 1 || nights > MAX_NIGHTS) return `Nights must be between 1 and ${MAX_NIGHTS}`
   if (mode === 'exact') return null
 
-  if (!searchEndDay) return 'Latest checkout date is required for a flexible search'
-  const minEnd = addDays(startDay, nights)
-  if (searchEndDay < minEnd) return `Latest checkout must be on or after ${formatShortDate(minEnd)}`
+  if (!latestStartDay) return 'Latest arrival date is required for a flexible search'
+  if (latestStartDay < startDay) return `Latest arrival must be on or after ${formatShortDate(startDay)}`
 
   const maxWidth = maxRangeWidthDaysFor(providerType)
-  const rangeWidth = daysBetween(startDay, searchEndDay)
+  const rangeWidth = daysBetween(startDay, latestStartDay)
   if (rangeWidth > maxWidth)
     return `Range can't be more than ${maxWidth} days for ${providerFriendlyName(providerType)}`
 
   return null
 }
 
-/** Plain-language summary shown below the date controls — the main guardrail against misreading checkout dates. */
-export function dateWindowSummary({ mode, startDay, nights, searchEndDay }: DateWindowInput): string | null {
+/** Plain-language summary shown below the date controls — arrival-only, so no derived checkout math is shown. */
+export function dateWindowSummary({ mode, startDay, nights, latestStartDay }: DateWindowInput): string | null {
   if (!startDay || nights < 1) return null
 
   if (mode === 'exact') {
     return `Watching ${formatShortDate(startDay)} to ${formatShortDate(addDays(startDay, nights))}`
   }
 
-  if (!searchEndDay || searchEndDay < startDay) return null
-  return `Watching any ${nights}-night stay between ${formatShortDate(startDay)} and ${formatShortDate(searchEndDay)}`
+  if (!latestStartDay || latestStartDay < startDay) return null
+  return `Watching any ${nights}-night stay, arriving between ${formatShortDate(startDay)} and ${formatShortDate(latestStartDay)}`
 }

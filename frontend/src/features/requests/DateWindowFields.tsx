@@ -7,8 +7,8 @@ interface Props {
   onModeChange: (mode: DateMode) => void
   startDay: string
   onStartDayChange: (value: string) => void
-  searchEndDay: string
-  onSearchEndDayChange: (value: string) => void
+  latestStartDay: string
+  onLatestStartDayChange: (value: string) => void
   nights: number
   providerType: ProviderType
   error?: string | null
@@ -17,21 +17,23 @@ interface Props {
 /**
  * Shared exact/flexible date controls for the create and edit flows — one place for the date-mode
  * toggle, range inputs, computed summary, and candidate-count feedback so both forms agree on what's
- * valid and what the user sees (see design.md decisions 9/13).
+ * valid and what the user sees (see design.md decisions 9/13). Both flexible-mode bounds are arrival
+ * dates — "earliest arrival" and "latest arrival" — so the user never has to compute a checkout date
+ * themselves to express the range they mean.
  */
 export function DateWindowFields({
   mode,
   onModeChange,
   startDay,
   onStartDayChange,
-  searchEndDay,
-  onSearchEndDayChange,
+  latestStartDay,
+  onLatestStartDayChange,
   nights,
   providerType,
   error
 }: Props) {
-  const summary = dateWindowSummary({ mode, startDay, nights, searchEndDay, providerType })
-  const candidateCount = mode === 'flexible' ? candidateArrivalCount(startDay, nights, searchEndDay) : null
+  const summary = dateWindowSummary({ mode, startDay, nights, latestStartDay, providerType })
+  const candidateCount = mode === 'flexible' ? candidateArrivalCount(startDay, latestStartDay) : null
 
   return (
     <div className="flex flex-col gap-2">
@@ -70,12 +72,12 @@ export function DateWindowFields({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-forest-600">Latest checkout</label>
+            <label className="mb-1 block text-xs font-medium text-forest-600">Latest arrival</label>
             <Input
               type="date"
-              value={searchEndDay}
-              onChange={(e) => onSearchEndDayChange(e.target.value)}
-              aria-label="Latest checkout"
+              value={latestStartDay}
+              onChange={(e) => onLatestStartDayChange(e.target.value)}
+              aria-label="Latest arrival"
             />
           </div>
         </div>

@@ -40,7 +40,7 @@ class RecreationServiceImplTest {
     private fun request(
         startDay: LocalDate,
         nights: Int,
-        searchEndDay: LocalDate? = null,
+        latestStartDay: LocalDate? = null,
         loops: List<String>? = null,
         siteIds: List<String>? = null,
         groupSize: Int = 2,
@@ -55,7 +55,7 @@ class RecreationServiceImplTest {
             name = "test",
             userId = 1L,
             provider = Provider.RECREATION_GOV,
-            searchEndDay = searchEndDay,
+            latestStartDay = latestStartDay,
         )
         val state = SearchRequestState()
         state.searchRequest = req
@@ -128,16 +128,34 @@ class RecreationServiceImplTest {
     @Test
     fun `flexible search selects the earliest matching candidate window`() {
         val startDay = LocalDate.now().plusDays(10)
-        // Range: startDay..startDay+4 (searchEndDay), nights=2 -> candidates startDay, +1, +2.
-        // Only the +1/+2 pair is fully available, so the second candidate (startDay+1) should win.
+        // latestStartDay = startDay+2, nights=2 -> candidates are startDay, +1, +2 directly (no
+        // subtraction for nights). Only the +1/+2 pair is fully available, so the second candidate
+        // (startDay+1) should win.
         val allDates = (0..4).map { startDay.plusDays(it.toLong()) }
         mockMonthlyFetch(campgroundWith(allDates, availableDates = setOf(startDay.plusDays(1), startDay.plusDays(2))))
 
-        val result = service.checkAvailability(request(startDay, nights = 2, searchEndDay = startDay.plusDays(4)), user, null)
+        val result = service.checkAvailability(request(startDay, nights = 2, latestStartDay = startDay.plusDays(2)), user, null)
 
         assertTrue(result.hasAvailableSites)
         assertEquals(startDay.plusDays(1), result.matchedStartDay)
         assertEquals(startDay.plusDays(3), result.matchedEndDay)
+    }
+
+    @Test
+    fun `candidate arrival dates run through latestStartDay directly, independent of nights`() {
+        val startDay = LocalDate.now().plusDays(10)
+        // nights=5 here would previously have shrunk the candidate range (lastArrival = latestStartDay
+        // - nights); now the candidate range is exactly [startDay, latestStartDay] regardless of nights.
+        val latestStartDay = startDay.plusDays(3)
+        val allDates = (0..8).map { startDay.plusDays(it.toLong()) }
+        // Only the very last candidate (startDay+3) is fully available for a 5-night stay.
+        mockMonthlyFetch(campgroundWith(allDates, availableDates = (3..8).map { startDay.plusDays(it.toLong()) }.toSet()))
+
+        val result = service.checkAvailability(request(startDay, nights = 5, latestStartDay = latestStartDay), user, null)
+
+        assertTrue(result.hasAvailableSites)
+        assertEquals(startDay.plusDays(3), result.matchedStartDay)
+        assertEquals(startDay.plusDays(8), result.matchedEndDay)
     }
 
     @Test
@@ -147,12 +165,12 @@ class RecreationServiceImplTest {
             .withDayOfMonth(1)
             .plusMonths(1)
             .minusDays(1) // last day of a month
-        val searchEndDay = startDay.plusDays(5)
+        val latestStartDay = startDay.plusDays(3)
         val allDates = (0..5).map { startDay.plusDays(it.toLong()) }
         // Only the last candidate's two nights (crossing into the next month) are available.
         mockMonthlyFetch(campgroundWith(allDates, availableDates = setOf(startDay.plusDays(3), startDay.plusDays(4))))
 
-        val result = service.checkAvailability(request(startDay, nights = 2, searchEndDay = searchEndDay), user, null)
+        val result = service.checkAvailability(request(startDay, nights = 2, latestStartDay = latestStartDay), user, null)
 
         assertTrue(result.hasAvailableSites)
         assertEquals(startDay.plusDays(3), result.matchedStartDay)
@@ -165,7 +183,7 @@ class RecreationServiceImplTest {
         val allDates = (0..4).map { startDay.plusDays(it.toLong()) }
         mockMonthlyFetch(campgroundWith(allDates, availableDates = emptySet()))
 
-        val result = service.checkAvailability(request(startDay, nights = 2, searchEndDay = startDay.plusDays(4)), user, null)
+        val result = service.checkAvailability(request(startDay, nights = 2, latestStartDay = startDay.plusDays(2)), user, null)
 
         assertFalse(result.hasAvailableSites)
         assertNull(result.matchedStartDay)
@@ -178,7 +196,7 @@ class RecreationServiceImplTest {
         val allDates = (0..2).map { startDay.plusDays(it.toLong()) }
         mockMonthlyFetch(campgroundWith(allDates, availableDates = allDates.toSet(), loop = "B Loop"))
 
-        val result = service.checkAvailability(request(startDay, nights = 1, searchEndDay = startDay.plusDays(2), loops = listOf("A Loop")), user, null)
+        val result = service.checkAvailability(request(startDay, nights = 1, latestStartDay = startDay.plusDays(1), loops = listOf("A Loop")), user, null)
 
         assertFalse(result.hasAvailableSites)
     }

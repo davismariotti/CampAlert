@@ -58,7 +58,7 @@ class CampLifeAvailabilityProvider(
         val amenityIds = details?.amenityIds ?: emptyList()
         val siteMap = campLifeCatalogCache.getCampgroundCatalog(campgroundId)?.siteMap ?: emptyMap()
 
-        val candidates = CandidateWindows.arrivalDates(searchRequest.startDay, searchRequest.nights, searchRequest.searchEndDay)
+        val candidates = CandidateWindows.arrivalDates(searchRequest.startDay, searchRequest.latestStartDay)
 
         // CampLife has no per-day availability calendar, so every candidate needs its own network
         // call — fire them all in parallel rather than short-circuiting (every candidate is already
@@ -66,7 +66,7 @@ class CampLifeAvailabilityProvider(
         // still goes through campLifeCallProtection.execute individually, so pacing beyond the
         // provider's rate limit is handled entirely by CallProtection (see CampLifeConfiguration),
         // not here. Worst case is bounded by campfinder.search.providers.camplife.max-range-width-days
-        // (see design.md decision 3/5). When searchEndDay is null, candidates is just [startDay], so
+        // (see design.md decision 3/5). When latestStartDay is null, candidates is just [startDay], so
         // this is exactly one call, matching prior behavior.
         val futuresByCandidate = candidates.associateWith { candidateStart ->
             val candidateEnd = candidateStart.plusDays(searchRequest.nights.toLong())
