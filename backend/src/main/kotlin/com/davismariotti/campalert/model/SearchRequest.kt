@@ -56,9 +56,9 @@ data class SearchRequest(
     @Column(name = "provider")
     val provider: Provider = Provider.RECREATION_GOV,
 
-    /** Latest acceptable checkout date for a flexible search; null means an exact-date search for `startDay` through `startDay + nights`. */
-    @Column(name = "search_end_day")
-    val searchEndDay: LocalDate? = null,
+    /** Latest acceptable arrival date for a flexible search; null means an exact-date search for `startDay` alone. */
+    @Column(name = "latest_start_day")
+    val latestStartDay: LocalDate? = null,
 ) : AlertableRequest {
     // Body properties: excluded from equals/hashCode/copy/toString to prevent circular reference.
     @OneToOne(mappedBy = "searchRequest", cascade = [CascadeType.ALL], fetch = FetchType.EAGER, orphanRemoval = true)

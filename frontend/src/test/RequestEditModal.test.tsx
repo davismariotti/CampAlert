@@ -38,61 +38,61 @@ function Wrapper({ request, onClose = () => {} }: { request: SearchRequestRespon
 }
 
 describe('RequestEditModal date window', () => {
-  it('initializes in exact mode when the request has no searchEndDay', () => {
+  it('initializes in exact mode when the request has no latestStartDay', () => {
     render(<Wrapper request={baseRequest} />)
 
     expect(screen.getByRole('button', { name: 'Exact dates' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByLabelText('Earliest arrival')).not.toBeInTheDocument()
   })
 
-  it('initializes in flexible mode when the request has a searchEndDay', () => {
-    render(<Wrapper request={{ ...baseRequest, searchEndDay: '2026-07-18' }} />)
+  it('initializes in flexible mode when the request has a latestStartDay', () => {
+    render(<Wrapper request={{ ...baseRequest, latestStartDay: '2026-07-18' }} />)
 
     expect(screen.getByRole('button', { name: 'Flexible window' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByLabelText('Earliest arrival')).toBeInTheDocument()
-    expect(screen.getByLabelText('Latest checkout')).toHaveValue('2026-07-18')
+    expect(screen.getByLabelText('Latest arrival')).toHaveValue('2026-07-18')
   })
 
-  it('switching to exact mode and saving omits searchEndDay from the payload', async () => {
+  it('switching to exact mode and saving omits latestStartDay from the payload', async () => {
     const updateSpy = vi.spyOn(sdk, 'updateSearchRequest').mockResolvedValue({
       data: { ...baseRequest },
       error: undefined
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any)
 
-    render(<Wrapper request={{ ...baseRequest, searchEndDay: '2026-07-18' }} />)
+    render(<Wrapper request={{ ...baseRequest, latestStartDay: '2026-07-18' }} />)
     await userEvent.click(screen.getByRole('button', { name: 'Exact dates' }))
     await userEvent.click(screen.getByRole('button', { name: /save/i }))
 
     expect(updateSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: expect.objectContaining({ searchEndDay: undefined })
+        body: expect.objectContaining({ latestStartDay: undefined })
       })
     )
   })
 
-  it('saving a valid flexible range includes searchEndDay in the payload', async () => {
+  it('saving a valid flexible range includes latestStartDay in the payload', async () => {
     const updateSpy = vi.spyOn(sdk, 'updateSearchRequest').mockResolvedValue({
       data: { ...baseRequest },
       error: undefined
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any)
 
-    render(<Wrapper request={{ ...baseRequest, searchEndDay: '2026-07-18' }} />)
+    render(<Wrapper request={{ ...baseRequest, latestStartDay: '2026-07-18' }} />)
     await userEvent.click(screen.getByRole('button', { name: /save/i }))
 
     expect(updateSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: expect.objectContaining({ searchEndDay: '2026-07-18' })
+        body: expect.objectContaining({ latestStartDay: '2026-07-18' })
       })
     )
   })
 
-  it('an invalid flexible range disables Save', async () => {
-    render(<Wrapper request={{ ...baseRequest, searchEndDay: '2026-07-18' }} />)
-    const checkoutInput = screen.getByLabelText('Latest checkout')
-    await userEvent.clear(checkoutInput)
-    await userEvent.type(checkoutInput, '2026-07-11')
+  it('an invalid flexible range (latest arrival before earliest arrival) disables Save', async () => {
+    render(<Wrapper request={{ ...baseRequest, latestStartDay: '2026-07-18' }} />)
+    const latestArrivalInput = screen.getByLabelText('Latest arrival')
+    await userEvent.clear(latestArrivalInput)
+    await userEvent.type(latestArrivalInput, '2026-07-05')
 
     expect(screen.getByRole('button', { name: /save/i })).toBeDisabled()
   })

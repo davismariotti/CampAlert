@@ -35,7 +35,7 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
   const [name, setName] = useState(() => defaultAlertName(campground.name))
   const [dateMode, setDateMode] = useState<DateMode>('exact')
   const [startDay, setStartDay] = useState('')
-  const [searchEndDay, setSearchEndDay] = useState('')
+  const [latestStartDay, setLatestStartDay] = useState('')
   const [nights, setNights] = useState(1)
   const [groupSize, setGroupSize] = useState(1)
   const [loops, setLoops] = useState<string[] | null>(null)
@@ -76,7 +76,7 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
     mode: dateMode,
     startDay,
     nights,
-    searchEndDay,
+    latestStartDay,
     providerType: campground.provider.type
   })
 
@@ -94,7 +94,7 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
           siteIds,
           amenityIds,
           provider: campground.provider,
-          searchEndDay: dateMode === 'flexible' ? searchEndDay : undefined
+          latestStartDay: dateMode === 'flexible' ? latestStartDay : undefined
         }
       })
       if (result.error) throw result
@@ -150,8 +150,8 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
             onModeChange={setDateMode}
             startDay={startDay}
             onStartDayChange={setStartDay}
-            searchEndDay={searchEndDay}
-            onSearchEndDayChange={setSearchEndDay}
+            latestStartDay={latestStartDay}
+            onLatestStartDayChange={setLatestStartDay}
             nights={nights}
             providerType={campground.provider.type}
             error={dateWindowError}

@@ -389,31 +389,31 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
     // --- flexible search range validation ---
 
     @Test
-    fun `create with a valid flexible range returns 201 with searchEndDay persisted`() {
+    fun `create with a valid flexible range returns 201 with latestStartDay persisted`() {
         val session = registerAndLogin()
         seedVerifiedPhone(userRepository.findByEmail("user@test.com")!!.id!!)
         val result = doPost(
             "/api/search-requests",
             session,
-            defaultCreateBody.copy(startDay = LocalDate.of(2027, 7, 1), nights = 2, searchEndDay = LocalDate.of(2027, 7, 10)),
+            defaultCreateBody.copy(startDay = LocalDate.of(2027, 7, 1), nights = 2, latestStartDay = LocalDate.of(2027, 7, 10)),
         )
         assertThat(result.response.status).isEqualTo(201)
         val tree = mapper.readTree(result.response.contentAsString)
-        assertThat(tree.get("searchEndDay").textValue()).isEqualTo("2027-07-10")
+        assertThat(tree.get("latestStartDay").textValue()).isEqualTo("2027-07-10")
         assertThat(tree.get("matchedStartDay").isNull).isTrue()
     }
 
     @Test
-    fun `create with searchEndDay narrower than startDay plus nights returns 400`() {
+    fun `create with latestStartDay earlier than startDay returns 400`() {
         val session = registerAndLogin()
         seedVerifiedPhone(userRepository.findByEmail("user@test.com")!!.id!!)
         val result = doPost(
             "/api/search-requests",
             session,
-            defaultCreateBody.copy(startDay = LocalDate.of(2027, 7, 1), nights = 2, searchEndDay = LocalDate.of(2027, 7, 2)),
+            defaultCreateBody.copy(startDay = LocalDate.of(2027, 7, 1), nights = 2, latestStartDay = LocalDate.of(2027, 6, 30)),
         )
         assertThat(result.response.status).isEqualTo(400)
-        assertThat(result.response.contentAsString).contains("SEARCH_END_DAY_TOO_EARLY")
+        assertThat(result.response.contentAsString).contains("LATEST_START_DAY_TOO_EARLY")
     }
 
     @Test
@@ -423,7 +423,7 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
         val result = doPost(
             "/api/search-requests",
             session,
-            defaultCreateBody.copy(startDay = LocalDate.of(2027, 7, 1), nights = 2, searchEndDay = LocalDate.of(2027, 8, 15)),
+            defaultCreateBody.copy(startDay = LocalDate.of(2027, 7, 1), nights = 2, latestStartDay = LocalDate.of(2027, 8, 15)),
         )
         assertThat(result.response.status).isEqualTo(400)
         assertThat(result.response.contentAsString).contains("SEARCH_RANGE_TOO_WIDE")
@@ -438,7 +438,7 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
     }
 
     @Test
-    fun `update to clear searchEndDay reverts to an exact-date search`() {
+    fun `update to clear latestStartDay reverts to an exact-date search`() {
         val session = registerAndLogin()
         val userId = userRepository.findByEmail("user@test.com")!!.id!!
         val req = SearchRequest(
@@ -449,7 +449,7 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
             campsiteId = 10,
             name = "Weekend Trip",
             campgroundName = "Pine Valley",
-            searchEndDay = LocalDate.of(2027, 7, 10),
+            latestStartDay = LocalDate.of(2027, 7, 10),
         )
         val st = SearchRequestState()
         st.searchRequest = req
@@ -459,11 +459,11 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
         val result = doPut(
             "/api/search-requests/${saved.id}",
             session,
-            defaultUpdateBody.copy(searchEndDay = null),
+            defaultUpdateBody.copy(latestStartDay = null),
         )
         assertThat(result.response.status).isEqualTo(200)
         val tree = mapper.readTree(result.response.contentAsString)
-        assertThat(tree.get("searchEndDay").isNull).isTrue()
+        assertThat(tree.get("latestStartDay").isNull).isTrue()
     }
 
     @Test

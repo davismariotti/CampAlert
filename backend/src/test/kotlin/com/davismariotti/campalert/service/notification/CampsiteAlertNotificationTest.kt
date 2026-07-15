@@ -19,7 +19,7 @@ class CampsiteAlertNotificationTest {
         startDay: LocalDate = LocalDate.now().plusDays(10),
         nights: Int = 2,
         provider: Provider = Provider.RECREATION_GOV,
-        searchEndDay: LocalDate? = null,
+        latestStartDay: LocalDate? = null,
         matchedStartDay: LocalDate? = null,
         matchedEndDay: LocalDate? = null,
     ): SearchRequest {
@@ -32,7 +32,7 @@ class CampsiteAlertNotificationTest {
             name = "Test Trip",
             campgroundName = campgroundName,
             provider = provider,
-            searchEndDay = searchEndDay,
+            latestStartDay = latestStartDay,
         )
         val st = SearchRequestState()
         st.searchRequest = req
@@ -120,7 +120,7 @@ class CampsiteAlertNotificationTest {
         val flexRequest = buildRequest(
             startDay = startDay,
             nights = 2,
-            searchEndDay = startDay.plusDays(8),
+            latestStartDay = startDay.plusDays(8),
             matchedStartDay = startDay.plusDays(3),
             matchedEndDay = startDay.plusDays(5),
         )
@@ -146,17 +146,18 @@ class CampsiteAlertNotificationTest {
     }
 
     @Test
-    fun `gone message describes the configured flexible range, not the cleared match`() {
+    fun `gone message describes the widest possible checkout across the configured range, not the cleared match`() {
         val startDay = LocalDate.now().plusDays(10)
         // Matched dates are already null here — AvailabilityStateService clears them on the same
-        // transition that queues this notification, before this ever runs.
-        val flexRequest = buildRequest(startDay = startDay, nights = 2, searchEndDay = startDay.plusDays(8))
+        // transition that queues this notification, before this ever runs. The widest possible
+        // checkout is latestStartDay + nights, i.e. if the very last candidate had matched.
+        val flexRequest = buildRequest(startDay = startDay, nights = 2, latestStartDay = startDay.plusDays(8))
         val notifications = listOf(PendingNotification(request = flexRequest, type = OutboxType.UNAVAILABLE, outboxId = 1L))
         val notification = CampsiteAlertNotification(available = emptyList(), gone = notifications)
 
         val body = notification.sms()!!.text
 
-        assertTrue(body.contains("$startDay to ${startDay.plusDays(8)}"))
+        assertTrue(body.contains("$startDay to ${startDay.plusDays(10)}"))
     }
 
     @Test

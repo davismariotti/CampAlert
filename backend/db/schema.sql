@@ -30,7 +30,7 @@ CREATE TABLE "public"."search_requests" (
   "campground_name" character varying(255) NOT NULL DEFAULT '',
   "campground_timezone" character varying(64) NULL,
   "provider" character varying(32) NOT NULL DEFAULT 'RECREATION_GOV',
-  "search_end_day" date NULL,
+  "latest_start_day" date NULL,
   PRIMARY KEY ("id"),
   -- atlas:renamed_from fk_search_requests_v2_user
   CONSTRAINT "fk_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),

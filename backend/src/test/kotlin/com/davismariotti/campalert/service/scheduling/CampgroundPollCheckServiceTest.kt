@@ -53,7 +53,7 @@ class CampgroundPollCheckServiceTest {
         pauseReason: String? = null,
         startDay: LocalDate = futureDay,
         nights: Int = 1,
-        searchEndDay: LocalDate? = null,
+        latestStartDay: LocalDate? = null,
     ): SearchRequest {
         val req = SearchRequest(
             id = id,
@@ -64,7 +64,7 @@ class CampgroundPollCheckServiceTest {
             name = "test",
             userId = userId,
             provider = provider,
-            searchEndDay = searchEndDay,
+            latestStartDay = latestStartDay,
         )
         val st = SearchRequestState()
         st.searchRequest = req
@@ -194,10 +194,10 @@ class CampgroundPollCheckServiceTest {
     }
 
     @Test
-    fun `flexible request whose startDay has passed but searchEndDay has not stays active`() {
+    fun `flexible request whose startDay has passed but latestStartDay has not stays active`() {
         val yesterday = LocalDate.now(ZoneOffset.UTC).minusDays(1)
-        // nights=2, searchEndDay=+10 -> last candidate arrival is +8, still in the future.
-        val req = request(startDay = yesterday, nights = 2, searchEndDay = LocalDate.now(ZoneOffset.UTC).plusDays(10))
+        // latestStartDay is the last candidate arrival directly — still in the future here.
+        val req = request(startDay = yesterday, nights = 2, latestStartDay = LocalDate.now(ZoneOffset.UTC).plusDays(8))
         `when`(searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, provider)).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser))
         `when`(availabilityProvider.checkAvailability(any(), any(), any())).thenReturn(result(req))
@@ -210,9 +210,9 @@ class CampgroundPollCheckServiceTest {
     }
 
     @Test
-    fun `flexible request whose last candidate arrival has passed is auto-completed`() {
-        // nights=2, searchEndDay=today+1 -> last candidate arrival is yesterday, already passed.
-        val req = request(startDay = LocalDate.now(ZoneOffset.UTC).minusDays(3), nights = 2, searchEndDay = LocalDate.now(ZoneOffset.UTC).plusDays(1))
+    fun `flexible request whose latestStartDay has passed is auto-completed`() {
+        // latestStartDay is the last candidate arrival directly — already passed here.
+        val req = request(startDay = LocalDate.now(ZoneOffset.UTC).minusDays(3), nights = 2, latestStartDay = LocalDate.now(ZoneOffset.UTC).minusDays(1))
         `when`(searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, provider)).thenReturn(listOf(req))
 
         val evaluated = service.check(provider, campsiteId)

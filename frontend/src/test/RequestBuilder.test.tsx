@@ -154,7 +154,7 @@ describe('RequestBuilder', () => {
   })
 
   describe('flexible date window', () => {
-    it('exact mode omits searchEndDay from the create payload', async () => {
+    it('exact mode omits latestStartDay from the create payload', async () => {
       const createSpy = vi.spyOn(sdk, 'createSearchRequest').mockResolvedValue({
         data: { id: 1 },
         error: undefined
@@ -169,17 +169,17 @@ describe('RequestBuilder', () => {
 
       expect(createSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: expect.objectContaining({ searchEndDay: undefined })
+          body: expect.objectContaining({ latestStartDay: undefined })
         })
       )
     })
 
-    it('switching to flexible mode shows earliest arrival and latest checkout fields', async () => {
+    it('switching to flexible mode shows earliest arrival and latest arrival fields', async () => {
       render(<Wrapper />)
       await userEvent.click(screen.getByRole('button', { name: 'Flexible window' }))
 
       expect(screen.getByLabelText('Earliest arrival')).toBeInTheDocument()
-      expect(screen.getByLabelText('Latest checkout')).toBeInTheDocument()
+      expect(screen.getByLabelText('Latest arrival')).toBeInTheDocument()
     })
 
     it('Set Alert is disabled with an incomplete flexible range', async () => {
@@ -202,12 +202,12 @@ describe('RequestBuilder', () => {
       await userEvent.type(screen.getByPlaceholderText('Alert name'), 'My Trip')
       await userEvent.click(screen.getByRole('button', { name: 'Flexible window' }))
       await userEvent.type(screen.getByLabelText('Earliest arrival'), '2026-07-01')
-      await userEvent.type(screen.getByLabelText('Latest checkout'), '2026-07-08')
+      await userEvent.type(screen.getByLabelText('Latest arrival'), '2026-07-08')
       await userEvent.click(screen.getByRole('button', { name: /set alert/i }))
 
       expect(createSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: expect.objectContaining({ startDay: '2026-07-01', searchEndDay: '2026-07-08' })
+          body: expect.objectContaining({ startDay: '2026-07-01', latestStartDay: '2026-07-08' })
         })
       )
     })
@@ -217,7 +217,7 @@ describe('RequestBuilder', () => {
       await userEvent.type(screen.getByPlaceholderText('Alert name'), 'My Trip')
       await userEvent.click(screen.getByRole('button', { name: 'Flexible window' }))
       await userEvent.type(screen.getByLabelText('Earliest arrival'), '2026-07-01')
-      await userEvent.type(screen.getByLabelText('Latest checkout'), '2026-07-15')
+      await userEvent.type(screen.getByLabelText('Latest arrival'), '2026-07-15')
 
       expect(screen.getByText(/9 days/)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /set alert/i })).toBeDisabled()

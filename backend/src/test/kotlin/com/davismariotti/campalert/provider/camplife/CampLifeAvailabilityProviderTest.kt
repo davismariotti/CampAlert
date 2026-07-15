@@ -52,7 +52,7 @@ class CampLifeAvailabilityProviderTest {
         groupSize: Int = 4,
         startDay: LocalDate = LocalDate.now().plusDays(10),
         nights: Int = 2,
-        searchEndDay: LocalDate? = null,
+        latestStartDay: LocalDate? = null,
     ): SearchRequest {
         val req = SearchRequest(
             id = 1L,
@@ -64,7 +64,7 @@ class CampLifeAvailabilityProviderTest {
             name = "test",
             userId = 1L,
             provider = Provider.CAMPLIFE,
-            searchEndDay = searchEndDay,
+            latestStartDay = latestStartDay,
         )
         val state = SearchRequestState()
         state.searchRequest = req
@@ -284,7 +284,7 @@ class CampLifeAvailabilityProviderTest {
         )
         `when`(campLifeCatalogCache.getCampgroundCatalog(campgroundId)).thenReturn(catalog())
 
-        val result = provider.checkAvailability(request(startDay = startDay, nights = 2, searchEndDay = startDay.plusDays(4)), user)
+        val result = provider.checkAvailability(request(startDay = startDay, nights = 2, latestStartDay = startDay.plusDays(2)), user)
 
         assertTrue(result.hasAvailableSites)
         assertEquals(startDay.plusDays(1), result.matchedStartDay)
@@ -303,7 +303,7 @@ class CampLifeAvailabilityProviderTest {
             ),
         )
 
-        val result = provider.checkAvailability(request(startDay = startDay, nights = 2, searchEndDay = startDay.plusDays(4)), user)
+        val result = provider.checkAvailability(request(startDay = startDay, nights = 2, latestStartDay = startDay.plusDays(2)), user)
 
         assertFalse(result.hasAvailableSites)
         assertNull(result.matchedStartDay)
