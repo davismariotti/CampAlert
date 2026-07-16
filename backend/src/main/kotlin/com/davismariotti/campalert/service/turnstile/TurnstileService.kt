@@ -17,8 +17,9 @@ class TurnstileService(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    fun verify(token: String): Boolean =
-        try {
+    /** @throws TurnstileFailedException if [token] fails verification. */
+    fun verify(token: String) {
+        val success = try {
             val response = turnstileApi.siteverify(props.secretKey, token).execute().body()
             if (response == null) {
                 log.warn("Turnstile siteverify returned an empty response body; failing open")
@@ -30,4 +31,6 @@ class TurnstileService(
             log.warn("Turnstile siteverify call failed; failing open", e)
             true
         }
+        if (!success) throw TurnstileFailedException()
+    }
 }

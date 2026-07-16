@@ -30,9 +30,7 @@ class PhoneGateTest {
     private val pollTargetRegistrationService = mock(PollTargetRegistrationService::class.java)
     private val campLifeCatalogCache = mock(CampLifeCatalogCache::class.java)
     private val providerSearchWindowProperties = mock(ProviderSearchWindowProperties::class.java)
-    private val turnstileService = mock(TurnstileService::class.java).also {
-        `when`(it.verify(org.mockito.ArgumentMatchers.anyString())).thenReturn(true)
-    }
+    private val turnstileService = mock(TurnstileService::class.java)
     private val delegate =
         SearchRequestsDelegateImpl(
             searchRequestRepository,

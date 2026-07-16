@@ -86,11 +86,7 @@ class SearchRequestsDelegateImpl(
     override fun createSearchRequest(
         createSearchRequestBody: CreateSearchRequestBody,
     ): ResponseEntity<SearchRequestResponse> {
-        if (!turnstileService.verify(createSearchRequestBody.turnstileToken)) {
-            return ResponseEntity.status(403).body(
-                ErrorResponse(message = "Bot verification failed", code = "TURNSTILE_FAILED"),
-            ) as ResponseEntity<SearchRequestResponse>
-        }
+        turnstileService.verify(createSearchRequestBody.turnstileToken)
         val userId = currentUserId()
         if (phoneNumberRepository.countByUserIdAndStatus(userId, PhoneNumberStatus.VERIFIED) == 0L) {
             return ResponseEntity.status(422).body(

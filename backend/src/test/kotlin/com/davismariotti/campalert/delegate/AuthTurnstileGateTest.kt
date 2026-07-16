@@ -1,6 +1,5 @@
 package com.davismariotti.campalert.delegate
 
-import com.davismariotti.campalert.api.model.ErrorResponse
 import com.davismariotti.campalert.api.model.RegisterBody
 import com.davismariotti.campalert.api.model.ResendVerificationBody
 import com.davismariotti.campalert.repository.UserRepository
@@ -11,17 +10,17 @@ import com.davismariotti.campalert.service.email.EmailVerificationService
 import com.davismariotti.campalert.service.email.PasswordResetService
 import com.davismariotti.campalert.service.notification.NotificationService
 import com.davismariotti.campalert.service.redis.ForgotPasswordRateLimiter
+import com.davismariotti.campalert.service.turnstile.TurnstileFailedException
 import com.davismariotti.campalert.service.turnstile.TurnstileService
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
-import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.springframework.http.HttpStatus
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository
@@ -51,27 +50,27 @@ class AuthTurnstileGateTest {
     )
 
     @Test
-    fun `register returns 403 TURNSTILE_FAILED and never creates a user when verification fails`() {
-        `when`(turnstileService.verify(anyString())).thenReturn(false)
+    fun `register throws TurnstileFailedException and never creates a user when verification fails`() {
+        `when`(turnstileService.verify(anyString())).thenThrow(TurnstileFailedException())
 
-        val result = delegate.register(
-            RegisterBody(email = "bot@example.com", password = "password1", timezone = "UTC", turnstileToken = "bad"),
-        )
+        assertThrows(TurnstileFailedException::class.java) {
+            delegate.register(
+                RegisterBody(email = "bot@example.com", password = "password1", timezone = "UTC", turnstileToken = "bad"),
+            )
+        }
 
-        assertEquals(HttpStatus.FORBIDDEN, result.statusCode)
-        assertEquals("TURNSTILE_FAILED", (result.body as ErrorResponse).code)
         verify(userRepository, never()).save(org.mockito.ArgumentMatchers.any())
         verify(emailVerificationService, never()).issueVerification(org.mockito.ArgumentMatchers.anyLong(), anyString())
     }
 
     @Test
-    fun `resendVerification returns 403 TURNSTILE_FAILED and never triggers a resend when verification fails`() {
-        `when`(turnstileService.verify(anyString())).thenReturn(false)
+    fun `resendVerification throws TurnstileFailedException and never triggers a resend when verification fails`() {
+        `when`(turnstileService.verify(anyString())).thenThrow(TurnstileFailedException())
 
-        val result = delegate.resendVerification(ResendVerificationBody(email = "bot@example.com", turnstileToken = "bad"))
+        assertThrows(TurnstileFailedException::class.java) {
+            delegate.resendVerification(ResendVerificationBody(email = "bot@example.com", turnstileToken = "bad"))
+        }
 
-        assertEquals(HttpStatus.FORBIDDEN, result.statusCode)
-        assertEquals("TURNSTILE_FAILED", (result.body as ErrorResponse).code)
         verify(emailVerificationService, never()).resendVerification(anyString())
     }
 }

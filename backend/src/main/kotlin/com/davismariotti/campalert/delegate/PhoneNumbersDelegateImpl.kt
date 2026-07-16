@@ -41,9 +41,7 @@ class PhoneNumbersDelegateImpl(
     @Suppress("UNCHECKED_CAST")
     @PreAuthorize("isAuthenticated()")
     override fun addPhoneNumber(addPhoneNumberBody: AddPhoneNumberBody): ResponseEntity<PhoneNumberResponse> {
-        if (!turnstileService.verify(addPhoneNumberBody.turnstileToken)) {
-            return error(403, "Bot verification failed", "TURNSTILE_FAILED") as ResponseEntity<PhoneNumberResponse>
-        }
+        turnstileService.verify(addPhoneNumberBody.turnstileToken)
         if (!addPhoneNumberBody.smsConsent) {
             return error(400, "SMS consent is required") as ResponseEntity<PhoneNumberResponse>
         }

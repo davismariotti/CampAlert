@@ -62,14 +62,8 @@ class AuthDelegateImpl(
     private val turnstileService: TurnstileService,
     @Value("\${campfinder.email.frontend-base-url}") private val frontendBaseUrl: String,
 ) : AuthApiDelegate {
-    @Suppress("UNCHECKED_CAST")
     override fun register(registerBody: RegisterBody): ResponseEntity<RegisterResponse> {
-        if (!turnstileService.verify(registerBody.turnstileToken)) {
-            return ResponseEntity
-                .status(HttpStatus.FORBIDDEN)
-                .body(ErrorResponse(message = "Bot verification failed", code = "TURNSTILE_FAILED"))
-                as ResponseEntity<RegisterResponse>
-        }
+        turnstileService.verify(registerBody.turnstileToken)
         if (userRepository.findByEmail(registerBody.email) != null) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "Email already registered")
         }
@@ -163,14 +157,8 @@ class AuthDelegateImpl(
         return ResponseEntity.ok(updated.toAuthResponse())
     }
 
-    @Suppress("UNCHECKED_CAST")
     override fun resendVerification(resendVerificationBody: ResendVerificationBody): ResponseEntity<Unit> {
-        if (!turnstileService.verify(resendVerificationBody.turnstileToken)) {
-            return ResponseEntity
-                .status(HttpStatus.FORBIDDEN)
-                .body(ErrorResponse(message = "Bot verification failed", code = "TURNSTILE_FAILED"))
-                as ResponseEntity<Unit>
-        }
+        turnstileService.verify(resendVerificationBody.turnstileToken)
         emailVerificationService.resendVerification(resendVerificationBody.email)
         return ResponseEntity.accepted().build()
     }
