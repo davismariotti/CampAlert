@@ -11,4 +11,5 @@ abstract class ApiException(
     val httpStatus: HttpStatus,
     val code: String?,
     override val message: String,
-) : RuntimeException(message)
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)

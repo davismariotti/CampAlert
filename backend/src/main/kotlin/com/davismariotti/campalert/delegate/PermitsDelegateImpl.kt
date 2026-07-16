@@ -51,7 +51,7 @@ class PermitsDelegateImpl(
             return ResponseEntity.ok(emptyList())
         } catch (ex: Exception) {
             log.warn("Recreation.gov error for searchPermits q={}", q, ex)
-            throw UpstreamProviderException()
+            throw UpstreamProviderException(cause = ex)
         }
         if (!response.isSuccessful) {
             throw UpstreamProviderException()
@@ -127,10 +127,10 @@ class PermitsDelegateImpl(
             recreationCb.executeSupplier { recreationApi.getZonePermitAvailability(id, formattedStart).execute() }
         } catch (e: CallNotPermittedException) {
             log.warn("Recreation.gov circuit open for getPermitAvailability id={}", id, e)
-            throw UpstreamProviderException()
+            throw UpstreamProviderException(cause = e)
         } catch (ex: Exception) {
             log.warn("Recreation.gov error for getPermitAvailability id={}", id, ex)
-            throw UpstreamProviderException()
+            throw UpstreamProviderException(cause = ex)
         }
         if (!response.isSuccessful) {
             throw UpstreamProviderException()
@@ -166,10 +166,10 @@ class PermitsDelegateImpl(
             recreationCb.executeSupplier { recreationApi.getItineraryDivisionAvailability(id, divisionId, month, year).execute() }
         } catch (e: CallNotPermittedException) {
             log.warn("Recreation.gov circuit open for getPermitDivisionAvailability id={} divisionId={}", id, divisionId, e)
-            throw UpstreamProviderException()
+            throw UpstreamProviderException(cause = e)
         } catch (ex: Exception) {
             log.warn("Recreation.gov error for getPermitDivisionAvailability id={} divisionId={}", id, divisionId, ex)
-            throw UpstreamProviderException()
+            throw UpstreamProviderException(cause = ex)
         }
         if (!response.isSuccessful) {
             throw UpstreamProviderException()

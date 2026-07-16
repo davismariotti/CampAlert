@@ -68,7 +68,7 @@ class PhoneNumbersDelegateImpl(
                 )
             ResponseEntity.status(201).body(saved.toResponse())
         } catch (e: TwilioException) {
-            throw PhoneNumberException.VerificationSendFailed()
+            throw PhoneNumberException.VerificationSendFailed(e)
         }
     }
 

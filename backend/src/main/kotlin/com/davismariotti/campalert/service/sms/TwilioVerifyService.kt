@@ -37,7 +37,7 @@ class TwilioVerifyService(
             if (e.statusCode == 404) {
                 VerifyResult.Expired
             } else {
-                log.warn("Twilio Verify unexpected error for phone={}", phone, e)
+                log.error("Twilio Verify unexpected error for phone={}", phone, e)
                 throw e
             }
         }
