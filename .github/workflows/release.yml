@@ -105,6 +105,7 @@ jobs:
     needs: release-check
     if: needs.release-check.outputs.new-release-published == 'true'
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -122,6 +123,7 @@ jobs:
         working-directory: frontend
         env:
           VITE_APP_VERSION: ${{ needs.release-check.outputs.new-release-version }}
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
         run: npm run build
       - name: Zip dist
         run: zip -r frontend-dist.zip frontend/dist/
