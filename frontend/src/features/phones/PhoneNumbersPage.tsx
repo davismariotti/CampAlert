@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { parsePhoneNumber } from 'libphonenumber-js'
 import confetti from 'canvas-confetti'
@@ -8,6 +8,7 @@ import type { PhoneNumberResponse } from '../../api/generated/types.gen'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { PhoneInput } from '../../components/ui/PhoneInput'
+import { TurnstileWidget, type TurnstileWidgetHandle } from '../../components/TurnstileWidget'
 import { useToast } from '../../components/ui/useToast'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import type { AxiosError } from 'axios'
@@ -208,12 +209,14 @@ function AddPhoneForm() {
   const [inputError, setInputError] = useState<string | null>(null)
   const [showUnstop, setShowUnstop] = useState(false)
   const [unstopPhone, setUnstopPhone] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null)
   const queryClient = useQueryClient()
   const { showToast } = useToast()
 
   const addMutation = useApiMutation({
     mutationFn: async () => {
-      const result = await addPhoneNumber({ body: { phone: e164, smsConsent: true } })
+      const result = await addPhoneNumber({ body: { phone: e164, smsConsent: true, turnstileToken: turnstileToken! } })
       if (result.error) throw result
       return result.data!
     },
@@ -229,7 +232,10 @@ function AddPhoneForm() {
     },
     onError: (err: AxiosError<{ code?: string; message?: string }>) => {
       const apiCode = err.response?.data?.code
-      if (apiCode === 'PHONE_ALREADY_REGISTERED') {
+      if (apiCode === 'TURNSTILE_FAILED') {
+        setInputError('Verification expired. Please try again.')
+        turnstileRef.current?.reset()
+      } else if (apiCode === 'PHONE_ALREADY_REGISTERED') {
         setInputError('This number is already registered on an account.')
       } else if (err.response?.status === 400) {
         setInputError('Enter a valid phone number.')
@@ -239,7 +245,7 @@ function AddPhoneForm() {
     }
   })
 
-  const canSubmit = e164 !== '' && consent
+  const canSubmit = e164 !== '' && consent && turnstileToken !== null
 
   return (
     <>
@@ -277,6 +283,8 @@ function AddPhoneForm() {
               .
             </span>
           </label>
+
+          <TurnstileWidget ref={turnstileRef} onToken={setTurnstileToken} />
 
           <Button loading={addMutation.isPending} disabled={!canSubmit} onClick={() => addMutation.mutate()}>
             Send verification code

@@ -12,6 +12,7 @@ import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.PhoneNumberService
 import com.davismariotti.campalert.service.sms.TwilioVerifyService
 import com.davismariotti.campalert.service.sms.VerifyResult
+import com.davismariotti.campalert.service.turnstile.TurnstileService
 import com.davismariotti.campalert.util.currentUserId
 import com.twilio.exception.TwilioException
 import org.springframework.http.ResponseEntity
@@ -27,6 +28,7 @@ class PhoneNumbersDelegateImpl(
     private val userRepository: UserRepository,
     private val twilioVerifyService: TwilioVerifyService,
     private val phoneNumberService: PhoneNumberService,
+    private val turnstileService: TurnstileService,
 ) : PhoneNumbersApiDelegate {
     private fun currentUserId(): Long = currentUserId(userRepository)
 
@@ -39,6 +41,9 @@ class PhoneNumbersDelegateImpl(
     @Suppress("UNCHECKED_CAST")
     @PreAuthorize("isAuthenticated()")
     override fun addPhoneNumber(addPhoneNumberBody: AddPhoneNumberBody): ResponseEntity<PhoneNumberResponse> {
+        if (!turnstileService.verify(addPhoneNumberBody.turnstileToken)) {
+            return error(403, "Bot verification failed", "TURNSTILE_FAILED") as ResponseEntity<PhoneNumberResponse>
+        }
         if (!addPhoneNumberBody.smsConsent) {
             return error(400, "SMS consent is required") as ResponseEntity<PhoneNumberResponse>
         }

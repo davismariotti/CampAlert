@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { createSearchRequest, getCampground } from '../../api/generated/sdk.gen'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { TurnstileWidget, type TurnstileWidgetHandle } from '../../components/TurnstileWidget'
 import { LoopPicker } from './LoopPicker'
 import { EquipmentTypeFilter } from './EquipmentTypeFilter'
 import { AmenityFilter } from './AmenityFilter'
@@ -45,6 +46,8 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
   const [showCampsiteModal, setShowCampsiteModal] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<{ noPhone?: boolean; message?: string } | null>(null)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null)
 
   // Only fetched for providers that might expose equipment-type data (CampLife) — Recreation.gov
   // requests never need this extra catalog fetch alongside the loops fetch LoopPicker already makes.
@@ -94,7 +97,8 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
           siteIds,
           amenityIds,
           provider: campground.provider,
-          latestStartDay: dateMode === 'flexible' ? latestStartDay : undefined
+          latestStartDay: dateMode === 'flexible' ? latestStartDay : undefined,
+          turnstileToken: turnstileToken!
         }
       })
       if (result.error) throw result
@@ -102,7 +106,10 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
     },
     onSuccess: () => (onSuccess ? onSuccess() : navigate('/requests')),
     onError: (err: AxiosError<{ code?: string; message?: string }>) => {
-      if (err.response?.status === 422 && err.response?.data?.code === 'NO_VERIFIED_PHONE') {
+      if (err.response?.data?.code === 'TURNSTILE_FAILED') {
+        setSubmitError({ message: 'Verification expired. Please try again.' })
+        turnstileRef.current?.reset()
+      } else if (err.response?.status === 422 && err.response?.data?.code === 'NO_VERIFIED_PHONE') {
         setSubmitError({ noPhone: true })
       } else {
         setSubmitError({ message: err.response?.data?.message ?? 'Something went wrong. Please try again.' })
@@ -119,7 +126,7 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
     return Object.keys(e).length === 0
   }
 
-  const canSubmit = name.trim() !== '' && !dateWindowError && groupSize >= 1
+  const canSubmit = name.trim() !== '' && !dateWindowError && groupSize >= 1 && turnstileToken !== null
 
   return (
     <div className="mt-4 overflow-hidden transition-all duration-250">
@@ -263,6 +270,8 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
             </p>
           )}
           {submitError?.message && <p className="text-sm text-red-600">{submitError.message}</p>}
+
+          <TurnstileWidget ref={turnstileRef} onToken={setTurnstileToken} />
 
           <Button
             type="button"

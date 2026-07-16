@@ -12,6 +12,7 @@ import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.TimezoneResolutionService
 import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
 import com.davismariotti.campalert.service.scheduling.ProviderSearchWindowProperties
+import com.davismariotti.campalert.service.turnstile.TurnstileService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -29,6 +30,9 @@ class PhoneGateTest {
     private val pollTargetRegistrationService = mock(PollTargetRegistrationService::class.java)
     private val campLifeCatalogCache = mock(CampLifeCatalogCache::class.java)
     private val providerSearchWindowProperties = mock(ProviderSearchWindowProperties::class.java)
+    private val turnstileService = mock(TurnstileService::class.java).also {
+        `when`(it.verify(org.mockito.ArgumentMatchers.anyString())).thenReturn(true)
+    }
     private val delegate =
         SearchRequestsDelegateImpl(
             searchRequestRepository,
@@ -39,6 +43,7 @@ class PhoneGateTest {
             pollTargetRegistrationService,
             campLifeCatalogCache,
             providerSearchWindowProperties,
+            turnstileService,
         )
 
     private val testUser = User(id = 1L, email = "test@example.com", passwordHash = "hash")
@@ -62,6 +67,7 @@ class PhoneGateTest {
                 campsiteId = 123,
                 campgroundName = "Test Campground",
                 name = "Test",
+                turnstileToken = "test-token",
             )
         val response = delegate.createSearchRequest(body)
 

@@ -11,6 +11,7 @@ import com.davismariotti.campalert.service.email.EmailVerificationService
 import com.davismariotti.campalert.service.email.PasswordResetService
 import com.davismariotti.campalert.service.notification.NotificationService
 import com.davismariotti.campalert.service.redis.ForgotPasswordRateLimiter
+import com.davismariotti.campalert.service.turnstile.TurnstileService
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.junit.jupiter.api.AfterEach
@@ -47,6 +48,7 @@ class AuthDelegateImplUpdateMeTest {
         rememberMeTokenRepository = mock(PersistentTokenRepository::class.java),
         notificationService = mock(NotificationService::class.java),
         forgotPasswordRateLimiter = mock(ForgotPasswordRateLimiter::class.java),
+        turnstileService = mock(TurnstileService::class.java),
         frontendBaseUrl = "http://localhost:5173",
     )
 

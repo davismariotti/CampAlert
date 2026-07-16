@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { createPermitSearchRequest } from '../../api/generated/sdk.gen'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { TurnstileWidget, type TurnstileWidgetHandle } from '../../components/TurnstileWidget'
 import { usePermit } from './usePermit'
 import { ZoneDivisionPicker } from './ZoneDivisionPicker'
 import { ZoneAvailabilityGrid } from './ZoneAvailabilityGrid'
@@ -25,6 +26,8 @@ export function ZoneRequestBuilder({ permit, onClear, onSuccess }: Props) {
   const [night, setNight] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<{ noPhone?: boolean; message?: string } | null>(null)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null)
 
   const maxGroupSize = permitDetail?.maxGroupSize ?? null
   const groupSizeExceedsMax = maxGroupSize != null && groupSize > maxGroupSize
@@ -41,7 +44,8 @@ export function ZoneRequestBuilder({ permit, onClear, onSuccess }: Props) {
           // Zone quota is only consumed on the first night — startDay/endDay model a flexibility
           // window, but date-range flexibility isn't built yet, so both are set to the same night.
           zoneTarget: { divisionIds, startDay: night, endDay: night },
-          provider: permit.provider
+          provider: permit.provider,
+          turnstileToken: turnstileToken!
         }
       })
       if (result.error) throw result
@@ -49,7 +53,10 @@ export function ZoneRequestBuilder({ permit, onClear, onSuccess }: Props) {
     },
     onSuccess: () => (onSuccess ? onSuccess() : navigate('/requests')),
     onError: (err: AxiosError<{ code?: string; message?: string }>) => {
-      if (err.response?.status === 422 && err.response?.data?.code === 'NO_VERIFIED_PHONE') {
+      if (err.response?.data?.code === 'TURNSTILE_FAILED') {
+        setSubmitError({ message: 'Verification expired. Please try again.' })
+        turnstileRef.current?.reset()
+      } else if (err.response?.status === 422 && err.response?.data?.code === 'NO_VERIFIED_PHONE') {
         setSubmitError({ noPhone: true })
       } else {
         setSubmitError({ message: err.response?.data?.message ?? 'Something went wrong. Please try again.' })
@@ -69,7 +76,12 @@ export function ZoneRequestBuilder({ permit, onClear, onSuccess }: Props) {
   }
 
   const canSubmit =
-    name.trim() !== '' && groupSize >= 1 && !groupSizeExceedsMax && divisionIds.length > 0 && night !== ''
+    name.trim() !== '' &&
+    groupSize >= 1 &&
+    !groupSizeExceedsMax &&
+    divisionIds.length > 0 &&
+    night !== '' &&
+    turnstileToken !== null
 
   return (
     <div className="mt-4 overflow-hidden transition-all duration-250">
@@ -140,6 +152,8 @@ export function ZoneRequestBuilder({ permit, onClear, onSuccess }: Props) {
             </p>
           )}
           {submitError?.message && <p className="text-sm text-red-600">{submitError.message}</p>}
+
+          <TurnstileWidget ref={turnstileRef} onToken={setTurnstileToken} />
 
           <Button
             type="button"

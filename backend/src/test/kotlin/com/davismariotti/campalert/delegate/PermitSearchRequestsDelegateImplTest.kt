@@ -18,6 +18,7 @@ import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.permit.PermitClassificationService
 import com.davismariotti.campalert.service.permit.PermitContentCache
 import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
+import com.davismariotti.campalert.service.turnstile.TurnstileService
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -41,6 +42,7 @@ class PermitSearchRequestsDelegateImplTest {
     private val permitClassificationService = mock(PermitClassificationService::class.java)
     private val permitContentCache = mock(PermitContentCache::class.java)
     private val pollTargetRegistrationService = mock(PollTargetRegistrationService::class.java)
+    private val turnstileService = mock(TurnstileService::class.java)
 
     private val delegate = PermitSearchRequestsDelegateImpl(
         permitSearchRequestRepository,
@@ -50,6 +52,7 @@ class PermitSearchRequestsDelegateImplTest {
         permitClassificationService,
         permitContentCache,
         pollTargetRegistrationService,
+        turnstileService,
     )
 
     private val user = User(id = 1L, email = "user@example.com", passwordHash = "hash")
@@ -62,6 +65,7 @@ class PermitSearchRequestsDelegateImplTest {
         context.authentication = auth
         SecurityContextHolder.setContext(context)
         `when`(userRepository.findByEmail(user.email)).thenReturn(user)
+        `when`(turnstileService.verify(anyKt())).thenReturn(true)
         `when`(phoneNumberRepository.countByUserIdAndStatus(user.id!!, PhoneNumberStatus.VERIFIED)).thenReturn(1L)
         `when`(permitClassificationService.classify(permitId)).thenReturn(SearchType.ZONE)
         `when`(permitSearchRequestRepository.save(anyKt())).thenAnswer { invocation ->
@@ -88,6 +92,7 @@ class PermitSearchRequestsDelegateImplTest {
             searchType = PermitType.ZONE,
             zoneTarget = PermitZoneTargetBody(divisionIds = listOf("290"), startDay = LocalDate.now().plusDays(1), endDay = LocalDate.now().plusDays(3)),
             provider = provider,
+            turnstileToken = "test-token",
         )
 
     @Test
@@ -97,6 +102,22 @@ class PermitSearchRequestsDelegateImplTest {
         assertEquals(ApiProviderType.RECREATION_GOV, result.body!!.provider.type)
         assertEquals("Recreation.gov", result.body!!.provider.name)
         verify(pollTargetRegistrationService).ensurePermitTarget(permitId, Provider.RECREATION_GOV)
+    }
+
+    @Test
+    fun `createPermitSearchRequest returns 403 TURNSTILE_FAILED and never registers a poll target when verification fails`() {
+        `when`(turnstileService.verify(org.mockito.ArgumentMatchers.anyString())).thenReturn(false)
+
+        val result = delegate.createPermitSearchRequest(createBody())
+
+        assertEquals(403, result.statusCode.value())
+        assertEquals(
+            "TURNSTILE_FAILED",
+            (result.body as com.davismariotti.campalert.api.model.ErrorResponse).code,
+        )
+        verify(pollTargetRegistrationService, org.mockito.Mockito.never())
+            .ensurePermitTarget(org.mockito.ArgumentMatchers.anyString(), anyKt())
+        verify(permitSearchRequestRepository, org.mockito.Mockito.never()).save(anyKt())
     }
 
     @Test

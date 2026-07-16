@@ -1079,8 +1079,11 @@ components:
       type: object
       required:
         - email
+        - turnstileToken
       properties:
         email:
+          type: string
+        turnstileToken:
           type: string
 
     VerifyEmailBody:
@@ -1132,6 +1135,7 @@ components:
         - email
         - password
         - timezone
+        - turnstileToken
       properties:
         email:
           type: string
@@ -1141,6 +1145,8 @@ components:
           minLength: 8
           maxLength: 72
         timezone:
+          type: string
+        turnstileToken:
           type: string
 
     LoginBody:
@@ -1372,6 +1378,7 @@ components:
         - campsiteId
         - name
         - campgroundName
+        - turnstileToken
       properties:
         startDay:
           type: string
@@ -1413,6 +1420,8 @@ components:
           format: date
           nullable: true
           description: Latest acceptable arrival date for a flexible search. Omit for an exact-date search.
+        turnstileToken:
+          type: string
 
     LoopInfo:
       type: object
@@ -1713,6 +1722,7 @@ components:
         - groupSize
         - name
         - searchType
+        - turnstileToken
       properties:
         permitId:
           type: string
@@ -1737,6 +1747,8 @@ components:
           allOf:
             - $ref: '#/components/schemas/Provider'
           nullable: true
+        turnstileToken:
+          type: string
 
     UpdatePermitSearchRequestBody:
       type: object
@@ -1873,6 +1885,7 @@ components:
       required:
         - phone
         - smsConsent
+        - turnstileToken
       properties:
         phone:
           type: string
@@ -1880,6 +1893,8 @@ components:
         smsConsent:
           type: boolean
           description: Must be true; user has agreed to receive SMS
+        turnstileToken:
+          type: string
 
     VerifyPhoneNumberBody:
       type: object

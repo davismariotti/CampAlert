@@ -64,7 +64,7 @@ class OnboardingFlowIntegrationTest : IntegrationTestBase() {
         return call
     }
 
-    private fun addPhone(session: Cookie, phone: String = "+12125551234"): MvcResult = doPost("/api/phone-numbers", session, AddPhoneNumberBody(phone = phone, smsConsent = true))
+    private fun addPhone(session: Cookie, phone: String = "+12125551234"): MvcResult = doPost("/api/phone-numbers", session, AddPhoneNumberBody(phone = phone, smsConsent = true, turnstileToken = "test-token"))
 
     private fun verifyPhone(session: Cookie, id: Long): MvcResult = doPost("/api/phone-numbers/$id/verify", session, VerifyPhoneNumberBody(code = "123456"))
 
@@ -81,6 +81,7 @@ class OnboardingFlowIntegrationTest : IntegrationTestBase() {
                 campsiteId = 10,
                 campgroundName = "Pine Valley",
                 name = "Summer Trip",
+                turnstileToken = "test-token",
             )
         )
 

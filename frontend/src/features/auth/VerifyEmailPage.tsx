@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import type { AxiosError } from 'axios'
 import { resendVerification, verifyEmail } from '../../api/generated/sdk.gen'
@@ -7,6 +7,7 @@ import { useAuth } from './useAuth'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { TurnstileWidget, type TurnstileWidgetHandle } from '../../components/TurnstileWidget'
 import { AuthPageShell } from './AuthPageShell'
 
 type VerificationLocationState = {
@@ -29,6 +30,8 @@ export function VerifyEmailPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [cooldown, setCooldown] = useState(0)
+  const [resendTurnstileToken, setResendTurnstileToken] = useState<string | null>(null)
+  const resendTurnstileRef = useRef<TurnstileWidgetHandle>(null)
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -67,14 +70,21 @@ export function VerifyEmailPage() {
 
   const resendMutation = useApiMutation({
     mutationFn: async () => {
-      await resendVerification({ body: { email }, throwOnError: true })
+      await resendVerification({ body: { email, turnstileToken: resendTurnstileToken! }, throwOnError: true })
     },
     onSuccess: () => {
       setMessage('If that account can be verified, a new code has been sent.')
       setError(null)
       setCooldown(RESEND_COOLDOWN_SECONDS)
     },
-    onError: () => setError('Unable to request a new code. Please try again.')
+    onError: (err: AxiosError<ErrorResponse>) => {
+      if (err.response?.data?.code === 'TURNSTILE_FAILED') {
+        setError('Verification expired. Please try again.')
+        resendTurnstileRef.current?.reset()
+      } else {
+        setError('Unable to request a new code. Please try again.')
+      }
+    }
   })
 
   // Show loading state while auto-verifying from link
@@ -130,11 +140,12 @@ export function VerifyEmailPage() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
+          <TurnstileWidget ref={resendTurnstileRef} onToken={setResendTurnstileToken} />
           <Button
             type="button"
             variant="secondary"
             loading={resendMutation.isPending}
-            disabled={!email.trim() || cooldown > 0}
+            disabled={!email.trim() || cooldown > 0 || resendTurnstileToken === null}
             onClick={() => resendMutation.mutate()}
           >
             {cooldown > 0 ? `Resend available in ${cooldown}s` : 'Resend verification email'}
