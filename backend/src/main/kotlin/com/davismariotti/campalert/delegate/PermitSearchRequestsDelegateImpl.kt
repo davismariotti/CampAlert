@@ -69,11 +69,7 @@ class PermitSearchRequestsDelegateImpl(
     override fun createPermitSearchRequest(
         createPermitSearchRequestBody: CreatePermitSearchRequestBody,
     ): ResponseEntity<PermitSearchRequestResponse> {
-        if (!turnstileService.verify(createPermitSearchRequestBody.turnstileToken)) {
-            return ResponseEntity.status(403).body(
-                ErrorResponse(message = "Bot verification failed", code = "TURNSTILE_FAILED"),
-            ) as ResponseEntity<PermitSearchRequestResponse>
-        }
+        turnstileService.verify(createPermitSearchRequestBody.turnstileToken)
         val userId = currentUserId()
         if (phoneNumberRepository.countByUserIdAndStatus(userId, PhoneNumberStatus.VERIFIED) == 0L) {
             return ResponseEntity.status(422).body(

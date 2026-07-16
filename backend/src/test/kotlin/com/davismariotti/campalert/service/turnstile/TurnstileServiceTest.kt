@@ -3,8 +3,7 @@ package com.davismariotti.campalert.service.turnstile
 import com.davismariotti.campalert.config.TurnstileProperties
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.mock
@@ -24,19 +23,19 @@ class TurnstileServiceTest {
     }
 
     @Test
-    fun `verified success returns true`() {
+    fun `verified success does not throw`() {
         val call = mockCall(Response.success(SiteverifyResponse(success = true)))
         `when`(turnstileApi.siteverify(anyString(), anyString())).thenReturn(call)
 
-        assertTrue(service.verify("token"))
+        service.verify("token")
     }
 
     @Test
-    fun `verified failure returns false`() {
+    fun `verified failure throws TurnstileFailedException`() {
         val call = mockCall(Response.success(SiteverifyResponse(success = false)))
         `when`(turnstileApi.siteverify(anyString(), anyString())).thenReturn(call)
 
-        assertFalse(service.verify("token"))
+        assertThrows(TurnstileFailedException::class.java) { service.verify("token") }
     }
 
     @Test
@@ -46,7 +45,7 @@ class TurnstileServiceTest {
         @Suppress("UNCHECKED_CAST")
         `when`(turnstileApi.siteverify(anyString(), anyString())).thenReturn(call as Call<SiteverifyResponse>)
 
-        assertTrue(service.verify("token"))
+        service.verify("token")
     }
 
     @Test
@@ -55,6 +54,6 @@ class TurnstileServiceTest {
         val call = mockCall(Response.error(502, errorBody))
         `when`(turnstileApi.siteverify(anyString(), anyString())).thenReturn(call)
 
-        assertTrue(service.verify("token"))
+        service.verify("token")
     }
 }

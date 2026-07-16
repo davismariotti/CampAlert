@@ -15,10 +15,12 @@ import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.TimezoneResolutionService
 import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
 import com.davismariotti.campalert.service.scheduling.ProviderSearchWindowProperties
+import com.davismariotti.campalert.service.turnstile.TurnstileFailedException
 import com.davismariotti.campalert.service.turnstile.TurnstileService
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -66,7 +68,6 @@ class SearchRequestsDelegateImplTest {
         context.authentication = auth
         SecurityContextHolder.setContext(context)
         `when`(userRepository.findByEmail(user.email)).thenReturn(user)
-        `when`(turnstileService.verify(anyKt())).thenReturn(true)
         `when`(phoneNumberRepository.countByUserIdAndStatus(user.id!!, PhoneNumberStatus.VERIFIED)).thenReturn(1L)
         `when`(searchRequestRepository.save(anyKt())).thenAnswer { invocation ->
             val req = invocation.arguments[0] as SearchRequest
@@ -103,16 +104,11 @@ class SearchRequestsDelegateImplTest {
     }
 
     @Test
-    fun `createSearchRequest returns 403 TURNSTILE_FAILED and never registers a poll target when verification fails`() {
-        `when`(turnstileService.verify(org.mockito.ArgumentMatchers.anyString())).thenReturn(false)
+    fun `createSearchRequest throws TurnstileFailedException and never registers a poll target when verification fails`() {
+        `when`(turnstileService.verify(org.mockito.ArgumentMatchers.anyString())).thenThrow(TurnstileFailedException())
 
-        val result = delegate.createSearchRequest(createBody())
+        assertThrows(TurnstileFailedException::class.java) { delegate.createSearchRequest(createBody()) }
 
-        assertEquals(403, result.statusCode.value())
-        assertEquals(
-            "TURNSTILE_FAILED",
-            (result.body as com.davismariotti.campalert.api.model.ErrorResponse).code,
-        )
         verify(pollTargetRegistrationService, org.mockito.Mockito.never())
             .ensureCampgroundTarget(org.mockito.ArgumentMatchers.anyInt(), anyKt())
         verify(searchRequestRepository, org.mockito.Mockito.never()).save(anyKt())
