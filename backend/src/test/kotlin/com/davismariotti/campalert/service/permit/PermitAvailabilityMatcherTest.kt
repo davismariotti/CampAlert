@@ -8,6 +8,7 @@ import com.davismariotti.campalert.model.PermitSearchRequestState
 import com.davismariotti.campalert.model.PermitZoneTarget
 import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.provider.CallProtection
+import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.provider.recreation.PermitContentResponse
 import com.davismariotti.campalert.provider.recreation.PermitDivisionAvailabilityPayload
 import com.davismariotti.campalert.provider.recreation.PermitDivisionAvailabilityResponse
@@ -65,7 +66,7 @@ class PermitAvailabilityMatcherTest {
             .build(),
     )
     private val callProtection: CallProtection = CallProtection
-        .Builder("recreation-gov")
+        .Builder(Provider.RECREATION_GOV)
         .circuitBreaker(circuitBreakerRegistry)
         .retry(retryRegistry)
         .rateLimiter(rateLimiterRegistry)

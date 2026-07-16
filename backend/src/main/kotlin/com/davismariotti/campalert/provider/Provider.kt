@@ -12,4 +12,7 @@ enum class Provider(
 
     /** The URL a user follows to book [campsiteId] once it's available, shown in SMS alerts. */
     abstract fun bookingLink(campsiteId: Int): String
+
+    /** Kebab-case key for external config/metrics, e.g. `RECREATION_GOV` -> "recreation-gov". */
+    fun configName(): String = name.lowercase().replace('_', '-')
 }

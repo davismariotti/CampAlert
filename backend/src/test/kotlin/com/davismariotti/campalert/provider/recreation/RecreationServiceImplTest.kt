@@ -27,7 +27,7 @@ class RecreationServiceImplTest {
     private val recreationApi = mock(RecreationApi::class.java)
     private val callProtection: CallProtection =
         CallProtection
-            .Builder("recreation-gov")
+            .Builder(Provider.RECREATION_GOV)
             .circuitBreaker(CircuitBreakerRegistry.of(CircuitBreakerConfig.ofDefaults()))
             .retry(RetryRegistry.of(RetryConfig.ofDefaults()))
             .build()
