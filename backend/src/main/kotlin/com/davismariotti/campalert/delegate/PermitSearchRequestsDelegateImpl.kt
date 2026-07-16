@@ -2,7 +2,6 @@ package com.davismariotti.campalert.delegate
 
 import com.davismariotti.campalert.api.PermitSearchRequestsApiDelegate
 import com.davismariotti.campalert.api.model.CreatePermitSearchRequestBody
-import com.davismariotti.campalert.api.model.ErrorResponse
 import com.davismariotti.campalert.api.model.PermitItineraryLegBody
 import com.davismariotti.campalert.api.model.PermitItineraryTargetResponse
 import com.davismariotti.campalert.api.model.PermitSearchRequestResponse
@@ -10,6 +9,10 @@ import com.davismariotti.campalert.api.model.PermitType
 import com.davismariotti.campalert.api.model.PermitZoneTargetResponse
 import com.davismariotti.campalert.api.model.SearchRequestStats
 import com.davismariotti.campalert.api.model.UpdatePermitSearchRequestBody
+import com.davismariotti.campalert.exception.BadRequestException
+import com.davismariotti.campalert.exception.NoVerifiedPhoneException
+import com.davismariotti.campalert.exception.NotFoundException
+import com.davismariotti.campalert.exception.UpstreamProviderException
 import com.davismariotti.campalert.model.PermitItineraryLeg
 import com.davismariotti.campalert.model.PermitItineraryTarget
 import com.davismariotti.campalert.model.PermitSearchRequest
@@ -22,20 +25,20 @@ import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PermitSearchRequestRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.UserRepository
+import com.davismariotti.campalert.service.permit.IllegalLegSequenceException
 import com.davismariotti.campalert.service.permit.ItineraryLegValidator
 import com.davismariotti.campalert.service.permit.LegValidationResult
+import com.davismariotti.campalert.service.permit.PermitClassificationException
 import com.davismariotti.campalert.service.permit.PermitClassificationService
 import com.davismariotti.campalert.service.permit.PermitContentCache
 import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
 import com.davismariotti.campalert.service.turnstile.TurnstileService
 import com.davismariotti.campalert.util.currentUserId
 import org.slf4j.LoggerFactory
-import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 
 @Service
 class PermitSearchRequestsDelegateImpl(
@@ -63,7 +66,6 @@ class PermitSearchRequestsDelegateImpl(
         return ResponseEntity.ok(results.map { it.toResponse(fetchStats(it)) })
     }
 
-    @Suppress("UNCHECKED_CAST")
     @Transactional
     @PreAuthorize("isAuthenticated()")
     override fun createPermitSearchRequest(
@@ -72,22 +74,20 @@ class PermitSearchRequestsDelegateImpl(
         turnstileService.verify(createPermitSearchRequestBody.turnstileToken)
         val userId = currentUserId()
         if (phoneNumberRepository.countByUserIdAndStatus(userId, PhoneNumberStatus.VERIFIED) == 0L) {
-            return ResponseEntity.status(422).body(
-                ErrorResponse(message = "A verified phone number is required to create a search request.", code = "NO_VERIFIED_PHONE"),
-            ) as ResponseEntity<PermitSearchRequestResponse>
+            throw NoVerifiedPhoneException()
         }
 
         val body = createPermitSearchRequestBody
         validateShape(body.searchType, body.zoneTarget != null, body.itineraryTarget != null)
 
         val classifiedType = permitClassificationService.classify(body.permitId)
-            ?: return unsupportedPermitResponse()
+            ?: throw PermitClassificationException.UnsupportedPermitType()
         if (classifiedType.toApi() != body.searchType) {
-            return searchTypeMismatchResponse(classifiedType.toApi())
+            throw PermitClassificationException.SearchTypeMismatch(classifiedType.toApi().toString())
         }
 
         if (body.searchType == PermitType.ITINERARY) {
-            validateLegs(body.permitId, body.itineraryTarget!!.legs)?.let { return it }
+            validateLegs(body.permitId, body.itineraryTarget!!.legs)
         }
 
         val entity = PermitSearchRequest(
@@ -117,11 +117,10 @@ class PermitSearchRequestsDelegateImpl(
             .findById(id)
             .orElse(null)
             ?.takeIf { it.userId == userId }
-            ?: return ResponseEntity.notFound().build()
+            ?: throw NotFoundException("Permit search request not found")
         return ResponseEntity.ok(entity.toResponse(fetchStats(entity)))
     }
 
-    @Suppress("UNCHECKED_CAST")
     @Transactional
     @PreAuthorize("isAuthenticated()")
     override fun updatePermitSearchRequest(
@@ -133,19 +132,19 @@ class PermitSearchRequestsDelegateImpl(
             .findById(id)
             .orElse(null)
             ?.takeIf { it.userId == userId }
-            ?: return ResponseEntity.notFound().build()
+            ?: throw NotFoundException("Permit search request not found")
 
         val body = updatePermitSearchRequestBody
         validateShape(body.searchType, body.zoneTarget != null, body.itineraryTarget != null)
 
         val classifiedType = permitClassificationService.classify(body.permitId)
-            ?: return unsupportedPermitResponse()
+            ?: throw PermitClassificationException.UnsupportedPermitType()
         if (classifiedType.toApi() != body.searchType) {
-            return searchTypeMismatchResponse(classifiedType.toApi())
+            throw PermitClassificationException.SearchTypeMismatch(classifiedType.toApi().toString())
         }
 
         if (body.searchType == PermitType.ITINERARY) {
-            validateLegs(body.permitId, body.itineraryTarget!!.legs)?.let { return it }
+            validateLegs(body.permitId, body.itineraryTarget!!.legs)
         }
 
         val updated = existing.copy(
@@ -178,7 +177,7 @@ class PermitSearchRequestsDelegateImpl(
             .findById(id)
             .orElse(null)
             ?.takeIf { it.userId == userId }
-            ?: return ResponseEntity.notFound().build()
+            ?: throw NotFoundException("Permit search request not found")
         notificationOutboxRepository.deleteByRequestTypeAndRequestId(RequestType.PERMIT, id)
         permitSearchRequestRepository.deleteById(id)
         return ResponseEntity.noContent().build()
@@ -192,37 +191,15 @@ class PermitSearchRequestsDelegateImpl(
             PermitType.ITINERARY -> hasItineraryTarget && !hasZoneTarget
         }
         if (valid) return
-        throw ResponseStatusException(
-            HttpStatus.BAD_REQUEST,
-            "Request body must include exactly the target matching searchType=$searchType",
-        )
+        throw BadRequestException("Request body must include exactly the target matching searchType=$searchType")
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun unsupportedPermitResponse(): ResponseEntity<PermitSearchRequestResponse> =
-        ResponseEntity.status(422).body(
-            ErrorResponse(message = "Permit reservation mechanism is not supported", code = "PERMIT_TYPE_NOT_SUPPORTED"),
-        ) as ResponseEntity<PermitSearchRequestResponse>
-
-    @Suppress("UNCHECKED_CAST")
-    private fun searchTypeMismatchResponse(actual: PermitType): ResponseEntity<PermitSearchRequestResponse> =
-        ResponseEntity.status(422).body(
-            ErrorResponse(message = "Permit is classified as $actual, not the requested searchType", code = "PERMIT_TYPE_MISMATCH"),
-        ) as ResponseEntity<PermitSearchRequestResponse>
-
-    @Suppress("UNCHECKED_CAST")
-    private fun validateLegs(permitId: String, legs: List<PermitItineraryLegBody>): ResponseEntity<PermitSearchRequestResponse>? {
+    private fun validateLegs(permitId: String, legs: List<PermitItineraryLegBody>) {
         val content = permitContentCache.get(permitId)
-            ?: throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Recreation.gov upstream error")
-        return when (val result = ItineraryLegValidator.validate(content, legs.map { it.divisionId })) {
-            LegValidationResult.Valid -> null
-            is LegValidationResult.Invalid ->
-                ResponseEntity.status(422).body(
-                    ErrorResponse(
-                        message = "Leg ${result.legIndex} (division ${result.divisionId}) is not a legal continuation of the previous leg",
-                        code = "ILLEGAL_LEG_SEQUENCE",
-                    ),
-                ) as ResponseEntity<PermitSearchRequestResponse>
+            ?: throw UpstreamProviderException()
+        when (val result = ItineraryLegValidator.validate(content, legs.map { it.divisionId })) {
+            LegValidationResult.Valid -> Unit
+            is LegValidationResult.Invalid -> throw IllegalLegSequenceException(result.legIndex, result.divisionId)
         }
     }
 

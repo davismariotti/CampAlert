@@ -1,7 +1,7 @@
 package com.davismariotti.campalert.delegate
 
 import com.davismariotti.campalert.api.model.CreateSearchRequestBody
-import com.davismariotti.campalert.api.model.ErrorResponse
+import com.davismariotti.campalert.exception.NoVerifiedPhoneException
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.provider.camplife.CampLifeCatalogCache
@@ -14,6 +14,7 @@ import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationServ
 import com.davismariotti.campalert.service.scheduling.ProviderSearchWindowProperties
 import com.davismariotti.campalert.service.turnstile.TurnstileService
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
@@ -67,11 +68,9 @@ class PhoneGateTest {
                 name = "Test",
                 turnstileToken = "test-token",
             )
-        val response = delegate.createSearchRequest(body)
+        val ex = assertThrows(NoVerifiedPhoneException::class.java) { delegate.createSearchRequest(body) }
 
-        assertEquals(422, response.statusCode.value())
-        @Suppress("UNCHECKED_CAST")
-        val error = (response as org.springframework.http.ResponseEntity<*>).body as ErrorResponse
-        assertEquals("NO_VERIFIED_PHONE", error.code)
+        assertEquals(422, ex.httpStatus.value())
+        assertEquals("NO_VERIFIED_PHONE", ex.code)
     }
 }

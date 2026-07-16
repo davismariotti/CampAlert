@@ -2,6 +2,7 @@ package com.davismariotti.campalert.delegate
 
 import com.davismariotti.campalert.api.model.CreateSearchRequestBody
 import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
+import com.davismariotti.campalert.exception.FlexibleSearchValidationException
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
@@ -158,9 +159,9 @@ class SearchRequestsDelegateImplTest {
     @Test
     fun `creating with latestStartDay earlier than startDay is rejected`() {
         val startDay = LocalDate.now().plusDays(5)
-        val result = delegate.createSearchRequest(createBody().copy(startDay = startDay, latestStartDay = startDay.minusDays(1)))
-
-        assertEquals(400, result.statusCode.value())
+        assertThrows(FlexibleSearchValidationException.LatestStartDayTooEarly::class.java) {
+            delegate.createSearchRequest(createBody().copy(startDay = startDay, latestStartDay = startDay.minusDays(1)))
+        }
         verify(searchRequestRepository, org.mockito.Mockito.never()).save(anyKt())
     }
 
@@ -175,21 +176,21 @@ class SearchRequestsDelegateImplTest {
     @Test
     fun `creating with a range wider than the provider max is rejected`() {
         val startDay = LocalDate.now().plusDays(5)
-        val result = delegate.createSearchRequest(createBody().copy(startDay = startDay, latestStartDay = startDay.plusDays(31)))
-
-        assertEquals(400, result.statusCode.value())
+        assertThrows(FlexibleSearchValidationException.RangeTooWide::class.java) {
+            delegate.createSearchRequest(createBody().copy(startDay = startDay, latestStartDay = startDay.plusDays(31)))
+        }
     }
 
     @Test
     fun `creating with latestStartDay for a provider with no configured max is rejected`() {
         `when`(providerSearchWindowProperties.maxRangeWidthDaysFor(Provider.CAMPLIFE)).thenReturn(null)
         val startDay = LocalDate.now().plusDays(5)
-        val result = delegate.createSearchRequest(
-            createBody(provider = ApiProvider(type = ApiProviderType.CAMPLIFE, name = "CampLife"))
-                .copy(startDay = startDay, latestStartDay = startDay.plusDays(4)),
-        )
-
-        assertEquals(400, result.statusCode.value())
+        assertThrows(FlexibleSearchValidationException.Unsupported::class.java) {
+            delegate.createSearchRequest(
+                createBody(provider = ApiProvider(type = ApiProviderType.CAMPLIFE, name = "CampLife"))
+                    .copy(startDay = startDay, latestStartDay = startDay.plusDays(4)),
+            )
+        }
     }
 
     @Test

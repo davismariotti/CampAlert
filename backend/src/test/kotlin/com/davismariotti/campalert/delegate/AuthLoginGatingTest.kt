@@ -6,6 +6,7 @@ import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.security.RememberMeServices
 import com.davismariotti.campalert.security.UserDetailsServiceImpl
 import com.davismariotti.campalert.service.SessionRevocationService
+import com.davismariotti.campalert.service.email.EmailNotVerifiedException
 import com.davismariotti.campalert.service.email.EmailVerificationService
 import com.davismariotti.campalert.service.email.PasswordResetService
 import com.davismariotti.campalert.service.notification.NotificationService
@@ -16,6 +17,7 @@ import jakarta.servlet.http.HttpServletResponse
 import jakarta.servlet.http.HttpSession
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyBoolean
@@ -82,11 +84,10 @@ class AuthLoginGatingTest {
         `when`(emailVerificationService.ensureVerificationForLogin(1L, "user@example.com"))
             .thenReturn(UUID.randomUUID())
 
-        val responseEntity = delegate.login(LoginBody(email = "user@example.com", password = "password"))
+        assertThrows(EmailNotVerifiedException::class.java) {
+            delegate.login(LoginBody(email = "user@example.com", password = "password"))
+        }
 
-        assertEquals(HttpStatus.UNAUTHORIZED, responseEntity.statusCode)
-        // body is an ErrorResponse cast as AuthResponse; we verify status and no-session behavior.
-        // Accessing .body from Kotlin inserts a checkcast that would ClassCastException.
         verify(request, never()).getSession(anyBoolean())
     }
 
@@ -102,7 +103,9 @@ class AuthLoginGatingTest {
         `when`(emailVerificationService.ensureVerificationForLogin(1L, "user@example.com"))
             .thenReturn(UUID.randomUUID())
 
-        delegate.login(LoginBody(email = "user@example.com", password = "password"))
+        assertThrows(EmailNotVerifiedException::class.java) {
+            delegate.login(LoginBody(email = "user@example.com", password = "password"))
+        }
 
         verify(request, never()).getSession(anyBoolean())
         verify(emailVerificationService).ensureVerificationForLogin(1L, "user@example.com")

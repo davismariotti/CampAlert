@@ -1,7 +1,6 @@
 package com.davismariotti.campalert.delegate
 
 import com.davismariotti.campalert.api.PermitsApiDelegate
-import com.davismariotti.campalert.api.model.ErrorResponse
 import com.davismariotti.campalert.api.model.PermitAvailabilityCell
 import com.davismariotti.campalert.api.model.PermitDivision
 import com.davismariotti.campalert.api.model.PermitDivisionAvailabilityPreviewResponse
@@ -9,23 +8,24 @@ import com.davismariotti.campalert.api.model.PermitResponse
 import com.davismariotti.campalert.api.model.PermitSearchResult
 import com.davismariotti.campalert.api.model.PermitZoneAvailabilityPreviewResponse
 import com.davismariotti.campalert.api.model.ProviderType
+import com.davismariotti.campalert.exception.BadRequestException
+import com.davismariotti.campalert.exception.UpstreamProviderException
 import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.provider.recreation.PermitRuleContent
 import com.davismariotti.campalert.provider.recreation.PermitRuleName
 import com.davismariotti.campalert.provider.recreation.RecreationApi
 import com.davismariotti.campalert.provider.recreation.SearchEntityType
+import com.davismariotti.campalert.service.permit.PermitClassificationException
 import com.davismariotti.campalert.service.permit.PermitClassificationService
 import com.davismariotti.campalert.service.permit.PermitContentCache
 import com.davismariotti.campalert.util.naturalOrder
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import org.slf4j.LoggerFactory
-import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
-import org.springframework.web.server.ResponseStatusException
 import java.time.LocalDate
 import java.time.ZoneOffset
 
@@ -42,7 +42,7 @@ class PermitsDelegateImpl(
     @PreAuthorize("isAuthenticated()")
     override fun searchPermits(q: String, provider: ProviderType?): ResponseEntity<List<PermitSearchResult>> {
         if (q.isBlank()) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Query parameter 'q' must not be blank")
+            throw BadRequestException("Query parameter 'q' must not be blank")
         }
         val response = try {
             recreationCb.executeSupplier { recreationApi.searchSuggest(q).execute() }
@@ -51,10 +51,10 @@ class PermitsDelegateImpl(
             return ResponseEntity.ok(emptyList())
         } catch (ex: Exception) {
             log.warn("Recreation.gov error for searchPermits q={}", q, ex)
-            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Recreation.gov upstream error")
+            throw UpstreamProviderException()
         }
         if (!response.isSuccessful) {
-            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Recreation.gov upstream error")
+            throw UpstreamProviderException()
         }
         // provider param is accepted for API-contract readiness but unused until a second provider
         // exists — every result is stamped RECREATION_GOV regardless (see design decision 7).
@@ -77,16 +77,13 @@ class PermitsDelegateImpl(
         return ResponseEntity.ok(results)
     }
 
-    @Suppress("UNCHECKED_CAST")
     @PreAuthorize("isAuthenticated()")
     override fun getPermit(id: String): ResponseEntity<PermitResponse> {
         val type = permitClassificationService.classify(id)
-            ?: return ResponseEntity.status(422).body(
-                ErrorResponse(message = "Permit reservation mechanism is not supported", code = "PERMIT_TYPE_NOT_SUPPORTED"),
-            ) as ResponseEntity<PermitResponse>
+            ?: throw PermitClassificationException.UnsupportedPermitType()
 
         val content = permitContentCache.get(id)
-            ?: throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Recreation.gov upstream error")
+            ?: throw UpstreamProviderException()
 
         val divisions = content.divisions.values
             .sortedWith(compareBy(naturalOrder) { it.name ?: it.id })
@@ -115,9 +112,9 @@ class PermitsDelegateImpl(
 
     @PreAuthorize("isAuthenticated()")
     override fun getPermitAvailability(id: String, startDate: LocalDate): ResponseEntity<PermitZoneAvailabilityPreviewResponse> {
-        val type = permitClassificationService.classify(id) ?: return unsupportedPermitResponse()
+        val type = permitClassificationService.classify(id) ?: throw PermitClassificationException.UnsupportedPermitType()
         if (type != SearchType.ZONE) {
-            return permitTypeMismatchResponse(type)
+            throw PermitClassificationException.TypeMismatch(type.toString())
         }
 
         val formattedStart = startDate
@@ -130,13 +127,13 @@ class PermitsDelegateImpl(
             recreationCb.executeSupplier { recreationApi.getZonePermitAvailability(id, formattedStart).execute() }
         } catch (e: CallNotPermittedException) {
             log.warn("Recreation.gov circuit open for getPermitAvailability id={}", id)
-            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Recreation.gov upstream error")
+            throw UpstreamProviderException()
         } catch (ex: Exception) {
             log.warn("Recreation.gov error for getPermitAvailability id={}", id, ex)
-            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Recreation.gov upstream error")
+            throw UpstreamProviderException()
         }
         if (!response.isSuccessful) {
-            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Recreation.gov upstream error")
+            throw UpstreamProviderException()
         }
 
         val divisions = response
@@ -160,22 +157,22 @@ class PermitsDelegateImpl(
         month: Int,
         year: Int,
     ): ResponseEntity<PermitDivisionAvailabilityPreviewResponse> {
-        val type = permitClassificationService.classify(id) ?: return unsupportedPermitResponse()
+        val type = permitClassificationService.classify(id) ?: throw PermitClassificationException.UnsupportedPermitType()
         if (type != SearchType.ITINERARY) {
-            return permitTypeMismatchResponse(type)
+            throw PermitClassificationException.TypeMismatch(type.toString())
         }
 
         val response = try {
             recreationCb.executeSupplier { recreationApi.getItineraryDivisionAvailability(id, divisionId, month, year).execute() }
         } catch (e: CallNotPermittedException) {
             log.warn("Recreation.gov circuit open for getPermitDivisionAvailability id={} divisionId={}", id, divisionId)
-            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Recreation.gov upstream error")
+            throw UpstreamProviderException()
         } catch (ex: Exception) {
             log.warn("Recreation.gov error for getPermitDivisionAvailability id={} divisionId={}", id, divisionId, ex)
-            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Recreation.gov upstream error")
+            throw UpstreamProviderException()
         }
         if (!response.isSuccessful) {
-            throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Recreation.gov upstream error")
+            throw UpstreamProviderException()
         }
 
         // Collapse quota_type_maps the same way PermitAvailabilityMatcher.checkItinerary does: a date
@@ -193,18 +190,6 @@ class PermitsDelegateImpl(
 
         return ResponseEntity.ok(PermitDivisionAvailabilityPreviewResponse(dates = dates))
     }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun <T : Any> unsupportedPermitResponse(): ResponseEntity<T> =
-        ResponseEntity.status(422).body(
-            ErrorResponse(message = "Permit reservation mechanism is not supported", code = "PERMIT_TYPE_NOT_SUPPORTED"),
-        ) as ResponseEntity<T>
-
-    @Suppress("UNCHECKED_CAST")
-    private fun <T : Any> permitTypeMismatchResponse(actual: SearchType): ResponseEntity<T> =
-        ResponseEntity.status(422).body(
-            ErrorResponse(message = "Permit is classified as $actual, not the type this endpoint requires", code = "PERMIT_TYPE_MISMATCH"),
-        ) as ResponseEntity<T>
 
     private fun maxGroupSizeFor(rules: List<PermitRuleContent>, divisionId: String?): Int? =
         rules

@@ -2,10 +2,12 @@ package com.davismariotti.campalert.delegate
 
 import com.davismariotti.campalert.api.SearchRequestsApiDelegate
 import com.davismariotti.campalert.api.model.CreateSearchRequestBody
-import com.davismariotti.campalert.api.model.ErrorResponse
 import com.davismariotti.campalert.api.model.SearchRequestResponse
 import com.davismariotti.campalert.api.model.SearchRequestStats
 import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
+import com.davismariotti.campalert.exception.FlexibleSearchValidationException
+import com.davismariotti.campalert.exception.NoVerifiedPhoneException
+import com.davismariotti.campalert.exception.NotFoundException
 import com.davismariotti.campalert.model.CampLifeSearchRequestDetails
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.RecreationGovSearchRequestDetails
@@ -81,7 +83,6 @@ class SearchRequestsDelegateImpl(
         )
     }
 
-    @Suppress("UNCHECKED_CAST")
     @PreAuthorize("isAuthenticated()")
     override fun createSearchRequest(
         createSearchRequestBody: CreateSearchRequestBody,
@@ -89,17 +90,10 @@ class SearchRequestsDelegateImpl(
         turnstileService.verify(createSearchRequestBody.turnstileToken)
         val userId = currentUserId()
         if (phoneNumberRepository.countByUserIdAndStatus(userId, PhoneNumberStatus.VERIFIED) == 0L) {
-            return ResponseEntity.status(422).body(
-                ErrorResponse(
-                    message = "A verified phone number is required to create a search request.",
-                    code = "NO_VERIFIED_PHONE",
-                ),
-            ) as ResponseEntity<SearchRequestResponse>
+            throw NoVerifiedPhoneException()
         }
         val provider = createSearchRequestBody.provider?.type?.toModel() ?: Provider.RECREATION_GOV
-        validateLatestStartDay(createSearchRequestBody.startDay, createSearchRequestBody.latestStartDay, provider)?.let {
-            return ResponseEntity.badRequest().body(it) as ResponseEntity<SearchRequestResponse>
-        }
+        validateLatestStartDay(createSearchRequestBody.startDay, createSearchRequestBody.latestStartDay, provider)
         val entity = SearchRequest(
             startDay = createSearchRequestBody.startDay,
             nights = createSearchRequestBody.nights,
@@ -130,11 +124,10 @@ class SearchRequestsDelegateImpl(
             .findById(id)
             .orElse(null)
             ?.takeIf { it.userId == userId }
-            ?: return ResponseEntity.notFound().build()
+            ?: throw NotFoundException("Search request not found")
         return ResponseEntity.ok(entity.toResponse(fetchStats(entity)))
     }
 
-    @Suppress("UNCHECKED_CAST")
     @PreAuthorize("isAuthenticated()")
     override fun updateSearchRequest(
         id: Long,
@@ -145,11 +138,9 @@ class SearchRequestsDelegateImpl(
             .findById(id)
             .orElse(null)
             ?.takeIf { it.userId == userId }
-            ?: return ResponseEntity.notFound().build()
+            ?: throw NotFoundException("Search request not found")
         val provider = updateSearchRequestBody.provider?.type?.toModel() ?: existing.provider
-        validateLatestStartDay(updateSearchRequestBody.startDay, updateSearchRequestBody.latestStartDay, provider)?.let {
-            return ResponseEntity.badRequest().body(it) as ResponseEntity<SearchRequestResponse>
-        }
+        validateLatestStartDay(updateSearchRequestBody.startDay, updateSearchRequestBody.latestStartDay, provider)
         val updated = existing.copy(
             startDay = updateSearchRequestBody.startDay,
             nights = updateSearchRequestBody.nights,
@@ -181,7 +172,7 @@ class SearchRequestsDelegateImpl(
             .findById(id)
             .orElse(null)
             ?.takeIf { it.userId == userId }
-            ?: return ResponseEntity.notFound().build()
+            ?: throw NotFoundException("Search request not found")
         notificationOutboxRepository.deleteByRequestTypeAndRequestId(RequestType.CAMPGROUND, id)
         searchRequestRepository.deleteById(id)
         return ResponseEntity.noContent().build()
@@ -191,34 +182,23 @@ class SearchRequestsDelegateImpl(
      * Validates an optional flexible-search `latestStartDay`: it must be on or after `startDay` (every
      * date in between is a legitimate candidate arrival, regardless of `nights`), and the resulting
      * range width must fit within the provider's configured `max-range-width-days` (a provider with no
-     * configured max does not support flexible search at all). Returns null when valid, or an
-     * [ErrorResponse] describing the first violation.
+     * configured max does not support flexible search at all).
      */
     private fun validateLatestStartDay(
         startDay: LocalDate,
         latestStartDay: LocalDate?,
         provider: Provider
-    ): ErrorResponse? {
-        if (latestStartDay == null) return null
+    ) {
+        if (latestStartDay == null) return
         if (latestStartDay.isBefore(startDay)) {
-            return ErrorResponse(
-                message = "latestStartDay must be on or after startDay.",
-                code = "LATEST_START_DAY_TOO_EARLY",
-            )
+            throw FlexibleSearchValidationException.LatestStartDayTooEarly()
         }
         val maxRangeWidthDays = providerSearchWindowProperties.maxRangeWidthDaysFor(provider)
-            ?: return ErrorResponse(
-                message = "Flexible search is not supported for ${provider.friendlyName}.",
-                code = "FLEXIBLE_SEARCH_UNSUPPORTED",
-            )
+            ?: throw FlexibleSearchValidationException.Unsupported(provider.friendlyName)
         val rangeWidthDays = ChronoUnit.DAYS.between(startDay, latestStartDay)
         if (rangeWidthDays > maxRangeWidthDays) {
-            return ErrorResponse(
-                message = "The flexible date range ($rangeWidthDays days) exceeds the maximum of $maxRangeWidthDays days for ${provider.friendlyName}.",
-                code = "SEARCH_RANGE_TOO_WIDE",
-            )
+            throw FlexibleSearchValidationException.RangeTooWide(rangeWidthDays, maxRangeWidthDays, provider.friendlyName)
         }
-        return null
     }
 
     private fun fetchStats(request: SearchRequest): SearchRequestStats {
