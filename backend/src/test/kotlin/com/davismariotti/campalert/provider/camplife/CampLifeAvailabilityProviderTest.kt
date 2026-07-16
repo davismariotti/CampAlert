@@ -30,7 +30,7 @@ class CampLifeAvailabilityProviderTest {
     private val campLifeCatalogCache = mock(CampLifeCatalogCache::class.java)
     private val callProtection: CallProtection =
         CallProtection
-            .Builder("camplife")
+            .Builder(Provider.CAMPLIFE)
             .circuitBreaker(CircuitBreakerRegistry.of(CircuitBreakerConfig.ofDefaults()))
             .retry(RetryRegistry.of(RetryConfig.ofDefaults()))
             .build()

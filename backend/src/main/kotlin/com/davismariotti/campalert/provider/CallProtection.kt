@@ -38,6 +38,8 @@ class CallProtection private constructor(
     class Builder(
         private val name: String
     ) {
+        constructor(provider: Provider) : this(provider.configName())
+
         private var circuitBreaker: CircuitBreaker? = null
         private var retry: Retry? = null
         private var rateLimiter: RateLimiter? = null

@@ -1,8 +1,9 @@
 package com.davismariotti.campalert.provider.camplife
 
+import com.davismariotti.campalert.httpclient.ProviderHttpClientFactory
 import com.davismariotti.campalert.httpclient.baseProviderObjectMapper
-import com.davismariotti.campalert.httpclient.buildBrowserOkHttpClient
 import com.davismariotti.campalert.provider.CallProtection
+import com.davismariotti.campalert.provider.Provider
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry
 import io.github.resilience4j.retry.RetryRegistry
@@ -18,9 +19,10 @@ private const val CAMPLIFE_ORIGIN = "https://www.camplife.com"
 @Configuration
 class CampLifeConfiguration(
     @Value("\${camplife.baseUrl}") val baseUrl: String,
+    private val providerHttpClientFactory: ProviderHttpClientFactory,
 ) {
     /** Extracted from [getCampLifeClient] so tests can verify cookie-jar isolation without a Spring context. Never call this from a shared/singleton context; each caller gets an independent cookie store. */
-    internal fun buildOkHttpClient(): OkHttpClient = buildBrowserOkHttpClient(refererOrigin = CAMPLIFE_ORIGIN, metricName = "Custom/CampLife/Request")
+    internal fun buildOkHttpClient(): OkHttpClient = providerHttpClientFactory.build(provider = Provider.CAMPLIFE, refererOrigin = CAMPLIFE_ORIGIN, metricName = "Custom/CampLife/Request")
 
     /**
      * CampLife-specific call protection (circuit breaker + retry + rate limiter), kept entirely
@@ -37,7 +39,7 @@ class CampLifeConfiguration(
         rateLimiterRegistry: RateLimiterRegistry,
     ): CallProtection =
         CallProtection
-            .Builder("camplife")
+            .Builder(Provider.CAMPLIFE)
             .circuitBreaker(circuitBreakerRegistry)
             .retry(retryRegistry)
             .rateLimiter(rateLimiterRegistry, timeoutEventName = "CampLifeRateLimitTimeout")

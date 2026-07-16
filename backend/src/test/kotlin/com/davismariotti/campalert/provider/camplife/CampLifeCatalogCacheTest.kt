@@ -1,6 +1,7 @@
 package com.davismariotti.campalert.provider.camplife
 
 import com.davismariotti.campalert.provider.CallProtection
+import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.service.redis.RedisJsonCache
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
@@ -28,7 +29,7 @@ class CampLifeCatalogCacheTest {
     private val redisJsonCache = mock(RedisJsonCache::class.java)
     private val callProtection: CallProtection =
         CallProtection
-            .Builder("camplife")
+            .Builder(Provider.CAMPLIFE)
             .circuitBreaker(CircuitBreakerRegistry.of(CircuitBreakerConfig.ofDefaults()))
             .retry(RetryRegistry.of(RetryConfig.ofDefaults()))
             .build()
