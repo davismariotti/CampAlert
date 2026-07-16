@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.delegate
 
+import com.davismariotti.campalert.exception.UpstreamProviderException
 import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.provider.recreation.PermitContentPayload
 import com.davismariotti.campalert.provider.recreation.PermitDivisionContent
@@ -14,6 +15,7 @@ import com.davismariotti.campalert.provider.recreation.PermitZoneAvailabilityPay
 import com.davismariotti.campalert.provider.recreation.PermitZoneAvailabilityResponse
 import com.davismariotti.campalert.provider.recreation.PermitZoneDivisionAvailability
 import com.davismariotti.campalert.provider.recreation.RecreationApi
+import com.davismariotti.campalert.service.permit.PermitClassificationException
 import com.davismariotti.campalert.service.permit.PermitClassificationService
 import com.davismariotti.campalert.service.permit.PermitContentCache
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
@@ -25,7 +27,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
-import org.springframework.web.server.ResponseStatusException
 import retrofit2.Call
 import retrofit2.Response
 import java.time.LocalDate
@@ -152,18 +153,20 @@ class PermitsDelegateImplTest {
     fun `getPermitAvailability rejects an itinerary permit with type mismatch`() {
         `when`(permitClassificationService.classify("4675323")).thenReturn(SearchType.ITINERARY)
 
-        val response = delegate.getPermitAvailability("4675323", LocalDate.of(2026, 7, 1))
-
-        assertEquals(422, response.statusCode.value())
+        val ex = assertThrows(PermitClassificationException.TypeMismatch::class.java) {
+            delegate.getPermitAvailability("4675323", LocalDate.of(2026, 7, 1))
+        }
+        assertEquals(422, ex.httpStatus.value())
     }
 
     @Test
     fun `getPermitAvailability rejects an unsupported permit`() {
         `when`(permitClassificationService.classify("999")).thenReturn(null)
 
-        val response = delegate.getPermitAvailability("999", LocalDate.of(2026, 7, 1))
-
-        assertEquals(422, response.statusCode.value())
+        val ex = assertThrows(PermitClassificationException.UnsupportedPermitType::class.java) {
+            delegate.getPermitAvailability("999", LocalDate.of(2026, 7, 1))
+        }
+        assertEquals(422, ex.httpStatus.value())
     }
 
     @Test
@@ -171,10 +174,10 @@ class PermitsDelegateImplTest {
         `when`(permitClassificationService.classify("233261")).thenReturn(SearchType.ZONE)
         circuitBreakerRegistry.circuitBreaker("recreation-gov").transitionToOpenState()
 
-        val ex = assertThrows(ResponseStatusException::class.java) {
+        val ex = assertThrows(UpstreamProviderException::class.java) {
             delegate.getPermitAvailability("233261", LocalDate.of(2026, 7, 1))
         }
-        assertEquals(502, ex.statusCode.value())
+        assertEquals(502, ex.httpStatus.value())
     }
 
     @Test
@@ -185,10 +188,10 @@ class PermitsDelegateImplTest {
         @Suppress("UNCHECKED_CAST")
         `when`(recreationApi.getZonePermitAvailability("233261", "2026-07-01T00:00:00.000Z")).thenReturn(call as Call<PermitZoneAvailabilityResponse>)
 
-        val ex = assertThrows(ResponseStatusException::class.java) {
+        val ex = assertThrows(UpstreamProviderException::class.java) {
             delegate.getPermitAvailability("233261", LocalDate.of(2026, 7, 1))
         }
-        assertEquals(502, ex.statusCode.value())
+        assertEquals(502, ex.httpStatus.value())
     }
 
     // --- getPermitDivisionAvailability (itinerary) ---
@@ -224,18 +227,20 @@ class PermitsDelegateImplTest {
     fun `getPermitDivisionAvailability rejects a zone permit with type mismatch`() {
         `when`(permitClassificationService.classify("233261")).thenReturn(SearchType.ZONE)
 
-        val response = delegate.getPermitDivisionAvailability("233261", "343", 7, 2026)
-
-        assertEquals(422, response.statusCode.value())
+        val ex = assertThrows(PermitClassificationException.TypeMismatch::class.java) {
+            delegate.getPermitDivisionAvailability("233261", "343", 7, 2026)
+        }
+        assertEquals(422, ex.httpStatus.value())
     }
 
     @Test
     fun `getPermitDivisionAvailability rejects an unsupported permit`() {
         `when`(permitClassificationService.classify("999")).thenReturn(null)
 
-        val response = delegate.getPermitDivisionAvailability("999", "1", 7, 2026)
-
-        assertEquals(422, response.statusCode.value())
+        val ex = assertThrows(PermitClassificationException.UnsupportedPermitType::class.java) {
+            delegate.getPermitDivisionAvailability("999", "1", 7, 2026)
+        }
+        assertEquals(422, ex.httpStatus.value())
     }
 
     @Test
@@ -243,9 +248,9 @@ class PermitsDelegateImplTest {
         `when`(permitClassificationService.classify("4675323")).thenReturn(SearchType.ITINERARY)
         circuitBreakerRegistry.circuitBreaker("recreation-gov").transitionToOpenState()
 
-        val ex = assertThrows(ResponseStatusException::class.java) {
+        val ex = assertThrows(UpstreamProviderException::class.java) {
             delegate.getPermitDivisionAvailability("4675323", "4675323001", 7, 2026)
         }
-        assertEquals(502, ex.statusCode.value())
+        assertEquals(502, ex.httpStatus.value())
     }
 }

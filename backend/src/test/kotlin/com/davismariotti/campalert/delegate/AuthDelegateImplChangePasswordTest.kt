@@ -1,6 +1,7 @@
 package com.davismariotti.campalert.delegate
 
 import com.davismariotti.campalert.api.model.ChangePasswordBody
+import com.davismariotti.campalert.exception.BadRequestException
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.notification.PasswordChangedNotification
 import com.davismariotti.campalert.repository.UserRepository
@@ -17,6 +18,7 @@ import jakarta.servlet.http.HttpServletResponse
 import jakarta.servlet.http.HttpSession
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -99,9 +101,10 @@ class AuthDelegateImplChangePasswordTest {
 
     @Test
     fun `wrong current password does not revoke tokens or send a notification`() {
-        val result = delegate.changePassword(ChangePasswordBody(currentPassword = "wrongpassword", newPassword = "newpassword1"))
+        assertThrows(BadRequestException::class.java) {
+            delegate.changePassword(ChangePasswordBody(currentPassword = "wrongpassword", newPassword = "newpassword1"))
+        }
 
-        assertEquals(HttpStatus.BAD_REQUEST, result.statusCode)
         verify(rememberMeTokenRepository, never()).removeUserTokens(anyKt())
         verify(notificationService, never()).sendAsync(anyKt(), anyKt())
     }

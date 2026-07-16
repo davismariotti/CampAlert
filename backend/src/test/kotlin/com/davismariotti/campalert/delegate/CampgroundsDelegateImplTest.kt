@@ -4,11 +4,13 @@ import com.davismariotti.campalert.api.model.CampgroundResponse
 import com.davismariotti.campalert.api.model.CampgroundSearchResult
 import com.davismariotti.campalert.api.model.LoopInfo
 import com.davismariotti.campalert.api.model.ProviderType
+import com.davismariotti.campalert.exception.BadRequestException
+import com.davismariotti.campalert.exception.NotFoundException
+import com.davismariotti.campalert.exception.UpstreamProviderException
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.service.availability.CampgroundCatalogProvider
 import com.davismariotti.campalert.service.availability.CampgroundCatalogProviderRegistry
 import org.junit.jupiter.api.Test
-import org.springframework.web.server.ResponseStatusException
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -73,14 +75,14 @@ class CampgroundsDelegateImplTest {
     fun `scoped search propagates a provider failure as an upstream error`() {
         val d = delegate(FakeCatalogProvider(Provider.RECREATION_GOV, results = { error("RIDB down") }))
 
-        assertFailsWith<ResponseStatusException> { d.searchCampgrounds("elkmont", ProviderType.RECREATION_GOV) }
+        assertFailsWith<UpstreamProviderException> { d.searchCampgrounds("elkmont", ProviderType.RECREATION_GOV) }
     }
 
     @Test
     fun `blank query is rejected`() {
         val d = delegate()
 
-        assertFailsWith<ResponseStatusException> { d.searchCampgrounds("  ", null) }
+        assertFailsWith<BadRequestException> { d.searchCampgrounds("  ", null) }
     }
 
     @Test
@@ -91,13 +93,13 @@ class CampgroundsDelegateImplTest {
         )
 
         assertEquals(200, d.getCampground(1, ProviderType.RECREATION_GOV).statusCode.value())
-        assertEquals(404, d.getCampground(1, ProviderType.CAMPLIFE).statusCode.value())
+        assertFailsWith<NotFoundException> { d.getCampground(1, ProviderType.CAMPLIFE) }
     }
 
     @Test
     fun `getCampgroundLoops propagates a provider failure as an upstream error`() {
         val d = delegate(FakeCatalogProvider(Provider.RECREATION_GOV, loops = { error("RIDB down") }))
 
-        assertFailsWith<ResponseStatusException> { d.getCampgroundLoops(1, ProviderType.RECREATION_GOV) }
+        assertFailsWith<UpstreamProviderException> { d.getCampgroundLoops(1, ProviderType.RECREATION_GOV) }
     }
 }

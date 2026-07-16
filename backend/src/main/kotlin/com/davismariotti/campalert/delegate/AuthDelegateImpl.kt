@@ -3,7 +3,6 @@ package com.davismariotti.campalert.delegate
 import com.davismariotti.campalert.api.AuthApiDelegate
 import com.davismariotti.campalert.api.model.AuthResponse
 import com.davismariotti.campalert.api.model.ChangePasswordBody
-import com.davismariotti.campalert.api.model.ErrorResponse
 import com.davismariotti.campalert.api.model.ForgotPasswordBody
 import com.davismariotti.campalert.api.model.LoginBody
 import com.davismariotti.campalert.api.model.RegisterBody
@@ -13,13 +12,20 @@ import com.davismariotti.campalert.api.model.ResetPasswordBody
 import com.davismariotti.campalert.api.model.UpdateMeBody
 import com.davismariotti.campalert.api.model.VerificationStatus
 import com.davismariotti.campalert.api.model.VerifyEmailBody
+import com.davismariotti.campalert.exception.BadRequestException
+import com.davismariotti.campalert.exception.ConflictException
+import com.davismariotti.campalert.exception.RateLimitExceededException
+import com.davismariotti.campalert.exception.UnauthorizedException
 import com.davismariotti.campalert.notification.PasswordChangedNotification
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.security.RememberMeServices
 import com.davismariotti.campalert.security.UserDetailsServiceImpl
 import com.davismariotti.campalert.service.SessionRevocationService
+import com.davismariotti.campalert.service.email.EmailNotVerifiedException
+import com.davismariotti.campalert.service.email.EmailVerificationException
 import com.davismariotti.campalert.service.email.EmailVerificationService
 import com.davismariotti.campalert.service.email.EmailVerificationService.VerifyResult
+import com.davismariotti.campalert.service.email.PasswordResetException
 import com.davismariotti.campalert.service.email.PasswordResetService
 import com.davismariotti.campalert.service.email.PasswordResetService.ResetResult
 import com.davismariotti.campalert.service.notification.NotificationService
@@ -41,7 +47,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
 import org.springframework.stereotype.Service
-import org.springframework.web.server.ResponseStatusException
 import com.davismariotti.campalert.model.User as UserEntity
 
 @Service
@@ -65,7 +70,7 @@ class AuthDelegateImpl(
     override fun register(registerBody: RegisterBody): ResponseEntity<RegisterResponse> {
         turnstileService.verify(registerBody.turnstileToken)
         if (userRepository.findByEmail(registerBody.email) != null) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Email already registered")
+            throw ConflictException("Email already registered")
         }
         val user = userRepository.save(
             UserEntity(
@@ -83,29 +88,19 @@ class AuthDelegateImpl(
         )
     }
 
-    @Suppress("UNCHECKED_CAST")
     override fun login(loginBody: LoginBody): ResponseEntity<AuthResponse> {
         val auth = try {
             authenticationManager.authenticate(
                 UsernamePasswordAuthenticationToken(loginBody.email, loginBody.password),
             )
         } catch (ex: AuthenticationException) {
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials")
+            throw UnauthorizedException("Invalid credentials")
         }
 
         val user = userRepository.findByEmail(loginBody.email)!!
         if (user.emailVerifiedAt == null) {
             val verificationId = emailVerificationService.ensureVerificationForLogin(user.id!!, user.email)
-            return ResponseEntity
-                .status(HttpStatus.UNAUTHORIZED)
-                .body(
-                    ErrorResponse(
-                        message = "Email not verified",
-                        code = "EMAIL_NOT_VERIFIED",
-                        verificationId = verificationId,
-                    ),
-                )
-                as ResponseEntity<AuthResponse>
+            throw EmailNotVerifiedException(verificationId)
         }
 
         val userDetails = auth.principal as UserDetails
@@ -134,7 +129,6 @@ class AuthDelegateImpl(
         return ResponseEntity.ok(user.toAuthResponse())
     }
 
-    @Suppress("UNCHECKED_CAST")
     @PreAuthorize("isAuthenticated()")
     override fun updateMe(updateMeBody: UpdateMeBody): ResponseEntity<AuthResponse> {
         val auth = SecurityContextHolder.getContext().authentication!!
@@ -147,10 +141,7 @@ class AuthDelegateImpl(
         )
 
         if (merged.pushoverOverrideEnabled && (merged.pushoverApiToken.isNullOrBlank() || merged.pushoverUserKey.isNullOrBlank())) {
-            return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(ErrorResponse(message = "Pushover app token and user key are required to enable the Pushover override"))
-                as ResponseEntity<AuthResponse>
+            throw BadRequestException("Pushover app token and user key are required to enable the Pushover override")
         }
 
         val updated = userRepository.save(merged)
@@ -163,7 +154,6 @@ class AuthDelegateImpl(
         return ResponseEntity.accepted().build()
     }
 
-    @Suppress("UNCHECKED_CAST")
     override fun verifyEmail(verifyEmailBody: VerifyEmailBody): ResponseEntity<AuthResponse> {
         val outcome = emailVerificationService.consumeVerification(verifyEmailBody.verificationId, verifyEmailBody.code)
         return when (outcome.result) {
@@ -173,21 +163,9 @@ class AuthDelegateImpl(
                 establishSession(userDetails)
                 ResponseEntity.ok(user.toAuthResponse())
             }
-            VerifyResult.ATTEMPTS_EXCEEDED ->
-                ResponseEntity
-                    .status(HttpStatus.UNPROCESSABLE_ENTITY)
-                    .body(ErrorResponse(message = "Attempt limit reached", code = "VERIFICATION_CODE_ATTEMPTS_EXCEEDED"))
-                    as ResponseEntity<AuthResponse>
-            VerifyResult.WRONG_CODE ->
-                ResponseEntity
-                    .status(HttpStatus.UNPROCESSABLE_ENTITY)
-                    .body(ErrorResponse(message = "Invalid verification code", code = "VERIFICATION_CODE_INVALID"))
-                    as ResponseEntity<AuthResponse>
-            VerifyResult.INVALID_OR_EXPIRED ->
-                ResponseEntity
-                    .status(HttpStatus.UNPROCESSABLE_ENTITY)
-                    .body(ErrorResponse(message = "Verification link is invalid or expired", code = "VERIFICATION_INVALID_OR_EXPIRED"))
-                    as ResponseEntity<AuthResponse>
+            VerifyResult.ATTEMPTS_EXCEEDED -> throw EmailVerificationException.AttemptsExceeded()
+            VerifyResult.WRONG_CODE -> throw EmailVerificationException.CodeInvalid()
+            VerifyResult.INVALID_OR_EXPIRED -> throw EmailVerificationException.LinkExpired()
         }
     }
 
@@ -200,23 +178,16 @@ class AuthDelegateImpl(
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context)
     }
 
-    @Suppress("UNCHECKED_CAST")
     @PreAuthorize("isAuthenticated()")
     override fun changePassword(changePasswordBody: ChangePasswordBody): ResponseEntity<Unit> {
         val auth = SecurityContextHolder.getContext().authentication!!
         val user = userRepository.findByEmail(auth.name)!!
 
         if (!passwordEncoder.matches(changePasswordBody.currentPassword, user.passwordHash)) {
-            return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(ErrorResponse(message = "Current password is incorrect"))
-                as ResponseEntity<Unit>
+            throw BadRequestException("Current password is incorrect")
         }
         if (changePasswordBody.newPassword == changePasswordBody.currentPassword) {
-            return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(ErrorResponse(message = "New password must differ from current password"))
-                as ResponseEntity<Unit>
+            throw BadRequestException("New password must differ from current password")
         }
 
         userRepository.save(user.copy(passwordHash = passwordEncoder.encode(changePasswordBody.newPassword)!!))
@@ -234,37 +205,20 @@ class AuthDelegateImpl(
         return ResponseEntity.noContent().build()
     }
 
-    @Suppress("UNCHECKED_CAST")
     override fun forgotPassword(forgotPasswordBody: ForgotPasswordBody): ResponseEntity<Unit> {
         if (!forgotPasswordRateLimiter.tryAcquire(request.remoteAddr)) {
-            return ResponseEntity
-                .status(HttpStatus.TOO_MANY_REQUESTS)
-                .body(ErrorResponse(message = "Too many requests, please try again later"))
-                as ResponseEntity<Unit>
+            throw RateLimitExceededException()
         }
         passwordResetService.forgotPassword(forgotPasswordBody.email)
         return ResponseEntity.accepted().build()
     }
 
-    @Suppress("UNCHECKED_CAST")
     override fun resetPassword(resetPasswordBody: ResetPasswordBody): ResponseEntity<Unit> =
         when (passwordResetService.consumeReset(resetPasswordBody.resetId, resetPasswordBody.token, resetPasswordBody.newPassword)) {
             ResetResult.SUCCESS -> ResponseEntity.noContent().build()
-            ResetResult.INVALID_OR_EXPIRED ->
-                ResponseEntity
-                    .status(HttpStatus.UNPROCESSABLE_ENTITY)
-                    .body(ErrorResponse(message = "Reset link is invalid or expired", code = "RESET_INVALID_OR_EXPIRED"))
-                    as ResponseEntity<Unit>
-            ResetResult.PASSWORD_TOO_WEAK ->
-                ResponseEntity
-                    .status(HttpStatus.UNPROCESSABLE_ENTITY)
-                    .body(ErrorResponse(message = "Password does not meet requirements", code = "RESET_PASSWORD_TOO_WEAK"))
-                    as ResponseEntity<Unit>
-            ResetResult.PASSWORD_SAME_AS_CURRENT ->
-                ResponseEntity
-                    .status(HttpStatus.UNPROCESSABLE_ENTITY)
-                    .body(ErrorResponse(message = "New password must differ from current password", code = "RESET_PASSWORD_SAME_AS_CURRENT"))
-                    as ResponseEntity<Unit>
+            ResetResult.INVALID_OR_EXPIRED -> throw PasswordResetException.InvalidOrExpired()
+            ResetResult.PASSWORD_TOO_WEAK -> throw PasswordResetException.TooWeak()
+            ResetResult.PASSWORD_SAME_AS_CURRENT -> throw PasswordResetException.SameAsCurrent()
         }
 
     private fun UserEntity.toAuthResponse() =
