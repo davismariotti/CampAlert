@@ -47,7 +47,7 @@ class PermitsDelegateImpl(
         val response = try {
             recreationCb.executeSupplier { recreationApi.searchSuggest(q).execute() }
         } catch (e: CallNotPermittedException) {
-            log.warn("Recreation.gov circuit open for searchPermits q={}", q)
+            log.warn("Recreation.gov circuit open for searchPermits q={}", q, e)
             return ResponseEntity.ok(emptyList())
         } catch (ex: Exception) {
             log.warn("Recreation.gov error for searchPermits q={}", q, ex)
@@ -126,7 +126,7 @@ class PermitsDelegateImpl(
         val response = try {
             recreationCb.executeSupplier { recreationApi.getZonePermitAvailability(id, formattedStart).execute() }
         } catch (e: CallNotPermittedException) {
-            log.warn("Recreation.gov circuit open for getPermitAvailability id={}", id)
+            log.warn("Recreation.gov circuit open for getPermitAvailability id={}", id, e)
             throw UpstreamProviderException()
         } catch (ex: Exception) {
             log.warn("Recreation.gov error for getPermitAvailability id={}", id, ex)
@@ -165,7 +165,7 @@ class PermitsDelegateImpl(
         val response = try {
             recreationCb.executeSupplier { recreationApi.getItineraryDivisionAvailability(id, divisionId, month, year).execute() }
         } catch (e: CallNotPermittedException) {
-            log.warn("Recreation.gov circuit open for getPermitDivisionAvailability id={} divisionId={}", id, divisionId)
+            log.warn("Recreation.gov circuit open for getPermitDivisionAvailability id={} divisionId={}", id, divisionId, e)
             throw UpstreamProviderException()
         } catch (ex: Exception) {
             log.warn("Recreation.gov error for getPermitDivisionAvailability id={} divisionId={}", id, divisionId, ex)

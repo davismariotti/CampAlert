@@ -30,7 +30,7 @@ class RecreationCatalogProvider(
         val response = try {
             ridbCb.executeSupplier { ridbApi.getFacilities(query).execute() }
         } catch (e: CallNotPermittedException) {
-            log.warn("RIDB circuit open for searchCampgrounds q={}", query)
+            log.warn("RIDB circuit open for searchCampgrounds q={}", query, e)
             return emptyList()
         }
         if (!response.isSuccessful) {
@@ -76,7 +76,7 @@ class RecreationCatalogProvider(
         val response = try {
             ridbCb.executeSupplier { ridbApi.getCampsites(id).execute() }
         } catch (e: CallNotPermittedException) {
-            log.warn("RIDB circuit open for getCampgroundLoops id={}", id)
+            log.warn("RIDB circuit open for getCampgroundLoops id={}", id, e)
             return emptyList()
         }
         if (!response.isSuccessful) {

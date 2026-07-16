@@ -29,7 +29,7 @@ class TimezoneResolutionService(
             }
             searchRequestRepository.updateTimezone(searchRequestId, timezone)
         } catch (e: CallNotPermittedException) {
-            log.warn("Circuit open for timezone resolution provider={} requestId={} campsiteId={}", provider, searchRequestId, campsiteId)
+            log.warn("Circuit open for timezone resolution provider={} requestId={} campsiteId={}", provider, searchRequestId, campsiteId, e)
         } catch (e: Exception) {
             log.warn("Failed to resolve timezone provider={} requestId={} campsiteId={}", provider, searchRequestId, campsiteId, e)
         }
