@@ -15,6 +15,7 @@ import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.TimezoneResolutionService
 import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
 import com.davismariotti.campalert.service.scheduling.ProviderSearchWindowProperties
+import com.davismariotti.campalert.service.turnstile.TurnstileService
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -42,6 +43,7 @@ class SearchRequestsDelegateImplTest {
         `when`(it.maxRangeWidthDaysFor(Provider.RECREATION_GOV)).thenReturn(30)
         `when`(it.maxRangeWidthDaysFor(Provider.CAMPLIFE)).thenReturn(9)
     }
+    private val turnstileService = mock(TurnstileService::class.java)
 
     private val delegate = SearchRequestsDelegateImpl(
         searchRequestRepository,
@@ -52,6 +54,7 @@ class SearchRequestsDelegateImplTest {
         pollTargetRegistrationService,
         campLifeCatalogCache,
         providerSearchWindowProperties,
+        turnstileService,
     )
 
     private val user = User(id = 1L, email = "user@example.com", passwordHash = "hash")
@@ -63,6 +66,7 @@ class SearchRequestsDelegateImplTest {
         context.authentication = auth
         SecurityContextHolder.setContext(context)
         `when`(userRepository.findByEmail(user.email)).thenReturn(user)
+        `when`(turnstileService.verify(anyKt())).thenReturn(true)
         `when`(phoneNumberRepository.countByUserIdAndStatus(user.id!!, PhoneNumberStatus.VERIFIED)).thenReturn(1L)
         `when`(searchRequestRepository.save(anyKt())).thenAnswer { invocation ->
             val req = invocation.arguments[0] as SearchRequest
@@ -86,6 +90,7 @@ class SearchRequestsDelegateImplTest {
             campgroundName = "Test Campground",
             name = "Test",
             provider = provider,
+            turnstileToken = "test-token",
         )
 
     @Test
@@ -95,6 +100,22 @@ class SearchRequestsDelegateImplTest {
         assertEquals(ApiProviderType.RECREATION_GOV, result.body!!.provider.type)
         assertEquals("Recreation.gov", result.body!!.provider.name)
         verify(pollTargetRegistrationService).ensureCampgroundTarget(233359, Provider.RECREATION_GOV)
+    }
+
+    @Test
+    fun `createSearchRequest returns 403 TURNSTILE_FAILED and never registers a poll target when verification fails`() {
+        `when`(turnstileService.verify(org.mockito.ArgumentMatchers.anyString())).thenReturn(false)
+
+        val result = delegate.createSearchRequest(createBody())
+
+        assertEquals(403, result.statusCode.value())
+        assertEquals(
+            "TURNSTILE_FAILED",
+            (result.body as com.davismariotti.campalert.api.model.ErrorResponse).code,
+        )
+        verify(pollTargetRegistrationService, org.mockito.Mockito.never())
+            .ensureCampgroundTarget(org.mockito.ArgumentMatchers.anyInt(), anyKt())
+        verify(searchRequestRepository, org.mockito.Mockito.never()).save(anyKt())
     }
 
     @Test

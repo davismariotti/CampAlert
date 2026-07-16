@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { createPermitSearchRequest } from '../../api/generated/sdk.gen'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Spinner } from '../../components/ui/Spinner'
+import { TurnstileWidget, type TurnstileWidgetHandle } from '../../components/TurnstileWidget'
 import { usePermit } from './usePermit'
 import { ItineraryLegPicker } from './ItineraryLegPicker'
 import type { PermitItineraryLegBody, PermitSearchResult } from '../../api/generated/types.gen'
@@ -33,6 +34,8 @@ export function ItineraryRequestBuilder({ permit, onClear, onSuccess }: Props) {
   const [legs, setLegs] = useState<PermitItineraryLegBody[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<{ noPhone?: boolean; message?: string } | null>(null)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null)
 
   function divisionName(divisionId: string) {
     return permitDetail?.divisions.find((d) => d.id === divisionId)?.name ?? divisionId
@@ -58,7 +61,8 @@ export function ItineraryRequestBuilder({ permit, onClear, onSuccess }: Props) {
           groupSize,
           searchType: 'ITINERARY',
           itineraryTarget: { legs },
-          provider: permit.provider
+          provider: permit.provider,
+          turnstileToken: turnstileToken!
         }
       })
       if (result.error) throw result
@@ -66,7 +70,10 @@ export function ItineraryRequestBuilder({ permit, onClear, onSuccess }: Props) {
     },
     onSuccess: () => (onSuccess ? onSuccess() : navigate('/requests')),
     onError: (err: AxiosError<{ code?: string; message?: string }>) => {
-      if (err.response?.status === 422 && err.response?.data?.code === 'NO_VERIFIED_PHONE') {
+      if (err.response?.data?.code === 'TURNSTILE_FAILED') {
+        setSubmitError({ message: 'Verification expired. Please try again.' })
+        turnstileRef.current?.reset()
+      } else if (err.response?.status === 422 && err.response?.data?.code === 'NO_VERIFIED_PHONE') {
         setSubmitError({ noPhone: true })
       } else if (err.response?.status === 422 && err.response?.data?.code === 'ILLEGAL_LEG_SEQUENCE') {
         setSubmitError({
@@ -90,7 +97,7 @@ export function ItineraryRequestBuilder({ permit, onClear, onSuccess }: Props) {
     return Object.keys(e).length === 0
   }
 
-  const canSubmit = name.trim() !== '' && groupSize >= 1 && legs.length > 0 && !hasConflict
+  const canSubmit = name.trim() !== '' && groupSize >= 1 && legs.length > 0 && !hasConflict && turnstileToken !== null
 
   function removeLeg(index: number) {
     // Legs after the removed one were chosen as continuations of it, so they're no longer
@@ -220,6 +227,8 @@ export function ItineraryRequestBuilder({ permit, onClear, onSuccess }: Props) {
             </p>
           )}
           {submitError?.message && <p className="text-sm text-red-600">{submitError.message}</p>}
+
+          <TurnstileWidget ref={turnstileRef} onToken={setTurnstileToken} />
 
           <Button
             type="button"

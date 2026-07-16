@@ -21,6 +21,7 @@ import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.TimezoneResolutionService
 import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
 import com.davismariotti.campalert.service.scheduling.ProviderSearchWindowProperties
+import com.davismariotti.campalert.service.turnstile.TurnstileService
 import com.davismariotti.campalert.util.currentUserId
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
@@ -40,6 +41,7 @@ class SearchRequestsDelegateImpl(
     private val pollTargetRegistrationService: PollTargetRegistrationService,
     private val campLifeCatalogCache: CampLifeCatalogCache,
     private val providerSearchWindowProperties: ProviderSearchWindowProperties,
+    private val turnstileService: TurnstileService,
 ) : SearchRequestsApiDelegate {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -84,6 +86,11 @@ class SearchRequestsDelegateImpl(
     override fun createSearchRequest(
         createSearchRequestBody: CreateSearchRequestBody,
     ): ResponseEntity<SearchRequestResponse> {
+        if (!turnstileService.verify(createSearchRequestBody.turnstileToken)) {
+            return ResponseEntity.status(403).body(
+                ErrorResponse(message = "Bot verification failed", code = "TURNSTILE_FAILED"),
+            ) as ResponseEntity<SearchRequestResponse>
+        }
         val userId = currentUserId()
         if (phoneNumberRepository.countByUserIdAndStatus(userId, PhoneNumberStatus.VERIFIED) == 0L) {
             return ResponseEntity.status(422).body(

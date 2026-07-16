@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { register } from '../../api/generated/sdk.gen'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { TurnstileWidget, type TurnstileWidgetHandle } from '../../components/TurnstileWidget'
 import landscapeImg from '../../assets/landscape.jpg'
 import { getBrowserTimezone, getTimezoneOptions } from '../../utils/timezones'
 import type { AxiosError } from 'axios'
@@ -12,13 +13,15 @@ export function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [timezone, setTimezone] = useState(getBrowserTimezone)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
   const timezoneOptions = getTimezoneOptions()
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null)
 
   const mutation = useApiMutation({
     mutationFn: async () => {
-      const result = await register({ body: { email, password, timezone } })
+      const result = await register({ body: { email, password, timezone, turnstileToken: turnstileToken! } })
       if (result.error) throw result
       return result.data!
     },
@@ -27,8 +30,11 @@ export function RegisterPage() {
         state: { verificationId: data.verificationId, email }
       })
     },
-    onError: (err: AxiosError<{ message: string }>) => {
-      if (err.response?.status === 409) {
+    onError: (err: AxiosError<{ code?: string; message?: string }>) => {
+      if (err.response?.data?.code === 'TURNSTILE_FAILED') {
+        setError('Verification expired. Please try again.')
+        turnstileRef.current?.reset()
+      } else if (err.response?.status === 409) {
         setError('An account with this email already exists')
       } else if (err.response?.status === 400) {
         setError(err.response.data?.message ?? 'Validation error')
@@ -38,7 +44,7 @@ export function RegisterPage() {
     }
   })
 
-  const canSubmit = email.trim() !== '' && password.length >= 8 && password.length <= 72
+  const canSubmit = email.trim() !== '' && password.length >= 8 && password.length <= 72 && turnstileToken !== null
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -105,6 +111,8 @@ export function RegisterPage() {
                 ))}
               </select>
             </label>
+
+            <TurnstileWidget ref={turnstileRef} onToken={setTurnstileToken} />
 
             {error && <p className="text-sm text-red-600">{error}</p>}
 

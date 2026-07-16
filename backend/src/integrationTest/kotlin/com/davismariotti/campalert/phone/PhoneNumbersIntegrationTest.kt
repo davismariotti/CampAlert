@@ -44,7 +44,7 @@ class PhoneNumbersIntegrationTest : IntegrationTestBase() {
 
     // --- helpers ---
 
-    private fun addPhone(session: Cookie, phone: String = "+12125551234", consent: Boolean = true): MvcResult = doPost("/api/phone-numbers", session, AddPhoneNumberBody(phone = phone, smsConsent = consent))
+    private fun addPhone(session: Cookie, phone: String = "+12125551234", consent: Boolean = true): MvcResult = doPost("/api/phone-numbers", session, AddPhoneNumberBody(phone = phone, smsConsent = consent, turnstileToken = "test-token"))
 
     private fun verifyPhone(session: Cookie, id: Long, code: String = "123456"): MvcResult = doPost("/api/phone-numbers/$id/verify", session, VerifyPhoneNumberBody(code = code))
 
@@ -91,7 +91,7 @@ class PhoneNumbersIntegrationTest : IntegrationTestBase() {
 
     @Test
     fun `unauthenticated POST add phone number returns 401`() {
-        val result = doPost("/api/phone-numbers", body = AddPhoneNumberBody(phone = "+12125551234", smsConsent = true))
+        val result = doPost("/api/phone-numbers", body = AddPhoneNumberBody(phone = "+12125551234", smsConsent = true, turnstileToken = "test-token"))
         assertThat(result.response.status).isEqualTo(401)
     }
 

@@ -16,7 +16,10 @@ class EmailAuthIntegrationTest : IntegrationTestBase() {
 
     @Test
     fun `resend-verification returns 202 for unknown email (enumeration resistance)`() {
-        val result = doPost("/api/auth/resend-verification", body = ResendVerificationBody(email = "ghost@test.com"))
+        val result = doPost(
+            "/api/auth/resend-verification",
+            body = ResendVerificationBody(email = "ghost@test.com", turnstileToken = "test-token"),
+        )
         assertThat(result.response.status).isEqualTo(202)
         assertThat(result.response.contentAsString).isEmpty()
     }
@@ -24,23 +27,23 @@ class EmailAuthIntegrationTest : IntegrationTestBase() {
     @Test
     fun `resend-verification returns 202 for verified account (enumeration resistance)`() {
         registerAndLogin()
-        val result = doPost("/api/auth/resend-verification", body = ResendVerificationBody(email = "user@test.com"))
+        val result = doPost("/api/auth/resend-verification", body = ResendVerificationBody(email = "user@test.com", turnstileToken = "test-token"))
         assertThat(result.response.status).isEqualTo(202)
         assertThat(result.response.contentAsString).isEmpty()
     }
 
     @Test
     fun `resend-verification returns 202 for unverified account`() {
-        doPost("/api/auth/register", body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles"))
-        val result = doPost("/api/auth/resend-verification", body = ResendVerificationBody(email = "user@test.com"))
+        doPost("/api/auth/register", body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles", turnstileToken = "test-token"))
+        val result = doPost("/api/auth/resend-verification", body = ResendVerificationBody(email = "user@test.com", turnstileToken = "test-token"))
         assertThat(result.response.status).isEqualTo(202)
         assertThat(result.response.contentAsString).isEmpty()
     }
 
     @Test
     fun `resend-verification does not set a session cookie`() {
-        doPost("/api/auth/register", body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles"))
-        val result = doPost("/api/auth/resend-verification", body = ResendVerificationBody(email = "user@test.com"))
+        doPost("/api/auth/register", body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles", turnstileToken = "test-token"))
+        val result = doPost("/api/auth/resend-verification", body = ResendVerificationBody(email = "user@test.com", turnstileToken = "test-token"))
         assertThat(result.response.getCookie("SESSION")).isNull()
         assertThat(result.response.getCookie("remember-me")).isNull()
     }
@@ -109,7 +112,7 @@ class EmailAuthIntegrationTest : IntegrationTestBase() {
 
     @Test
     fun `forgot-password returns 202 for unverified account (enumeration resistance)`() {
-        doPost("/api/auth/register", body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles"))
+        doPost("/api/auth/register", body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles", turnstileToken = "test-token"))
         val result = doPost("/api/auth/forgot-password", body = ForgotPasswordBody(email = "user@test.com"))
         assertThat(result.response.status).isEqualTo(202)
         assertThat(result.response.contentAsString).isEmpty()
@@ -199,7 +202,7 @@ class EmailAuthIntegrationTest : IntegrationTestBase() {
         // Instead, verify that the resend endpoint itself doesn't error and the new code works.
         // To bypass cooldown in test, use a second registration on different email.
         // For this test, just confirm resend returns 202 and the ORIGINAL code still works within expiry.
-        val resendResult = doPost("/api/auth/resend-verification", body = ResendVerificationBody(email = "user@test.com"))
+        val resendResult = doPost("/api/auth/resend-verification", body = ResendVerificationBody(email = "user@test.com", turnstileToken = "test-token"))
         assertThat(resendResult.response.status).isEqualTo(202)
 
         // The first code was consumed by the resend (prior pending rows are invalidated).

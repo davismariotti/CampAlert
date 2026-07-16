@@ -7,6 +7,7 @@ import { useAuth } from '../features/auth/useAuth'
 import { useApiMutation } from '../hooks/useApiMutation'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
+import { TurnstileWidget, type TurnstileWidgetHandle } from './TurnstileWidget'
 import type { AxiosError } from 'axios'
 
 interface Props {
@@ -20,9 +21,11 @@ export function LoginModal({ onClose }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [unverified, setUnverified] = useState(false)
   const [resendConfirmation, setResendConfirmation] = useState<string | null>(null)
+  const [resendTurnstileToken, setResendTurnstileToken] = useState<string | null>(null)
   const { login: storeAuth } = useAuth()
   const navigate = useNavigate()
   const firstInputRef = useRef<HTMLInputElement>(null)
+  const resendTurnstileRef = useRef<TurnstileWidgetHandle>(null)
 
   useEffect(() => {
     firstInputRef.current?.focus()
@@ -70,13 +73,20 @@ export function LoginModal({ onClose }: Props) {
 
   const resendMutation = useApiMutation({
     mutationFn: async () => {
-      await resendVerification({ body: { email }, throwOnError: true })
+      await resendVerification({ body: { email, turnstileToken: resendTurnstileToken! }, throwOnError: true })
     },
     onSuccess: () => {
       setResendConfirmation('If that account can be verified, a new code has been sent.')
       setError(null)
     },
-    onError: () => setError('Unable to request a new code. Please try again.')
+    onError: (err: AxiosError<ErrorResponse>) => {
+      if (err.response?.data?.code === 'TURNSTILE_FAILED') {
+        setError('Verification expired. Please try again.')
+        resendTurnstileRef.current?.reset()
+      } else {
+        setError('Unable to request a new code. Please try again.')
+      }
+    }
   })
 
   const canSubmit = email.trim() !== '' && password !== ''
@@ -149,14 +159,18 @@ export function LoginModal({ onClose }: Props) {
           {resendConfirmation && <p className="text-sm text-green-700">{resendConfirmation}</p>}
 
           {unverified && (
-            <Button
-              type="button"
-              variant="secondary"
-              loading={resendMutation.isPending}
-              onClick={() => resendMutation.mutate()}
-            >
-              Resend verification email
-            </Button>
+            <>
+              <TurnstileWidget ref={resendTurnstileRef} onToken={setResendTurnstileToken} />
+              <Button
+                type="button"
+                variant="secondary"
+                loading={resendMutation.isPending}
+                disabled={resendTurnstileToken === null}
+                onClick={() => resendMutation.mutate()}
+              >
+                Resend verification email
+              </Button>
+            </>
           )}
 
           <Button type="submit" loading={mutation.isPending} disabled={!canSubmit}>

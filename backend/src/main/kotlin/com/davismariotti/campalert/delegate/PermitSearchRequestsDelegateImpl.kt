@@ -27,6 +27,7 @@ import com.davismariotti.campalert.service.permit.LegValidationResult
 import com.davismariotti.campalert.service.permit.PermitClassificationService
 import com.davismariotti.campalert.service.permit.PermitContentCache
 import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
+import com.davismariotti.campalert.service.turnstile.TurnstileService
 import com.davismariotti.campalert.util.currentUserId
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -45,6 +46,7 @@ class PermitSearchRequestsDelegateImpl(
     private val permitClassificationService: PermitClassificationService,
     private val permitContentCache: PermitContentCache,
     private val pollTargetRegistrationService: PollTargetRegistrationService,
+    private val turnstileService: TurnstileService,
 ) : PermitSearchRequestsApiDelegate {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -67,6 +69,11 @@ class PermitSearchRequestsDelegateImpl(
     override fun createPermitSearchRequest(
         createPermitSearchRequestBody: CreatePermitSearchRequestBody,
     ): ResponseEntity<PermitSearchRequestResponse> {
+        if (!turnstileService.verify(createPermitSearchRequestBody.turnstileToken)) {
+            return ResponseEntity.status(403).body(
+                ErrorResponse(message = "Bot verification failed", code = "TURNSTILE_FAILED"),
+            ) as ResponseEntity<PermitSearchRequestResponse>
+        }
         val userId = currentUserId()
         if (phoneNumberRepository.countByUserIdAndStatus(userId, PhoneNumberStatus.VERIFIED) == 0L) {
             return ResponseEntity.status(422).body(

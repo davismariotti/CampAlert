@@ -75,7 +75,12 @@ describe('RegisterPage', () => {
 
     await waitFor(() =>
       expect(registerSpy).toHaveBeenCalledWith({
-        body: { email: 'new@b.com', password: 'password1', timezone: 'America/Denver' }
+        body: {
+          email: 'new@b.com',
+          password: 'password1',
+          timezone: 'America/Denver',
+          turnstileToken: 'test-turnstile-token'
+        }
       })
     )
     expect(screen.getByTestId('location')).toHaveTextContent(

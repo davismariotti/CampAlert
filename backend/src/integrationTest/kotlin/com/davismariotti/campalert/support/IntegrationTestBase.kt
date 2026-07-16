@@ -7,6 +7,8 @@ import com.davismariotti.campalert.provider.camplife.CampLifeApi
 import com.davismariotti.campalert.provider.recreation.RecreationApi
 import com.davismariotti.campalert.provider.recreation.RidbApi
 import com.davismariotti.campalert.service.sms.TwilioVerifyService
+import com.davismariotti.campalert.service.turnstile.SiteverifyResponse
+import com.davismariotti.campalert.service.turnstile.TurnstileApi
 import com.davismariotti.notifications.EmailSender
 import com.davismariotti.notifications.PushoverSender
 import com.davismariotti.notifications.SendResult
@@ -37,6 +39,8 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.postgresql.PostgreSQLContainer
+import retrofit2.Call
+import retrofit2.Response
 import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
@@ -90,6 +94,12 @@ open class IntegrationTestBase {
     @MockitoBean
     protected lateinit var campLifeApi: CampLifeApi
 
+    // Replaces the real Cloudflare Turnstile client so no real network call is made during tests —
+    // mirrors how recreationApi/ridbApi/campLifeApi are mocked above rather than pointed at a real
+    // (or test-key) external endpoint. Defaulted to always-succeed in resetState() below.
+    @MockitoBean
+    protected lateinit var turnstileApi: TurnstileApi
+
     // Replaces the library's real EmailSender so no real email is sent during tests.
     @MockitoBean
     protected lateinit var emailSender: EmailSender
@@ -141,6 +151,13 @@ open class IntegrationTestBase {
         `when`(smsSender.send(anyString(), anyString())).thenReturn(SendResult.success())
         `when`(emailSender.send(anyString(), anyString(), anyString())).thenReturn(SendResult.success())
         `when`(pushoverSender.send(anyKt(), anyKt())).thenReturn(SendResult.success())
+        @Suppress("UNCHECKED_CAST")
+        val turnstileCall = org.mockito.Mockito.mock(Call::class.java) as Call<SiteverifyResponse>
+        org.mockito.Mockito
+            .doReturn(Response.success(SiteverifyResponse(success = true)))
+            .`when`(turnstileCall)
+            .execute()
+        `when`(turnstileApi.siteverify(anyString(), anyString())).thenReturn(turnstileCall)
 
         sentEmailVarsList.clear()
         sentEmailTemplates.clear()
@@ -248,7 +265,7 @@ open class IntegrationTestBase {
     protected fun registerOnly(email: String = "user@test.com", password: String = "password1"): String {
         val result = doPost(
             "/api/auth/register",
-            body = RegisterBody(email = email, password = password, timezone = "America/Los_Angeles"),
+            body = RegisterBody(email = email, password = password, timezone = "America/Los_Angeles", turnstileToken = "test-token"),
         )
         return mapper.readTree(result.response.contentAsString).get("verificationId").asText()
     }

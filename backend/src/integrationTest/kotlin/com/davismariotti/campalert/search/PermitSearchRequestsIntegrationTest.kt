@@ -87,6 +87,7 @@ class PermitSearchRequestsIntegrationTest : IntegrationTestBase() {
         name = "Aloha Zone Watch",
         searchType = PermitType.ZONE,
         zoneTarget = PermitZoneTargetBody(divisionIds = listOf("343"), startDay = LocalDate.of(2027, 7, 10), endDay = LocalDate.of(2027, 7, 15)),
+        turnstileToken = "test-token",
     )
 
     private val itineraryCreateBody = CreatePermitSearchRequestBody(
@@ -96,6 +97,7 @@ class PermitSearchRequestsIntegrationTest : IntegrationTestBase() {
         name = "Blacktail Loop",
         searchType = PermitType.ITINERARY,
         itineraryTarget = PermitItineraryTargetBody(legs = listOf(PermitItineraryLegBody(divisionId = "A", date = LocalDate.of(2027, 7, 12)))),
+        turnstileToken = "test-token",
     )
 
     private fun createRequest(session: Cookie, body: CreatePermitSearchRequestBody): MvcResult = doPost("/api/permit-search-requests", session, body)

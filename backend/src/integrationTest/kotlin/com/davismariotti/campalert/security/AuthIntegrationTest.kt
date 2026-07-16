@@ -19,7 +19,7 @@ class AuthIntegrationTest : IntegrationTestBase() {
     fun `successful registration returns 201 with verificationId in body`() {
         val result = doPost(
             "/api/auth/register",
-            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles"),
+            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles", turnstileToken = "test-token"),
         )
         assertThat(result.response.status).isEqualTo(201)
         assertThat(result.response.contentAsString).contains("verificationId")
@@ -30,14 +30,14 @@ class AuthIntegrationTest : IntegrationTestBase() {
     fun `registration does not create a session`() {
         val result = doPost(
             "/api/auth/register",
-            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles"),
+            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles", turnstileToken = "test-token"),
         )
         assertThat(result.response.getCookie("SESSION")).isNull()
     }
 
     @Test
     fun `duplicate email registration returns 409`() {
-        val body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles")
+        val body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles", turnstileToken = "test-token")
         doPost("/api/auth/register", body = body)
         assertThat(doPost("/api/auth/register", body = body).response.status).isEqualTo(409)
     }
@@ -46,7 +46,7 @@ class AuthIntegrationTest : IntegrationTestBase() {
     fun `password shorter than 8 characters returns 400`() {
         val result = doPost(
             "/api/auth/register",
-            body = RegisterBody(email = "short@test.com", password = "abc", timezone = "America/Los_Angeles"),
+            body = RegisterBody(email = "short@test.com", password = "abc", timezone = "America/Los_Angeles", turnstileToken = "test-token"),
         )
         assertThat(result.response.status).isEqualTo(400)
     }
@@ -55,7 +55,7 @@ class AuthIntegrationTest : IntegrationTestBase() {
     fun `invalid email format returns 400`() {
         val result = doPost(
             "/api/auth/register",
-            body = RegisterBody(email = "notanemail", password = "password1", timezone = "America/Los_Angeles"),
+            body = RegisterBody(email = "notanemail", password = "password1", timezone = "America/Los_Angeles", turnstileToken = "test-token"),
         )
         assertThat(result.response.status).isEqualTo(400)
     }
@@ -66,7 +66,7 @@ class AuthIntegrationTest : IntegrationTestBase() {
     fun `login with correct credentials on unverified account returns 401 EMAIL_NOT_VERIFIED`() {
         doPost(
             "/api/auth/register",
-            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles"),
+            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles", turnstileToken = "test-token"),
         )
         val result = doPost("/api/auth/login", body = LoginBody(email = "user@test.com", password = "password1"))
         assertThat(result.response.status).isEqualTo(401)
@@ -78,7 +78,7 @@ class AuthIntegrationTest : IntegrationTestBase() {
     fun `login on unverified account does not create a session`() {
         doPost(
             "/api/auth/register",
-            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles"),
+            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles", turnstileToken = "test-token"),
         )
         val result = doPost("/api/auth/login", body = LoginBody(email = "user@test.com", password = "password1"))
         assertThat(result.response.getCookie("SESSION")).isNull()
@@ -100,7 +100,7 @@ class AuthIntegrationTest : IntegrationTestBase() {
     fun `wrong password returns 401`() {
         doPost(
             "/api/auth/register",
-            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles"),
+            body = RegisterBody(email = "user@test.com", password = "password1", timezone = "America/Los_Angeles", turnstileToken = "test-token"),
         )
         assertThat(
             doPost("/api/auth/login", body = LoginBody(email = "user@test.com", password = "wrongpassword")).response.status,

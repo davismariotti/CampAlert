@@ -75,6 +75,7 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
         campsiteId = 10,
         campgroundName = "Pine Valley",
         name = "Weekend Trip",
+        turnstileToken = "test-token",
     )
 
     private val defaultUpdateBody = UpdateSearchRequestBody(

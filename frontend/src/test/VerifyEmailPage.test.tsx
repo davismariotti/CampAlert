@@ -126,7 +126,7 @@ describe('VerifyEmailPage', () => {
 
     await waitFor(() =>
       expect(resendSpy).toHaveBeenCalledWith({
-        body: { email: 'pending@test.com' },
+        body: { email: 'pending@test.com', turnstileToken: 'test-turnstile-token' },
         throwOnError: true
       })
     )
