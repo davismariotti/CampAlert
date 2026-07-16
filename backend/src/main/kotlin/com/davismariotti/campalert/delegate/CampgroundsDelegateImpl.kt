@@ -33,7 +33,7 @@ class CampgroundsDelegateImpl(
             campgroundCatalogProviderRegistry.forProvider(provider?.toModel() ?: Provider.RECREATION_GOV).getLoops(id)
         } catch (ex: Exception) {
             log.warn("Catalog loops error provider={} id={}", provider, id, ex)
-            throw UpstreamProviderException("Upstream error")
+            throw UpstreamProviderException("Upstream error", cause = ex)
         }
         return ResponseEntity.ok(loops)
     }
@@ -49,7 +49,7 @@ class CampgroundsDelegateImpl(
                 campgroundCatalogProviderRegistry.forProvider(provider.toModel()).search(q)
             } catch (ex: Exception) {
                 log.warn("Catalog search error provider={} q={}", provider, q, ex)
-                throw UpstreamProviderException("Upstream error")
+                throw UpstreamProviderException("Upstream error", cause = ex)
             }
             return ResponseEntity.ok(results)
         }

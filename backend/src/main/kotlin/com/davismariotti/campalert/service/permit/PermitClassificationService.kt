@@ -61,7 +61,7 @@ class PermitClassificationService(
                 }
             }
         } catch (e: Exception) {
-            log.warn("Failed to fetch permitmapping", e)
+            log.warn("Failed to fetch permit mapping", e)
             null
         }
 
