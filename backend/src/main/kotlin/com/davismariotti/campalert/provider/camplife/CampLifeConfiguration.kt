@@ -27,13 +27,7 @@ class CampLifeConfiguration(
         providerHttpClientFactory.build(
             provider = Provider.CAMPLIFE,
             refererOrigin = CAMPLIFE_ORIGIN,
-            metricsInterceptor = MetricsInterceptor.byPath(
-                default = "Custom/CampLife/Request",
-                // Directory listing (CampLifeCatalogCache.getDirectory) — the known-slow endpoint.
-                Regex("^/campgrounds$") to "Custom/CampLife/CatalogFetch",
-                // Per-campground session lookup (CampLifeCatalogCache.getCampgroundSession).
-                Regex("reservation/session") to "Custom/CampLife/CatalogFetch",
-            ),
+            metricsInterceptor = MetricsInterceptor.byRetrofitMethod(prefix = "Custom/CampLife/"),
         )
 
     /**
