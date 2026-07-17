@@ -30,6 +30,8 @@ data class PermitDivisionContent(
     @JsonProperty("children") val children: List<String> = emptyList(),
     @JsonProperty("entry_ids") val entryIds: List<String> = emptyList(),
     @JsonProperty("exit_ids") val exitIds: List<String> = emptyList(),
+    /** Confirmed live (e.g. Yosemite's "HSC Admin" divisions) — internal/admin-only, not meant to be user-selectable. Filtered out of [com.davismariotti.campalert.delegate.PermitsDelegateImpl.getPermit]'s division list rather than exposed to any client. */
+    @JsonProperty("is_hidden") val isHidden: Boolean = false,
 )
 
 /**
