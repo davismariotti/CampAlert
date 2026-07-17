@@ -4,13 +4,16 @@ Kotlin/Spring Boot service that monitors Recreation.gov for campground availabil
 
 ## Repo layout
 
-All backend code lives under `backend/`. Future `frontend/` and `infrastructure/` directories will sit alongside it at the repo root.
+Backend code lives under `backend/`, frontend under `frontend/`. A future `infrastructure/` directory will sit alongside them at the repo root. `api/campalert-api.yaml` at the repo root is the shared OpenAPI contract both sides generate code from.
+
+Frontend is organized by feature under `frontend/src/features/` (e.g. `permit/`, `campground/`, `requests/`, `account/`), with shared UI in `frontend/src/components/`, hooks in `frontend/src/hooks/`, and the generated API client in `frontend/src/api/generated/` (gitignored, regenerated from `api/campalert-api.yaml` — never edit directly, same rule as the backend's generated OpenAPI code).
 
 ## Stack
 
-- Kotlin 1.9.25 / Spring Boot 3.3.3 / Gradle (Groovy DSL) / Java 21
+- Backend: Kotlin 1.9.25 / Spring Boot 3.3.3 / Gradle (Groovy DSL) / Java 21
+- Frontend: React 19 / TypeScript / Vite / Tailwind CSS 4 / TanStack Query / react-router-dom
 - PostgreSQL — schema managed by Atlas (`backend/db/schema.sql` is the source of truth)
-- OpenAPI spec-first — `api/campalert-api.yaml` drives code generation via `openApiGenerate` (shared with frontend)
+- OpenAPI spec-first — `api/campalert-api.yaml` drives code generation for both sides: `openApiGenerate` (Gradle) on the backend, `npm run generate` (`@hey-api/openapi-ts`) on the frontend
 - Retrofit2 — internal client for Recreation.gov API only (not used for the app's own API)
 
 ## Running locally
@@ -33,6 +36,17 @@ Or bring up all dev services (Postgres + Redis) at once:
 ```bash
 docker compose -f docker/docker-compose-dev.yaml up -d
 ```
+
+Frontend:
+
+```bash
+cd frontend
+npm install
+npm run generate  # regenerates the API client from api/campalert-api.yaml — run this after pulling changes to the spec
+npm run dev
+```
+
+Vite proxies `/api` to `http://localhost:8080`, so run the backend (above) alongside it.
 
 ## Where things live
 
@@ -67,6 +81,7 @@ When adding or changing an endpoint:
 2. `cd backend && ./gradlew openApiGenerate` — regenerates interfaces and models into `backend/build/generated/openapi/`
 3. Update or create the delegate in `backend/src/main/kotlin/.../delegate/`
 4. `./gradlew compileKotlin` — verify no type errors before running
+5. `cd frontend && npm run generate` — regenerates the frontend's API client from the same spec. Easy to forget since nothing fails loudly when skipped: the frontend just silently keeps using the old generated types (e.g. a new enum value won't type-check, but a new field on an existing response is invisible without a diff). Do this in the same commit as the spec change.
 
 ## CI
 

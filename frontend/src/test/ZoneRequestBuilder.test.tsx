@@ -13,6 +13,7 @@ const permit: PermitSearchResult = {
   name: 'Desolation Wilderness',
   recareaName: 'Eldorado National Forest',
   type: 'ZONE',
+  isSupported: true,
   provider: { type: 'RECREATION_GOV', name: 'Recreation.gov' }
 }
 

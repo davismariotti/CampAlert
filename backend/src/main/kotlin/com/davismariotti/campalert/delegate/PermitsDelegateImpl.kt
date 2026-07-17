@@ -70,6 +70,7 @@ class PermitsDelegateImpl(
                     name = suggestion.name,
                     recareaName = suggestion.parentName,
                     type = type?.toApi(),
+                    isSupported = type != null,
                     provider = resultProvider,
                 )
             }
