@@ -116,6 +116,27 @@ class PermitsDelegateImplTest {
         assertEquals(listOf("4675323002"), division.childDivisionIds)
     }
 
+    @Test
+    fun `getPermit excludes hidden divisions from the returned list`() {
+        `when`(permitClassificationService.classify("445859")).thenReturn(SearchType.TRAILHEAD)
+        `when`(permitContentCache.get("445859")).thenReturn(
+            PermitContentPayload(
+                id = "445859",
+                name = "Yosemite National Park Wilderness Permits",
+                divisions = mapOf(
+                    "44585901" to PermitDivisionContent(id = "44585901", name = "Alder Creek", isHidden = false),
+                    "44585967" to PermitDivisionContent(id = "44585967", name = "HSC Admin (Glen Aulin)", isHidden = true),
+                ),
+            ),
+        )
+
+        val response = delegate.getPermit("445859")
+
+        assertEquals(200, response.statusCode.value())
+        val names = response.body!!.divisions.map { it.name }
+        assertEquals(listOf("Alder Creek"), names)
+    }
+
     // --- getPermitAvailability (zone) ---
 
     @Test

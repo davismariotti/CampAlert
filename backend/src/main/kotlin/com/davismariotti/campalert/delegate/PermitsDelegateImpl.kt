@@ -87,6 +87,7 @@ class PermitsDelegateImpl(
             ?: throw UpstreamProviderException()
 
         val divisions = content.divisions.values
+            .filterNot { it.isHidden }
             .sortedWith(compareBy(naturalOrder) { it.name ?: it.id })
             .map { division ->
                 PermitDivision(
