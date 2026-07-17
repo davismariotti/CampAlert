@@ -5,9 +5,11 @@ interface Props {
   permitId: string
   selectedDivisionIds: string[]
   onChange: (divisionIds: string[]) => void
+  /** Label for the picker and its loading/error states — e.g. "Zones" or "Trailheads" depending on the permit's reservation type. */
+  label?: string
 }
 
-export function ZoneDivisionPicker({ permitId, selectedDivisionIds, onChange }: Props) {
+export function ZoneDivisionPicker({ permitId, selectedDivisionIds, onChange, label = 'Zones' }: Props) {
   const { data: permit, isLoading, isError } = usePermit(permitId)
 
   function toggle(divisionId: string) {
@@ -20,7 +22,7 @@ export function ZoneDivisionPicker({ permitId, selectedDivisionIds, onChange }: 
   if (isLoading) {
     return (
       <div>
-        <label className="mb-1 block text-xs font-medium text-forest-600">Zones</label>
+        <label className="mb-1 block text-xs font-medium text-forest-600">{label}</label>
         <div className="flex flex-wrap gap-1.5">
           {[80, 56, 64, 72, 48].map((w) => (
             <div key={w} className="h-6 animate-pulse rounded-full bg-forest-100" style={{ width: w }} />
@@ -31,13 +33,13 @@ export function ZoneDivisionPicker({ permitId, selectedDivisionIds, onChange }: 
   }
 
   if (isError || !permit) {
-    return <p className="text-xs text-red-600">Couldn't load this permit's zones. Try again.</p>
+    return <p className="text-xs text-red-600">Couldn't load this permit's {label.toLowerCase()}. Try again.</p>
   }
 
   return (
     <div>
       <label className="mb-1 block text-xs font-medium text-forest-600">
-        Zones <span className="font-normal text-forest-400">({selectedDivisionIds.length} selected)</span>
+        {label} <span className="font-normal text-forest-400">({selectedDivisionIds.length} selected)</span>
       </label>
       <div className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-xl border border-forest-100 p-2">
         {permit.divisions.map((division) => {

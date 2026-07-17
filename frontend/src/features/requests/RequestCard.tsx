@@ -210,12 +210,20 @@ export function RequestCard({ request }: Props) {
             : `${formatDate(request.zoneTarget.startDay)} – ${formatDate(request.zoneTarget.endDay)}`,
           `${request.groupSize} ${request.groupSize !== 1 ? 'people' : 'person'}`
         ].join(' · ')
-      : request.itineraryTarget
+      : request.searchType === 'TRAILHEAD' && request.trailheadTarget
         ? [
-            `${request.itineraryTarget.legs.length} night${request.itineraryTarget.legs.length !== 1 ? 's' : ''}`,
+            `${request.trailheadTarget.divisionIds.length} trailhead${request.trailheadTarget.divisionIds.length !== 1 ? 's' : ''}`,
+            request.trailheadTarget.startDay === request.trailheadTarget.endDay
+              ? formatDate(request.trailheadTarget.startDay)
+              : `${formatDate(request.trailheadTarget.startDay)} – ${formatDate(request.trailheadTarget.endDay)}`,
             `${request.groupSize} ${request.groupSize !== 1 ? 'people' : 'person'}`
           ].join(' · ')
-        : ''
+        : request.itineraryTarget
+          ? [
+              `${request.itineraryTarget.legs.length} night${request.itineraryTarget.legs.length !== 1 ? 's' : ''}`,
+              `${request.groupSize} ${request.groupSize !== 1 ? 'people' : 'person'}`
+            ].join(' · ')
+          : ''
     : request.latestStartDay
       ? [
           `Any ${request.nights} night${request.nights !== 1 ? 's' : ''}`,
@@ -301,6 +309,12 @@ export function RequestCard({ request }: Props) {
           <p className="mt-2 text-xs text-forest-600">
             Matches <span className="font-medium">{divisionName(request.zoneTarget.matchedDivisionId)}</span>
             {request.zoneTarget.matchedDate && ` on ${formatDate(request.zoneTarget.matchedDate)}`}
+          </p>
+        )}
+        {isPermit && request.searchType === 'TRAILHEAD' && request.trailheadTarget?.matchedDivisionId && (
+          <p className="mt-2 text-xs text-forest-600">
+            Matches <span className="font-medium">{divisionName(request.trailheadTarget.matchedDivisionId)}</span>
+            {request.trailheadTarget.matchedDate && ` on ${formatDate(request.trailheadTarget.matchedDate)}`}
           </p>
         )}
         {isPermit && request.searchType === 'ITINERARY' && request.itineraryTarget?.blockingDivisionId && (

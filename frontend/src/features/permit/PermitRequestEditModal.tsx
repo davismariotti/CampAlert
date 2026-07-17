@@ -27,14 +27,20 @@ export function PermitRequestEditModal({ request, onClose }: Props) {
   const queryClient = useQueryClient()
   const { data: permitDetail } = usePermit(request.permitId)
   const isZone = request.searchType === 'ZONE'
+  const isTrailhead = request.searchType === 'TRAILHEAD'
+  // ZONE and TRAILHEAD share the same target shape (divisionIds/startDay/endDay) and picker UI —
+  // only ITINERARY needs the leg-based fields below.
+  const usesDivisionPicker = isZone || isTrailhead
 
   const [name, setName] = useState(request.name)
   const [groupSize, setGroupSize] = useState(request.groupSize)
   const [completed, setCompleted] = useState(request.completed)
   const [error, setError] = useState<string | null>(null)
 
-  const [divisionIds, setDivisionIds] = useState<string[]>(request.zoneTarget?.divisionIds ?? [])
-  const [night, setNight] = useState(request.zoneTarget?.startDay ?? '')
+  const [divisionIds, setDivisionIds] = useState<string[]>(
+    request.zoneTarget?.divisionIds ?? request.trailheadTarget?.divisionIds ?? []
+  )
+  const [night, setNight] = useState(request.zoneTarget?.startDay ?? request.trailheadTarget?.startDay ?? '')
 
   const [legs, setLegs] = useState<PermitItineraryLegBody[]>(request.itineraryTarget?.legs ?? [])
   const [startDate, setStartDate] = useState(request.itineraryTarget?.legs[0]?.date ?? '')
@@ -51,7 +57,7 @@ export function PermitRequestEditModal({ request, onClose }: Props) {
     return null
   }
 
-  const hasConflict = !isZone && legs.some((leg) => legConflict(leg) != null)
+  const hasConflict = !usesDivisionPicker && legs.some((leg) => legConflict(leg) != null)
 
   const mutation = useApiMutation({
     mutationFn: async () => {
@@ -63,10 +69,12 @@ export function PermitRequestEditModal({ request, onClose }: Props) {
           permitName: request.permitName,
           groupSize,
           searchType: request.searchType,
-          // Zone quota is only consumed on the first night — startDay/endDay model a flexibility
-          // window, but date-range flexibility isn't built yet, so both are set to the same night.
+          // Zone/trailhead quota is only consumed on the first night — startDay/endDay model a
+          // flexibility window, but date-range flexibility isn't built yet, so both are set to the
+          // same night.
           zoneTarget: isZone ? { divisionIds, startDay: night, endDay: night } : undefined,
-          itineraryTarget: !isZone ? { legs } : undefined,
+          trailheadTarget: isTrailhead ? { divisionIds, startDay: night, endDay: night } : undefined,
+          itineraryTarget: !usesDivisionPicker ? { legs } : undefined,
           completed
         }
       })
@@ -80,7 +88,7 @@ export function PermitRequestEditModal({ request, onClose }: Props) {
     onError: () => setError('Failed to update. Please try again.')
   })
 
-  const canSubmit = isZone
+  const canSubmit = usesDivisionPicker
     ? name.trim() !== '' && groupSize >= 1 && divisionIds.length > 0 && night !== ''
     : name.trim() !== '' && groupSize >= 1 && legs.length > 0 && !hasConflict
 
@@ -117,22 +125,26 @@ export function PermitRequestEditModal({ request, onClose }: Props) {
             </div>
           </div>
 
-          {isZone && (
+          {usesDivisionPicker && (
             <>
               <div>
-                <label className="mb-1 block text-xs font-medium text-forest-600">Entry Night</label>
+                <label className="mb-1 block text-xs font-medium text-forest-600">
+                  Entry {isZone ? 'Night' : 'Date'}
+                </label>
                 <Input type="date" value={night} onChange={(e) => setNight(e.target.value)} />
               </div>
               <ZoneDivisionPicker
                 permitId={request.permitId}
                 selectedDivisionIds={divisionIds}
                 onChange={setDivisionIds}
+                label={isZone ? 'Zones' : 'Trailheads'}
               />
-              <ZoneAvailabilityGrid permitId={request.permitId} divisionIds={divisionIds} />
+              {/* No availability-preview endpoint exists for TRAILHEAD permits yet — zone-only for now. */}
+              {isZone && <ZoneAvailabilityGrid permitId={request.permitId} divisionIds={divisionIds} />}
             </>
           )}
 
-          {!isZone && permitDetail && (
+          {!usesDivisionPicker && permitDetail && (
             <>
               <div>
                 <label className="mb-1 block text-xs font-medium text-forest-600">First night</label>
