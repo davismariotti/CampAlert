@@ -84,7 +84,7 @@ class PermitPollCheckServiceTest {
         val evaluated = service.check(provider, permitId)
 
         assertEquals(0, evaluated)
-        verify(permitAvailabilityMatcher, never()).check(any(), any(), any())
+        verify(permitAvailabilityMatcher, never()).check(any(), any(), any(), any())
     }
 
     @Test
@@ -95,7 +95,7 @@ class PermitPollCheckServiceTest {
         val evaluated = service.check(provider, permitId)
 
         assertEquals(0, evaluated)
-        verify(permitAvailabilityMatcher, never()).check(any(), any(), any())
+        verify(permitAvailabilityMatcher, never()).check(any(), any(), any(), any())
     }
 
     @Test
@@ -113,7 +113,7 @@ class PermitPollCheckServiceTest {
         val req = zoneRequest()
         `when`(permitSearchRequestRepository.findByPermitIdAndProviderAndCompletedFalse(permitId, provider)).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser))
-        `when`(permitAvailabilityMatcher.check(any(), any(), any())).thenReturn(result(req))
+        `when`(permitAvailabilityMatcher.check(any(), any(), any(), any())).thenReturn(result(req))
 
         val evaluated = service.check(provider, permitId)
 
@@ -134,7 +134,7 @@ class PermitPollCheckServiceTest {
         val req = zoneRequest()
         `when`(permitSearchRequestRepository.findByPermitIdAndProviderAndCompletedFalse(permitId, provider)).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser))
-        `when`(permitAvailabilityMatcher.check(any(), any(), any())).thenThrow(RuntimeException("Recreation.gov unavailable"))
+        `when`(permitAvailabilityMatcher.check(any(), any(), any(), any())).thenThrow(RuntimeException("Recreation.gov unavailable"))
 
         service.check(provider, permitId)
 
@@ -153,7 +153,7 @@ class PermitPollCheckServiceTest {
         val req = zoneRequest()
         `when`(permitSearchRequestRepository.findByPermitIdAndProviderAndCompletedFalse(permitId, provider)).thenReturn(listOf(req))
         `when`(userRepository.findAllById(any())).thenReturn(listOf(normalUser))
-        `when`(permitAvailabilityMatcher.check(any(), any(), any())).thenReturn(result(req))
+        `when`(permitAvailabilityMatcher.check(any(), any(), any(), any())).thenReturn(result(req))
         doThrow(RuntimeException("DB failure")).`when`(permitAvailabilityStateService).processUserResults(any(), any())
 
         service.check(provider, permitId)

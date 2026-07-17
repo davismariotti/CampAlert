@@ -1,25 +1,38 @@
 package com.davismariotti.campalert.service.permit
 
-import com.davismariotti.campalert.provider.recreation.PermitZoneAvailabilityCell
 import com.davismariotti.campalert.service.redis.RedisJsonCache
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
+import java.time.LocalDate
 import java.time.YearMonth
-import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 
+/** Normalized `{total, remaining}` for one quota gate on one date — see [ZoneAvailabilityBaselineService]. */
+data class AvailabilityQuotaGate(
+    val total: Int,
+    val remaining: Int
+)
+
 data class ZoneBaselineSnapshot(
-    val confirmed: Map<String, PermitZoneAvailabilityCell> = emptyMap(),
-    val pending: Map<String, PermitZoneAvailabilityCell> = emptyMap(),
+    val confirmed: Map<String, Map<String, AvailabilityQuotaGate>> = emptyMap(),
+    val pending: Map<String, Map<String, AvailabilityQuotaGate>> = emptyMap(),
 )
 
 /**
- * Detects one specific implausible transition in zone permit availability: a date that showed real
- * depletion (remaining < total) on the last CONFIRMED tick suddenly reporting remaining == total, as
- * if every booking for that date vanished. Confirmed live: a batch of Desolation Wilderness divisions
- * showed exactly this pattern and self-corrected — sometimes within one ~2-minute tick, sometimes
- * spanning a couple of ticks — with no change on our end — almost certainly a Recreation.gov-side sync
- * lag, not a real mass cancellation.
+ * Detects one specific implausible transition in permit availability: a (date, quota gate) pair that
+ * showed real depletion (remaining < total) on the last CONFIRMED tick suddenly reporting remaining ==
+ * total, as if every booking for that date vanished. Confirmed live on the zone endpoint: a batch of
+ * Desolation Wilderness divisions showed exactly this pattern and self-corrected — sometimes within one
+ * ~2-minute tick, sometimes spanning a couple of ticks — with no change on our end — almost certainly a
+ * Recreation.gov-side sync lag, not a real mass cancellation.
+ *
+ * Shared by both ZONE and TRAILHEAD (design.md decision 7) via a normalized
+ * `Map<String, AvailabilityQuotaGate>` per date: ZONE's single `{total, remaining}` field is wrapped as
+ * a one-entry map at its call site in [PermitAvailabilityMatcher]; TRAILHEAD's already-open quota-type
+ * map is passed straight through, so a multi-gate cell (e.g. Enchantments' `constant_quota_usage_daily`
+ * + `quota_usage_by_member_daily`) gets each gate checked independently rather than just one. Still
+ * named for its zone origin rather than renamed wholesale — the underlying detection logic and cache
+ * key scheme are unchanged, only the shape of what it compares.
  *
  * An ordinary (non-suspicious) reading promotes straight to [ZoneBaselineSnapshot.confirmed], same as
  * before — that's what lets a division's very first-ever tick establish a real baseline, and lets a
@@ -37,7 +50,7 @@ data class ZoneBaselineSnapshot(
  * left to decrement once quotas lift. Comparing only against this division's OWN confirmed baseline —
  * never against siblings or an absolute threshold — avoids flagging that as suspicious.
  *
- * Also requires [PermitZoneAvailabilityCell.total] to be unchanged between ticks before flagging a
+ * Also requires a gate's [AvailabilityQuotaGate.total] to be unchanged between ticks before flagging a
  * flip. Confirmed live: dates past a division's permit season report a sentinel total (e.g. 900000,
  * with remaining == total) instead of the real permit quota — a legitimate change in what's being
  * counted, not bookings vanishing against the same quota. Requiring the total to match keeps that
@@ -49,24 +62,27 @@ class ZoneAvailabilityBaselineService(
     private val redisJsonCache: RedisJsonCache,
     @param:Value("\${campfinder.permit.zone-baseline-ttl-minutes:30}") private val ttlMinutes: Long,
 ) {
-    /** True if any date in [current] flipped from partially-booked to fully-open since the last CONFIRMED tick; a non-suspicious reading promotes straight to the confirmed baseline, while a suspicious one only promotes once it repeats on the following tick. */
+    /** True if any (date, gate) pair in [current] flipped from partially-booked to fully-open since the last CONFIRMED tick; a non-suspicious reading promotes straight to the confirmed baseline, while a suspicious one only promotes once it repeats on the following tick. */
     fun looksSuspicious(
         permitId: String,
         divisionId: String,
         month: YearMonth,
-        current: Map<ZonedDateTime, PermitZoneAvailabilityCell>,
+        current: Map<LocalDate, Map<String, AvailabilityQuotaGate>>,
     ): Boolean {
         val key = cacheKey(permitId, divisionId, month)
         val previous = redisJsonCache.get(key, ZoneBaselineSnapshot::class.java)
         val confirmed = previous?.confirmed ?: emptyMap()
 
         val suspicious = previous != null &&
-            current.any { (dateTime, cell) ->
-                val confirmedCell = confirmed[dateTime.toString()]
-                confirmedCell != null &&
-                    confirmedCell.total == cell.total &&
-                    confirmedCell.remaining < confirmedCell.total &&
-                    cell.remaining == cell.total
+            current.any { (date, gates) ->
+                val confirmedGates = confirmed[date.toString()] ?: return@any false
+                gates.any { (gateName, gate) ->
+                    val confirmedGate = confirmedGates[gateName]
+                    confirmedGate != null &&
+                        confirmedGate.total == gate.total &&
+                        confirmedGate.remaining < confirmedGate.total &&
+                        gate.remaining == gate.total
+                }
             }
 
         val currentByKey = current.mapKeys { it.key.toString() }

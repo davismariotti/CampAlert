@@ -13,6 +13,7 @@ private class FakePermitAvailabilityProvider(
         request: PermitSearchRequest,
         zoneCache: ZoneAvailabilityCache,
         itineraryCache: ItineraryAvailabilityCache,
+        trailheadCache: TrailheadAvailabilityCache,
     ): PermitAvailabilityResult = PermitAvailabilityResult(request, hasAvailability = false)
 }
 

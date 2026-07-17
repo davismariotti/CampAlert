@@ -5,6 +5,7 @@ import com.davismariotti.campalert.api.model.CreatePermitSearchRequestBody
 import com.davismariotti.campalert.api.model.PermitItineraryLegBody
 import com.davismariotti.campalert.api.model.PermitItineraryTargetResponse
 import com.davismariotti.campalert.api.model.PermitSearchRequestResponse
+import com.davismariotti.campalert.api.model.PermitTrailheadTargetResponse
 import com.davismariotti.campalert.api.model.PermitType
 import com.davismariotti.campalert.api.model.PermitZoneTargetResponse
 import com.davismariotti.campalert.api.model.SearchRequestStats
@@ -17,6 +18,7 @@ import com.davismariotti.campalert.model.PermitItineraryLeg
 import com.davismariotti.campalert.model.PermitItineraryTarget
 import com.davismariotti.campalert.model.PermitSearchRequest
 import com.davismariotti.campalert.model.PermitSearchRequestState
+import com.davismariotti.campalert.model.PermitTrailheadTarget
 import com.davismariotti.campalert.model.PermitZoneTarget
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.RequestType
@@ -78,7 +80,7 @@ class PermitSearchRequestsDelegateImpl(
         }
 
         val body = createPermitSearchRequestBody
-        validateShape(body.searchType, body.zoneTarget != null, body.itineraryTarget != null)
+        validateShape(body.searchType, body.zoneTarget != null, body.itineraryTarget != null, body.trailheadTarget != null)
 
         val classifiedType = permitClassificationService.classify(body.permitId)
             ?: throw PermitClassificationException.UnsupportedPermitType()
@@ -102,7 +104,7 @@ class PermitSearchRequestsDelegateImpl(
         val state = PermitSearchRequestState()
         state.permitSearchRequest = entity
         entity.state = state
-        applyTargets(entity, body.zoneTarget, body.itineraryTarget)
+        applyTargets(entity, body.zoneTarget, body.itineraryTarget, body.trailheadTarget)
 
         val saved = permitSearchRequestRepository.save(entity)
         log.info("Permit search request created userId={} requestId={} permitId={} searchType={}", userId, saved.id, saved.permitId, saved.searchType)
@@ -135,7 +137,7 @@ class PermitSearchRequestsDelegateImpl(
             ?: throw NotFoundException("Permit search request not found")
 
         val body = updatePermitSearchRequestBody
-        validateShape(body.searchType, body.zoneTarget != null, body.itineraryTarget != null)
+        validateShape(body.searchType, body.zoneTarget != null, body.itineraryTarget != null, body.trailheadTarget != null)
 
         val classifiedType = permitClassificationService.classify(body.permitId)
             ?: throw PermitClassificationException.UnsupportedPermitType()
@@ -162,7 +164,8 @@ class PermitSearchRequestsDelegateImpl(
         updated.state.completed = body.completed
         updated.zoneTarget = existing.zoneTarget
         updated.itineraryTarget = existing.itineraryTarget
-        applyTargets(updated, body.zoneTarget, body.itineraryTarget)
+        updated.trailheadTarget = existing.trailheadTarget
+        applyTargets(updated, body.zoneTarget, body.itineraryTarget, body.trailheadTarget)
 
         val saved = permitSearchRequestRepository.save(updated)
         pollTargetRegistrationService.ensurePermitTarget(saved.permitId, saved.provider)
@@ -185,10 +188,16 @@ class PermitSearchRequestsDelegateImpl(
 
     // --- validation helpers ---
 
-    private fun validateShape(searchType: PermitType, hasZoneTarget: Boolean, hasItineraryTarget: Boolean) {
+    private fun validateShape(
+        searchType: PermitType,
+        hasZoneTarget: Boolean,
+        hasItineraryTarget: Boolean,
+        hasTrailheadTarget: Boolean
+    ) {
         val valid = when (searchType) {
-            PermitType.ZONE -> hasZoneTarget && !hasItineraryTarget
-            PermitType.ITINERARY -> hasItineraryTarget && !hasZoneTarget
+            PermitType.ZONE -> hasZoneTarget && !hasItineraryTarget && !hasTrailheadTarget
+            PermitType.ITINERARY -> hasItineraryTarget && !hasZoneTarget && !hasTrailheadTarget
+            PermitType.TRAILHEAD -> hasTrailheadTarget && !hasZoneTarget && !hasItineraryTarget
         }
         if (valid) return
         throw BadRequestException("Request body must include exactly the target matching searchType=$searchType")
@@ -207,6 +216,7 @@ class PermitSearchRequestsDelegateImpl(
         entity: PermitSearchRequest,
         zoneTargetBody: com.davismariotti.campalert.api.model.PermitZoneTargetBody?,
         itineraryTargetBody: com.davismariotti.campalert.api.model.PermitItineraryTargetBody?,
+        trailheadTargetBody: com.davismariotti.campalert.api.model.PermitTrailheadTargetBody?,
     ) {
         if (zoneTargetBody != null) {
             val target = entity.zoneTarget ?: PermitZoneTarget()
@@ -216,12 +226,23 @@ class PermitSearchRequestsDelegateImpl(
             target.endDay = zoneTargetBody.endDay
             entity.zoneTarget = target
             entity.itineraryTarget = null
+            entity.trailheadTarget = null
         } else if (itineraryTargetBody != null) {
             val target = entity.itineraryTarget ?: PermitItineraryTarget()
             target.permitSearchRequest = entity
             target.legs = itineraryTargetBody.legs.map { PermitItineraryLeg(it.divisionId, it.date) }
             entity.itineraryTarget = target
             entity.zoneTarget = null
+            entity.trailheadTarget = null
+        } else if (trailheadTargetBody != null) {
+            val target = entity.trailheadTarget ?: PermitTrailheadTarget()
+            target.permitSearchRequest = entity
+            target.divisionIds = trailheadTargetBody.divisionIds
+            target.startDay = trailheadTargetBody.startDay
+            target.endDay = trailheadTargetBody.endDay
+            entity.trailheadTarget = target
+            entity.zoneTarget = null
+            entity.itineraryTarget = null
         }
     }
 
@@ -263,6 +284,15 @@ class PermitSearchRequestsDelegateImpl(
                     legs = t.legs.map { PermitItineraryLegBody(divisionId = it.divisionId, date = it.date) },
                     blockingDivisionId = this.state.blockingDivisionId,
                     blockingDate = this.state.blockingDate,
+                )
+            },
+            trailheadTarget = this.trailheadTarget?.let { t ->
+                PermitTrailheadTargetResponse(
+                    divisionIds = t.divisionIds,
+                    startDay = t.startDay,
+                    endDay = t.endDay,
+                    matchedDivisionId = this.state.matchedDivisionId,
+                    matchedDate = this.state.matchedDate,
                 )
             },
             completed = this.state.completed,

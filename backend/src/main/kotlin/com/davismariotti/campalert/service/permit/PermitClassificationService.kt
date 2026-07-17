@@ -14,8 +14,15 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Classifies a permit's reservation mechanism (design decision 1). `permitmapping` is the primary,
- * cheap, cacheable signal; an unflagged permit only gets accepted as [SearchType.ZONE] after a
- * structural fallback check against its own division/rule shape — anything else fails closed (null).
+ * cheap, cacheable signal; a permit not in the `itinerary`/`day_use`/`hunting`/`vehicle`/`water`/`fake`
+ * buckets only gets accepted as [SearchType.ZONE] or [SearchType.TRAILHEAD] after a structural fallback
+ * check against its own division/rule shape — anything else fails closed (null).
+ *
+ * `land`/`lottery` bucket membership is deliberately NOT in the unconditional-reject set: both were
+ * confirmed to contain permits with a genuine `Entry Point` division structure (Yosemite, Mt. Whitney,
+ * and several unrelated non-lottery forests), and the lottery flag is orthogonal to that shape — the
+ * existing zone endpoint fails identically for lottery-flagged and non-lottery-flagged Entry Point
+ * permits alike. Those buckets fall through to the same structural check an unflagged permit gets.
  */
 @Service
 class PermitClassificationService(
@@ -31,20 +38,26 @@ class PermitClassificationService(
     private val cb by lazy { circuitBreakerRegistry.circuitBreaker("recreation-gov") }
     private val retry by lazy { retryRegistry.retry("recreation-gov") }
 
-    /** ZONE, ITINERARY, or unsupported (null) — never guesses; anything in doubt fails closed. */
+    /** ZONE, ITINERARY, TRAILHEAD, or unsupported (null) — never guesses; anything in doubt fails closed. */
     fun classify(permitId: String): SearchType? {
         val mapping = getMapping() ?: return null
         if (permitId in mapping.itineraryPermitIds) return SearchType.ITINERARY
 
-        val unsupported = mapping.dayUsePermitIds + mapping.huntingPermitIds + mapping.landPermitIds +
-            mapping.lotteryPermitIds + mapping.vehiclePermitIds + mapping.waterPermitIds + mapping.fakePermitIds
+        val unsupported = mapping.dayUsePermitIds + mapping.huntingPermitIds +
+            mapping.vehiclePermitIds + mapping.waterPermitIds + mapping.fakePermitIds
         if (permitId in unsupported) return null
 
-        // Unflagged: verify structurally before trusting it as ZONE.
+        // Not itinerary-flagged or unconditionally unsupported: verify structurally before trusting it
+        // as ZONE or TRAILHEAD. Applies equally to unflagged permits and to land/lottery-flagged ones.
         val content = permitContentCache.get(permitId) ?: return null
         val hasDestinationZone = content.divisions.values.any { it.type == PermitDivisionType.DESTINATION_ZONE }
         val hasEnteringPerDayRule = content.rules.any { it.operation?.contains("EnteringPerDay") == true }
-        return if (hasDestinationZone && hasEnteringPerDayRule) SearchType.ZONE else null
+        if (hasDestinationZone && hasEnteringPerDayRule) return SearchType.ZONE
+
+        val hasEntryPoint = content.divisions.values.any { it.type == PermitDivisionType.ENTRY_POINT }
+        if (hasEntryPoint) return SearchType.TRAILHEAD
+
+        return null
     }
 
     private fun getMapping(): PermitMappingPayload? = redisJsonCache.getOrLoad(MAPPING_CACHE_KEY, PermitMappingPayload::class.java, ttlHours, TimeUnit.HOURS) { fetchMapping() }

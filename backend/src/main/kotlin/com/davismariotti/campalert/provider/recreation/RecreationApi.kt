@@ -11,6 +11,9 @@ import java.time.format.DateTimeFormatter
 interface RecreationApi {
     companion object {
         val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+
+        /** Plain `yyyy-MM-dd`, confirmed live to be what `permitinyo/.../availabilityv2` expects — distinct from [dateFormatter]'s full ISO datetime, which this endpoint does not accept. */
+        val trailheadDateFormatter: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
     }
 
     @GET("camps/availability/campground/{id}/month")
@@ -83,6 +86,40 @@ interface RecreationApi {
         @Query("commercial_acct") commercialAcct: Boolean = false,
         @Query("is_lottery") isLottery: Boolean = false,
     ): Call<PermitDivisionAvailabilityResponse>
+
+    /**
+     * Every division on a trailhead (`Entry Point`-shaped, [com.davismariotti.campalert.model.SearchType.TRAILHEAD])
+     * permit for a date range. Confirmed NOT the same endpoint as [getZonePermitAvailability] — that
+     * one returns a hard server error for every `Entry Point`-shaped permit tested, lottery-flagged or
+     * not. Requires [startDate]/[endDate] to fall exactly on calendar month boundaries; a partial-month
+     * range returns an explicit `"requested dates are invalid"` error, confirmed live.
+     */
+    @GET("permitinyo/{id}/availabilityv2")
+    fun getTrailheadPermitAvailability(
+        @Path("id") id: String,
+        @Query("start_date") startDate: String,
+        @Query("end_date") endDate: String,
+        @Query("commercial_acct") commercialAcct: Boolean = false,
+    ): Call<PermitTrailheadAvailabilityResponse>
+
+    /**
+     * Same endpoint as [getTrailheadPermitAvailability], scoped to one division via an undocumented
+     * `division_id` query parameter (confirmed live: same full-month-boundary requirement, values match
+     * the unscoped bulk response for the same division/date). Used to corroborate a candidate trailhead
+     * match before trusting a fresh availability transition — but unlike [getDivisionAvailability]'s
+     * confirmed independence from [getZonePermitAvailability], this call's independence from
+     * [getTrailheadPermitAvailability] is NOT confirmed (see design.md decision 7). Used anyway as a
+     * knowingly-imperfect safety layer; [PermitAvailabilityMatcher] logs any disagreement to gather
+     * evidence on whether it's actually computed independently.
+     */
+    @GET("permitinyo/{id}/availabilityv2")
+    fun getTrailheadDivisionAvailability(
+        @Path("id") id: String,
+        @Query("division_id") divisionId: String,
+        @Query("start_date") startDate: String,
+        @Query("end_date") endDate: String,
+        @Query("commercial_acct") commercialAcct: Boolean = false,
+    ): Call<PermitTrailheadAvailabilityResponse>
 
     /** Mixed inventory typeahead (rec areas, campgrounds, permits, activity passes) — filter results to `entity_type == "permit"`. */
     @GET("search/suggest")

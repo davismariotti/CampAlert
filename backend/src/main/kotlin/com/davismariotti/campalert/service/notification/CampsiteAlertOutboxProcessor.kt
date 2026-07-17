@@ -102,7 +102,7 @@ class CampsiteAlertOutboxProcessor(
                 RequestType.PERMIT -> {
                     val permitRequest = request as PermitSearchRequest
                     val divisionName = permitRequest.state.matchedDivisionId
-                        ?.takeIf { permitRequest.searchType == SearchType.ZONE }
+                        ?.takeIf { permitRequest.searchType == SearchType.ZONE || permitRequest.searchType == SearchType.TRAILHEAD }
                         ?.let { divisionId ->
                             permitContentCache
                                 .get(permitRequest.permitId)

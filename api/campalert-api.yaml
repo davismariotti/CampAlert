@@ -1501,7 +1501,7 @@ components:
 
     PermitType:
       type: string
-      enum: [ZONE, ITINERARY]
+      enum: [ZONE, ITINERARY, TRAILHEAD]
 
     ProviderType:
       type: string
@@ -1549,6 +1549,10 @@ components:
       properties:
         id:
           type: string
+        code:
+          type: string
+          nullable: true
+          description: Human-facing identifier Recreation.gov's own booking UI shows next to the division name (e.g. "611" for "Chilnualna Falls"). Null when not present.
         name:
           type: string
         description:
@@ -1649,6 +1653,25 @@ components:
           type: string
           format: date
 
+    PermitTrailheadTargetBody:
+      type: object
+      required:
+        - divisionIds
+        - startDay
+        - endDay
+      properties:
+        divisionIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        startDay:
+          type: string
+          format: date
+        endDay:
+          type: string
+          format: date
+
     PermitItineraryLegBody:
       type: object
       required:
@@ -1714,6 +1737,31 @@ components:
           format: date
           nullable: true
 
+    PermitTrailheadTargetResponse:
+      type: object
+      required:
+        - divisionIds
+        - startDay
+        - endDay
+      properties:
+        divisionIds:
+          type: array
+          items:
+            type: string
+        startDay:
+          type: string
+          format: date
+        endDay:
+          type: string
+          format: date
+        matchedDivisionId:
+          type: string
+          nullable: true
+        matchedDate:
+          type: string
+          format: date
+          nullable: true
+
     CreatePermitSearchRequestBody:
       type: object
       required:
@@ -1742,6 +1790,10 @@ components:
         itineraryTarget:
           allOf:
             - $ref: '#/components/schemas/PermitItineraryTargetBody'
+          nullable: true
+        trailheadTarget:
+          allOf:
+            - $ref: '#/components/schemas/PermitTrailheadTargetBody'
           nullable: true
         provider:
           allOf:
@@ -1778,6 +1830,10 @@ components:
         itineraryTarget:
           allOf:
             - $ref: '#/components/schemas/PermitItineraryTargetBody'
+          nullable: true
+        trailheadTarget:
+          allOf:
+            - $ref: '#/components/schemas/PermitTrailheadTargetBody'
           nullable: true
         completed:
           type: boolean
@@ -1822,6 +1878,10 @@ components:
         itineraryTarget:
           allOf:
             - $ref: '#/components/schemas/PermitItineraryTargetResponse'
+          nullable: true
+        trailheadTarget:
+          allOf:
+            - $ref: '#/components/schemas/PermitTrailheadTargetResponse'
           nullable: true
         completed:
           type: boolean

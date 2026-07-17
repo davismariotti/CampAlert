@@ -22,6 +22,7 @@ data class PermitContentPayload(
 
 data class PermitDivisionContent(
     @JsonProperty("id") val id: String,
+    @JsonProperty("code") val code: String? = null,
     @JsonProperty("name") val name: String? = null,
     @JsonProperty("type") val type: PermitDivisionType? = null,
     @JsonProperty("description") val description: String? = null,
@@ -35,8 +36,10 @@ data class PermitDivisionContent(
  * `division.type` values confirmed against live traffic. A Destination Zone division is the
  * structural signature [com.davismariotti.campalert.service.permit.PermitClassificationService] uses
  * to accept an unflagged permit as ZONE-type (Desolation); Camp Area is an ITINERARY-type leg
- * (Yellowstone). UNKNOWN is the fallback for anything else — permitcontent is an undocumented,
- * unversioned endpoint, so an unrecognized type must not be silently misread as one of these two.
+ * (Yellowstone); Entry Point is the TRAILHEAD-type signature (Yosemite, and a wide range of other
+ * wilderness permits nationwide — the trailhead you enter from, not where you camp). UNKNOWN is the
+ * fallback for anything else — permitcontent is an undocumented, unversioned endpoint, so an
+ * unrecognized type must not be silently misread as one of these three.
  */
 enum class PermitDivisionType {
     @JsonProperty("Destination Zone")
@@ -44,6 +47,9 @@ enum class PermitDivisionType {
 
     @JsonProperty("Camp Area")
     CAMP_AREA,
+
+    @JsonProperty("Entry Point")
+    ENTRY_POINT,
 
     @JsonEnumDefaultValue
     UNKNOWN,

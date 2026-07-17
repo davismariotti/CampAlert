@@ -107,7 +107,7 @@ CREATE TABLE "public"."permit_search_requests" (
   "provider" character varying(32) NOT NULL DEFAULT 'RECREATION_GOV',
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_permit_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
-  CONSTRAINT "chk_permit_search_requests_search_type" CHECK (search_type IN ('ZONE', 'ITINERARY')),
+  CONSTRAINT "chk_permit_search_requests_search_type" CHECK (search_type IN ('ZONE', 'ITINERARY', 'TRAILHEAD')),
   CONSTRAINT "chk_permit_search_requests_provider" CHECK (provider IN ('RECREATION_GOV'))
 );
 CREATE INDEX ON "public"."permit_search_requests" ("user_id");
@@ -126,6 +126,15 @@ CREATE TABLE "public"."permit_itinerary_target" (
   "legs" json NOT NULL,
   PRIMARY KEY ("permit_search_request_id"),
   CONSTRAINT "fk_permit_itinerary_target_request" FOREIGN KEY ("permit_search_request_id") REFERENCES "public"."permit_search_requests" ("id") ON DELETE CASCADE
+);
+-- Create "permit_trailhead_target" table
+CREATE TABLE "public"."permit_trailhead_target" (
+  "permit_search_request_id" bigint NOT NULL,
+  "division_ids" json NOT NULL,
+  "start_day" date NOT NULL,
+  "end_day" date NOT NULL,
+  PRIMARY KEY ("permit_search_request_id"),
+  CONSTRAINT "fk_permit_trailhead_target_request" FOREIGN KEY ("permit_search_request_id") REFERENCES "public"."permit_search_requests" ("id") ON DELETE CASCADE
 );
 -- Create "permit_search_request_state" table
 CREATE TABLE "public"."permit_search_request_state" (

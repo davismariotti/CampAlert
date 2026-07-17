@@ -3,6 +3,7 @@ package com.davismariotti.campalert.search
 import com.davismariotti.campalert.api.model.CreatePermitSearchRequestBody
 import com.davismariotti.campalert.api.model.PermitItineraryLegBody
 import com.davismariotti.campalert.api.model.PermitItineraryTargetBody
+import com.davismariotti.campalert.api.model.PermitTrailheadTargetBody
 import com.davismariotti.campalert.api.model.PermitType
 import com.davismariotti.campalert.api.model.PermitZoneTargetBody
 import com.davismariotti.campalert.api.model.UpdatePermitSearchRequestBody
@@ -66,6 +67,15 @@ class PermitSearchRequestsIntegrationTest : IntegrationTestBase() {
         )
     }
 
+    /** Land/lottery-flagged (or unflagged) permit with a valid "Entry Point" structural fallback. */
+    private fun stubTrailheadPermit(permitId: String, divisionIds: List<String> = listOf("44585905")) {
+        stubMapping()
+        stubContent(
+            permitId,
+            divisions = divisionIds.associateWith { PermitDivisionContent(id = it, name = "Trailhead $it", type = PermitDivisionType.ENTRY_POINT) },
+        )
+    }
+
     private fun stubItineraryPermit(permitId: String, divisionIds: Map<String, List<String>> = mapOf("A" to listOf("B"), "B" to emptyList())) {
         stubMapping(itineraryIds = listOf(permitId))
         stubContent(permitId, divisions = divisionIds.entries.associate { (id, children) -> id to PermitDivisionContent(id = id, name = "Division $id", children = children) })
@@ -97,6 +107,16 @@ class PermitSearchRequestsIntegrationTest : IntegrationTestBase() {
         name = "Blacktail Loop",
         searchType = PermitType.ITINERARY,
         itineraryTarget = PermitItineraryTargetBody(legs = listOf(PermitItineraryLegBody(divisionId = "A", date = LocalDate.of(2027, 7, 12)))),
+        turnstileToken = "test-token",
+    )
+
+    private val trailheadCreateBody = CreatePermitSearchRequestBody(
+        permitId = "445859",
+        permitName = "Yosemite Wilderness Permits",
+        groupSize = 3,
+        name = "Bridalveil Watch",
+        searchType = PermitType.TRAILHEAD,
+        trailheadTarget = PermitTrailheadTargetBody(divisionIds = listOf("44585905"), startDay = LocalDate.of(2027, 7, 10), endDay = LocalDate.of(2027, 7, 15)),
         turnstileToken = "test-token",
     )
 
@@ -170,6 +190,20 @@ class PermitSearchRequestsIntegrationTest : IntegrationTestBase() {
         assertThat(result.response.status).isEqualTo(201)
         assertThat(result.response.contentAsString).contains("Blacktail Loop")
         assertThat(result.response.contentAsString).contains("\"searchType\":\"ITINERARY\"")
+    }
+
+    @Test
+    fun `create trailhead permit with verified phone returns 201 with persisted fields`() {
+        val session = registerAndLogin()
+        seedVerifiedPhone(userRepository.findByEmail("user@test.com")!!.id!!)
+        stubTrailheadPermit("445859")
+
+        val result = createRequest(session, trailheadCreateBody)
+
+        assertThat(result.response.status).isEqualTo(201)
+        assertThat(result.response.contentAsString).contains("Bridalveil Watch")
+        assertThat(result.response.contentAsString).contains("\"searchType\":\"TRAILHEAD\"")
+        assertThat(result.response.contentAsString).contains("\"divisionIds\":[\"44585905\"]")
     }
 
     @Test
@@ -344,5 +378,59 @@ class PermitSearchRequestsIntegrationTest : IntegrationTestBase() {
                 .andReturn()
                 .response.status
         ).isEqualTo(404)
+    }
+
+    // --- TRAILHEAD lifecycle ---
+
+    @Test
+    fun `trailhead search request supports the full list, get, update, delete lifecycle`() {
+        val session = registerAndLogin()
+        seedVerifiedPhone(userRepository.findByEmail("user@test.com")!!.id!!)
+        stubTrailheadPermit("445859")
+
+        val created = createRequest(session, trailheadCreateBody)
+        assertThat(created.response.status).isEqualTo(201)
+        val id = extractId(created)
+
+        val listResult = mockMvc.perform(get("/api/permit-search-requests").cookie(session)).andReturn()
+        assertThat(listResult.response.status).isEqualTo(200)
+        assertThat(listResult.response.contentAsString).contains("Bridalveil Watch")
+
+        val getResult = mockMvc.perform(get("/api/permit-search-requests/$id").cookie(session)).andReturn()
+        assertThat(getResult.response.status).isEqualTo(200)
+        assertThat(getResult.response.contentAsString).contains("\"searchType\":\"TRAILHEAD\"")
+
+        val updateBody = UpdatePermitSearchRequestBody(
+            permitId = "445859",
+            permitName = "Yosemite Wilderness Permits",
+            groupSize = 5,
+            name = "Bridalveil Watch",
+            searchType = PermitType.TRAILHEAD,
+            completed = false,
+            trailheadTarget = PermitTrailheadTargetBody(divisionIds = listOf("44585905"), startDay = LocalDate.of(2027, 7, 10), endDay = LocalDate.of(2027, 7, 20)),
+        )
+        val updateResult = doPut("/api/permit-search-requests/$id", session, updateBody)
+        assertThat(updateResult.response.status).isEqualTo(200)
+        assertThat(updateResult.response.contentAsString).contains("\"groupSize\":5")
+
+        assertThat(doDelete("/api/permit-search-requests/$id", session).response.status).isEqualTo(204)
+        assertThat(
+            mockMvc
+                .perform(get("/api/permit-search-requests/$id").cookie(session))
+                .andReturn()
+                .response.status
+        ).isEqualTo(404)
+    }
+
+    @Test
+    fun `create trailhead body with mismatched target shape returns 400`() {
+        val session = registerAndLogin()
+        seedVerifiedPhone(userRepository.findByEmail("user@test.com")!!.id!!)
+        stubTrailheadPermit("445859")
+        val body = trailheadCreateBody.copy(zoneTarget = PermitZoneTargetBody(divisionIds = listOf("343"), startDay = LocalDate.of(2027, 7, 10), endDay = LocalDate.of(2027, 7, 15)))
+
+        val result = createRequest(session, body)
+
+        assertThat(result.response.status).isEqualTo(400)
     }
 }
