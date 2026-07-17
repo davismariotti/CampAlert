@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.provider.camplife
 
+import com.davismariotti.campalert.httpclient.MetricsInterceptor
 import com.davismariotti.campalert.httpclient.ProviderHttpClientFactory
 import com.davismariotti.campalert.httpclient.baseProviderObjectMapper
 import com.davismariotti.campalert.provider.CallProtection
@@ -22,7 +23,18 @@ class CampLifeConfiguration(
     private val providerHttpClientFactory: ProviderHttpClientFactory,
 ) {
     /** Extracted from [getCampLifeClient] so tests can verify cookie-jar isolation without a Spring context. Never call this from a shared/singleton context; each caller gets an independent cookie store. */
-    internal fun buildOkHttpClient(): OkHttpClient = providerHttpClientFactory.build(provider = Provider.CAMPLIFE, refererOrigin = CAMPLIFE_ORIGIN, metricName = "Custom/CampLife/Request")
+    internal fun buildOkHttpClient(): OkHttpClient =
+        providerHttpClientFactory.build(
+            provider = Provider.CAMPLIFE,
+            refererOrigin = CAMPLIFE_ORIGIN,
+            metricsInterceptor = MetricsInterceptor.byPath(
+                default = "Custom/CampLife/Request",
+                // Directory listing (CampLifeCatalogCache.getDirectory) — the known-slow endpoint.
+                Regex("^/campgrounds$") to "Custom/CampLife/CatalogFetch",
+                // Per-campground session lookup (CampLifeCatalogCache.getCampgroundSession).
+                Regex("reservation/session") to "Custom/CampLife/CatalogFetch",
+            ),
+        )
 
     /**
      * CampLife-specific call protection (circuit breaker + retry + rate limiter), kept entirely

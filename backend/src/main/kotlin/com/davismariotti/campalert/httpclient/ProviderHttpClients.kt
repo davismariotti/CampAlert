@@ -38,19 +38,47 @@ class ProviderHttpClientFactory(
         refererOrigin: String,
         metricName: String,
         vararg additionalInterceptors: Interceptor,
+    ): OkHttpClient = build(provider, refererOrigin, MetricsInterceptor(metricName), *additionalInterceptors)
+
+    fun build(
+        provider: Provider,
+        refererOrigin: String,
+        metricsInterceptor: MetricsInterceptor,
+        vararg additionalInterceptors: Interceptor,
     ): OkHttpClient {
         val vendor = provider.configName()
         return OkHttpClient
             .Builder()
             .cookieJar(InMemoryCookieJar())
             .addInterceptor(BrowserHeadersInterceptor(refererOrigin = refererOrigin))
-            .addInterceptor(MetricsInterceptor(metricName))
+            .addInterceptor(metricsInterceptor)
             .apply { additionalInterceptors.forEach { addInterceptor(it) } }
             .connectTimeout(timeouts.connectTimeout[vendor] ?: DEFAULT_TIMEOUT)
             .readTimeout(timeouts.readTimeout[vendor] ?: DEFAULT_TIMEOUT)
             .writeTimeout(timeouts.writeTimeout[vendor] ?: DEFAULT_TIMEOUT)
             .build()
     }
+
+    /**
+     * For integrations that aren't a [Provider] (no campsite/permit booking link) and don't need
+     * [InMemoryCookieJar]/[BrowserHeadersInterceptor]'s browser-mimicking behavior — e.g. Cloudflare
+     * Turnstile, a legitimate first-party API call rather than a scrape target. [vendor] is the same
+     * kebab-case key [Provider.configName] produces, used to look up per-vendor timeout overrides.
+     * Attaches only [MetricsInterceptor] and per-vendor timeouts.
+     */
+    fun buildSimple(
+        vendor: String,
+        metricsInterceptor: MetricsInterceptor,
+        vararg additionalInterceptors: Interceptor,
+    ): OkHttpClient =
+        OkHttpClient
+            .Builder()
+            .addInterceptor(metricsInterceptor)
+            .apply { additionalInterceptors.forEach { addInterceptor(it) } }
+            .connectTimeout(timeouts.connectTimeout[vendor] ?: DEFAULT_TIMEOUT)
+            .readTimeout(timeouts.readTimeout[vendor] ?: DEFAULT_TIMEOUT)
+            .writeTimeout(timeouts.writeTimeout[vendor] ?: DEFAULT_TIMEOUT)
+            .build()
 
     companion object {
         private val DEFAULT_TIMEOUT: Duration = Duration.ofSeconds(30)

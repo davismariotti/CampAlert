@@ -50,6 +50,11 @@ dependencies {
     compileOnly 'com.newrelic.agent.java:newrelic-api:8.18.0'
     testRuntimeOnly 'com.newrelic.agent.java:newrelic-api:8.18.0'
 
+    // Exports Micrometer meters (currently: notifications-java's notifications.send Timer/Counter)
+    // to New Relic via the agent already attached above — INSIGHTS_AGENT client provider, no second
+    // credential. See MicrometerNewRelicConfiguration.
+    implementation 'io.micrometer:micrometer-registry-new-relic:1.15.0'
+
     // Notifications library (extracted transport + message model), consumed from Maven Central.
     // Provider modules are added explicitly because the starter declares them compileOnly.
     // pushover-client/postmark/spring-boot-starter-thymeleaf are no longer needed directly — the

@@ -55,7 +55,11 @@ class RecreationConfiguration(
         providerHttpClientFactory.build(
             provider = Provider.RECREATION_GOV,
             refererOrigin = "https://www.recreation.gov",
-            metricName = "Custom/RecreationGov/AvailabilityFetch",
+            metricsInterceptor = MetricsInterceptor.byPath(
+                default = "Custom/RecreationGov/AvailabilityFetch",
+                Regex("^/camps/") to "Custom/RecreationGov/AvailabilityFetch",
+                Regex("permit") to "Custom/RecreationGov/PermitAvailabilityFetch",
+            ),
             RawBodyCapturingInterceptor(),
         )
 
@@ -87,8 +91,14 @@ class RecreationConfiguration(
                     .addHeader("apikey", ridbApiKey)
                     .build()
                 chain.proceed(request)
-            }.addInterceptor(MetricsInterceptor("Custom/Ridb/Request"))
-            .build()
+            }.addInterceptor(
+                MetricsInterceptor.byPath(
+                    default = "Custom/Ridb/CatalogRequest",
+                    // Exactly `facilities/{id}` (RecreationCoordinateProvider.getFacility) — a trailing
+                    // segment like `/campsites` or `/permitentrances` falls through to the catalog default.
+                    Regex("/facilities/\\d+$") to "Custom/Ridb/CoordinateRequest",
+                ),
+            ).build()
         val retrofit = Retrofit
             .Builder()
             .baseUrl(ridbBaseUrl)
