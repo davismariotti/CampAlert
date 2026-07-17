@@ -5,6 +5,7 @@ import com.davismariotti.campalert.model.PermitItineraryLeg
 import com.davismariotti.campalert.model.PermitItineraryTarget
 import com.davismariotti.campalert.model.PermitSearchRequest
 import com.davismariotti.campalert.model.PermitSearchRequestState
+import com.davismariotti.campalert.model.PermitTrailheadTarget
 import com.davismariotti.campalert.model.PermitZoneTarget
 import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.provider.CallProtection
@@ -18,6 +19,9 @@ import com.davismariotti.campalert.provider.recreation.PermitItineraryAvailabili
 import com.davismariotti.campalert.provider.recreation.PermitItineraryAvailabilityResponse
 import com.davismariotti.campalert.provider.recreation.PermitQuotaType
 import com.davismariotti.campalert.provider.recreation.PermitRuleName
+import com.davismariotti.campalert.provider.recreation.PermitTrailheadAvailabilityCell
+import com.davismariotti.campalert.provider.recreation.PermitTrailheadAvailabilityResponse
+import com.davismariotti.campalert.provider.recreation.PermitTrailheadQuotaGate
 import com.davismariotti.campalert.provider.recreation.PermitZoneAvailabilityCell
 import com.davismariotti.campalert.provider.recreation.PermitZoneAvailabilityPayload
 import com.davismariotti.campalert.provider.recreation.PermitZoneAvailabilityResponse
@@ -79,6 +83,7 @@ class PermitAvailabilityMatcherTest {
 
     private val zoneCache: ZoneAvailabilityCache = ConcurrentHashMap()
     private val itineraryCache: ItineraryAvailabilityCache = ConcurrentHashMap()
+    private val trailheadCache: TrailheadAvailabilityCache = ConcurrentHashMap()
 
     @BeforeEach
     fun setUp() {
@@ -186,6 +191,49 @@ class PermitAvailabilityMatcherTest {
         `when`(recreationApi.getItineraryDivisionAvailability(permitId, divisionId, month, year)).thenReturn(call)
     }
 
+    private fun trailheadRequest(
+        divisionIds: List<String>,
+        startDay: LocalDate,
+        endDay: LocalDate,
+        groupSize: Int = 2
+    ): PermitSearchRequest {
+        val req = PermitSearchRequest(id = 3L, permitId = "445859", permitName = "Yosemite", groupSize = groupSize, name = "Test", searchType = SearchType.TRAILHEAD)
+        val state = PermitSearchRequestState()
+        state.permitSearchRequest = req
+        req.state = state
+        val target = PermitTrailheadTarget()
+        target.permitSearchRequest = req
+        target.divisionIds = divisionIds
+        target.startDay = startDay
+        target.endDay = endDay
+        req.trailheadTarget = target
+        return req
+    }
+
+    private fun trailheadCell(gates: Map<String, PermitTrailheadQuotaGate>, notYetReleased: Boolean = false) = PermitTrailheadAvailabilityCell(isWalkup = false, notYetReleased = notYetReleased, quotaGates = gates)
+
+    private fun singleGateCell(remaining: Int, total: Int = 10) = trailheadCell(mapOf("quota_usage_by_member_daily" to PermitTrailheadQuotaGate(total = total, remaining = remaining)))
+
+    private fun stubTrailheadAvailability(permitId: String, payload: Map<LocalDate, Map<String, PermitTrailheadAvailabilityCell>>) {
+        val call = mockCall(PermitTrailheadAvailabilityResponse(payload))
+        `when`(recreationApi.getTrailheadPermitAvailability(eqK(permitId), anyString(), anyString(), anyBoolean())).thenReturn(call)
+    }
+
+    // Stubs the trailhead corroboration endpoint hit for a fresh (non-AVAILABLE) transition's candidate
+    // match — same reasoning as stubDivisionAvailability.
+    private fun stubTrailheadDivisionAvailability(
+        permitId: String,
+        divisionId: String,
+        date: LocalDate,
+        cell: PermitTrailheadAvailabilityCell?
+    ) {
+        val payload = if (cell != null) mapOf(date to mapOf(divisionId to cell)) else emptyMap()
+        val call = mockCall(PermitTrailheadAvailabilityResponse(payload))
+        `when`(
+            recreationApi.getTrailheadDivisionAvailability(eqK(permitId), eqK(divisionId), anyString(), anyString(), anyBoolean()),
+        ).thenReturn(call)
+    }
+
     // --- zone matcher ---
 
     @Test
@@ -200,7 +248,7 @@ class PermitAvailabilityMatcherTest {
         )
         stubDivisionAvailability("233261", "343", LocalDate.of(2026, 7, 13), remaining = 3)
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertTrue(result.hasAvailability)
         assertEquals("343", result.matchedDivisionId)
@@ -215,7 +263,7 @@ class PermitAvailabilityMatcherTest {
             mapOf("290" to PermitZoneDivisionAvailability("290", mapOf(LocalDate.of(2026, 7, 12).atStartOfDay(ZoneOffset.UTC) to zoneCell(0)))),
         )
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertFalse(result.hasAvailability)
         assertNull(result.matchedDivisionId)
@@ -232,7 +280,7 @@ class PermitAvailabilityMatcherTest {
             mapOf("343" to PermitZoneDivisionAvailability("343", mapOf(LocalDate.of(2026, 7, 17).atStartOfDay(ZoneOffset.UTC) to zoneCell(1)))),
         )
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertFalse(result.hasAvailability)
     }
@@ -246,7 +294,7 @@ class PermitAvailabilityMatcherTest {
         )
         stubDivisionAvailability("233261", "343", LocalDate.of(2026, 7, 17), remaining = 4)
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertTrue(result.hasAvailability)
     }
@@ -260,7 +308,7 @@ class PermitAvailabilityMatcherTest {
             mapOf("290" to PermitZoneDivisionAvailability("290", mapOf(LocalDate.of(2026, 7, 20).atStartOfDay(ZoneOffset.UTC) to zoneCell(5)))),
         )
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertFalse(result.hasAvailability)
     }
@@ -284,7 +332,7 @@ class PermitAvailabilityMatcherTest {
             nextAvailableDate = LocalDate.of(2026, 7, 11).atStartOfDay(ZoneOffset.UTC),
         )
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertFalse(result.hasAvailability)
     }
@@ -309,7 +357,7 @@ class PermitAvailabilityMatcherTest {
         )
         stubDivisionAvailability("233261", "343", LocalDate.of(2026, 7, 11), remaining = 5)
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertTrue(result.hasAvailability)
         assertEquals("343", result.matchedDivisionId)
@@ -325,7 +373,7 @@ class PermitAvailabilityMatcherTest {
         )
         `when`(zoneAvailabilityBaselineService.looksSuspicious(eqK("233261"), eqK("343"), anyK(), anyK())).thenReturn(true)
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertFalse(result.hasAvailability)
     }
@@ -347,7 +395,7 @@ class PermitAvailabilityMatcherTest {
         `when`(zoneAvailabilityBaselineService.looksSuspicious(eqK("233261"), eqK("100"), anyK(), anyK())).thenReturn(true)
         `when`(zoneAvailabilityBaselineService.looksSuspicious(eqK("233261"), eqK("200"), anyK(), anyK())).thenReturn(true)
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertFalse(result.hasAvailability)
     }
@@ -364,7 +412,7 @@ class PermitAvailabilityMatcherTest {
         // response would produce, since the two endpoints are confirmed live to be computed independently.
         stubDivisionAvailability("233261", "343", LocalDate.of(2026, 7, 13), remaining = 0)
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertFalse(result.hasAvailability)
     }
@@ -381,7 +429,7 @@ class PermitAvailabilityMatcherTest {
         // Call mock would return null and corroboration would fail closed, so this only passes if the
         // match short-circuits corroboration for an already-AVAILABLE request.
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertTrue(result.hasAvailability)
     }
@@ -410,7 +458,7 @@ class PermitAvailabilityMatcherTest {
             mapOf(PermitQuotaType.ConstantQuotaUsageDaily to mapOf(LocalDate.of(2026, 7, 13) to PermitItineraryAvailabilityCell(remaining = 1))),
         )
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertTrue(result.hasAvailability)
         assertNull(result.blockingDivisionId)
@@ -431,7 +479,7 @@ class PermitAvailabilityMatcherTest {
             mapOf(PermitQuotaType.ConstantQuotaUsageDaily to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 0))),
         )
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertFalse(result.hasAvailability)
         assertEquals("4675323001", result.blockingDivisionId)
@@ -453,7 +501,7 @@ class PermitAvailabilityMatcherTest {
             ),
         )
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertFalse(result.hasAvailability)
     }
@@ -475,7 +523,7 @@ class PermitAvailabilityMatcherTest {
             ),
         )
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertFalse(result.hasAvailability)
     }
@@ -495,7 +543,7 @@ class PermitAvailabilityMatcherTest {
             ),
         )
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertTrue(result.hasAvailability)
     }
@@ -515,7 +563,167 @@ class PermitAvailabilityMatcherTest {
             mapOf(PermitQuotaType.UNKNOWN to mapOf(LocalDate.of(2026, 7, 12) to PermitItineraryAvailabilityCell(remaining = 1))),
         )
 
-        val result = matcher.check(request, zoneCache, itineraryCache)
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
+
+        assertFalse(result.hasAvailability)
+    }
+
+    // --- trailhead matcher ---
+
+    @Test
+    fun `trailhead matcher marks available when one of several accepted divisions has remaining quota`() {
+        val request = trailheadRequest(divisionIds = listOf("44585905", "44585901"), LocalDate.of(2026, 7, 20), LocalDate.of(2026, 7, 25))
+        stubTrailheadAvailability(
+            "445859",
+            mapOf(
+                LocalDate.of(2026, 7, 21) to mapOf("44585905" to singleGateCell(remaining = 0)),
+                LocalDate.of(2026, 7, 22) to mapOf("44585901" to singleGateCell(remaining = 15)),
+            ),
+        )
+        stubTrailheadDivisionAvailability("445859", "44585901", LocalDate.of(2026, 7, 22), singleGateCell(remaining = 15))
+
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
+
+        assertTrue(result.hasAvailability)
+        assertEquals("44585901", result.matchedDivisionId)
+        assertEquals(LocalDate.of(2026, 7, 22), result.matchedDate)
+    }
+
+    @Test
+    fun `trailhead matcher marks unavailable when no accepted division has quota in window`() {
+        val request = trailheadRequest(divisionIds = listOf("44585905"), LocalDate.of(2026, 7, 20), LocalDate.of(2026, 7, 25))
+        stubTrailheadAvailability("445859", mapOf(LocalDate.of(2026, 7, 21) to mapOf("44585905" to singleGateCell(remaining = 0))))
+
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
+
+        assertFalse(result.hasAvailability)
+        assertNull(result.matchedDivisionId)
+        assertNull(result.matchedDate)
+    }
+
+    @Test
+    fun `trailhead matcher marks unavailable when remaining quota is nonzero but too small for the group`() {
+        val request = trailheadRequest(divisionIds = listOf("44585905"), LocalDate.of(2026, 7, 20), LocalDate.of(2026, 7, 25), groupSize = 4)
+        stubTrailheadAvailability("445859", mapOf(LocalDate.of(2026, 7, 21) to mapOf("44585905" to singleGateCell(remaining = 1))))
+
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
+
+        assertFalse(result.hasAvailability)
+    }
+
+    @Test
+    fun `trailhead matcher never matches a not_yet_released cell, regardless of the numbers present`() {
+        // Yosemite shape: a rolling-release cell that hasn't opened yet shows remaining=0 alongside the
+        // flag in practice, but the flag alone must be decisive even if a future/buggy response paired
+        // it with a nonzero remaining.
+        val request = trailheadRequest(divisionIds = listOf("44585914"), LocalDate.of(2026, 7, 25), LocalDate.of(2026, 7, 25))
+        stubTrailheadAvailability(
+            "445859",
+            mapOf(
+                LocalDate.of(2026, 7, 25) to mapOf(
+                    "44585914" to trailheadCell(
+                        gates = mapOf("quota_usage_by_member_daily" to PermitTrailheadQuotaGate(total = 15, remaining = 15)),
+                        notYetReleased = true,
+                    ),
+                ),
+            ),
+        )
+
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
+
+        assertFalse(result.hasAvailability)
+    }
+
+    @Test
+    fun `trailhead matcher treats a division absent from a date's response as unavailable`() {
+        // Confirmed live (Mt. Whitney): a date entirely absent from the payload, and a division absent
+        // from a date that otherwise has other divisions present, are both just "nothing to find" —
+        // there's no explicit null-check branch, so this test exercises that it behaves correctly.
+        val request = trailheadRequest(divisionIds = listOf("44585901"), LocalDate.of(2026, 7, 20), LocalDate.of(2026, 7, 22))
+        stubTrailheadAvailability(
+            "445859",
+            mapOf(LocalDate.of(2026, 7, 21) to mapOf("44585905" to singleGateCell(remaining = 25))),
+        )
+
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
+
+        assertFalse(result.hasAvailability)
+    }
+
+    @Test
+    fun `trailhead matcher requires every quota gate on a cell to clear, not just one`() {
+        // Enchantments shape: a flat 1-permit-per-day gate blocks the match even though the per-person
+        // gate shows plenty of room.
+        val request = trailheadRequest(divisionIds = listOf("445863002"), LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 1))
+        stubTrailheadAvailability(
+            "445859",
+            mapOf(
+                LocalDate.of(2026, 8, 1) to mapOf(
+                    "445863002" to trailheadCell(
+                        gates = mapOf(
+                            "constant_quota_usage_daily" to PermitTrailheadQuotaGate(total = 1, remaining = 0),
+                            "quota_usage_by_member_daily" to PermitTrailheadQuotaGate(total = 8, remaining = 8),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
+
+        assertFalse(result.hasAvailability)
+    }
+
+    @Test
+    fun `trailhead matcher matches when every quota gate on a cell independently clears`() {
+        val request = trailheadRequest(divisionIds = listOf("445863002"), LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 1))
+        val cell = trailheadCell(
+            gates = mapOf(
+                "constant_quota_usage_daily" to PermitTrailheadQuotaGate(total = 1, remaining = 1),
+                "quota_usage_by_member_daily" to PermitTrailheadQuotaGate(total = 8, remaining = 2),
+            ),
+        )
+        stubTrailheadAvailability("445859", mapOf(LocalDate.of(2026, 8, 1) to mapOf("445863002" to cell)))
+        stubTrailheadDivisionAvailability("445859", "445863002", LocalDate.of(2026, 8, 1), cell)
+
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
+
+        assertTrue(result.hasAvailability)
+    }
+
+    @Test
+    fun `trailhead matcher rejects a candidate match that fails independent corroboration`() {
+        val request = trailheadRequest(divisionIds = listOf("44585905"), LocalDate.of(2026, 7, 20), LocalDate.of(2026, 7, 25))
+        stubTrailheadAvailability("445859", mapOf(LocalDate.of(2026, 7, 21) to mapOf("44585905" to singleGateCell(remaining = 15))))
+        // The bulk response says 44585905 has room, but the division_id-scoped corroboration call
+        // disagrees (remaining=0) — fails closed, same reasoning as the zone matcher's corroboration.
+        stubTrailheadDivisionAvailability("445859", "44585905", LocalDate.of(2026, 7, 21), singleGateCell(remaining = 0))
+
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
+
+        assertFalse(result.hasAvailability)
+    }
+
+    @Test
+    fun `trailhead matcher skips corroboration when the request is already AVAILABLE (steady state)`() {
+        val request = trailheadRequest(divisionIds = listOf("44585905"), LocalDate.of(2026, 7, 20), LocalDate.of(2026, 7, 25))
+        request.state.lastAvailabilityState = AvailabilityState.AVAILABLE
+        stubTrailheadAvailability("445859", mapOf(LocalDate.of(2026, 7, 21) to mapOf("44585905" to singleGateCell(remaining = 15))))
+        // Deliberately not stubbing getTrailheadDivisionAvailability — if the matcher called it, the
+        // unstubbed Call mock would return null and corroboration would fail closed.
+
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
+
+        assertTrue(result.hasAvailability)
+    }
+
+    @Test
+    fun `trailhead matcher skips a division flagged suspicious against its baseline`() {
+        val request = trailheadRequest(divisionIds = listOf("44585905"), LocalDate.of(2026, 7, 20), LocalDate.of(2026, 7, 25))
+        stubTrailheadAvailability("445859", mapOf(LocalDate.of(2026, 7, 21) to mapOf("44585905" to singleGateCell(remaining = 15))))
+        `when`(zoneAvailabilityBaselineService.looksSuspicious(eqK("445859"), eqK("44585905"), anyK(), anyK())).thenReturn(true)
+
+        val result = matcher.check(request, zoneCache, itineraryCache, trailheadCache)
 
         assertFalse(result.hasAvailability)
     }
@@ -674,8 +882,8 @@ class PermitAvailabilityMatcherTest {
             ),
         )
 
-        matcher.check(request1, zoneCache, itineraryCache)
-        matcher.check(request2, zoneCache, itineraryCache)
+        matcher.check(request1, zoneCache, itineraryCache, trailheadCache)
+        matcher.check(request2, zoneCache, itineraryCache, trailheadCache)
 
         org.mockito.Mockito
             .verify(recreationApi, org.mockito.Mockito.times(1))
@@ -700,8 +908,8 @@ class PermitAvailabilityMatcherTest {
             ),
         )
 
-        matcher.check(request1, zoneCache, itineraryCache)
-        matcher.check(request2, zoneCache, itineraryCache)
+        matcher.check(request1, zoneCache, itineraryCache, trailheadCache)
+        matcher.check(request2, zoneCache, itineraryCache, trailheadCache)
 
         org.mockito.Mockito
             .verify(recreationApi, org.mockito.Mockito.times(1))

@@ -57,6 +57,9 @@ data class PermitSearchRequest(
     @OneToOne(mappedBy = "permitSearchRequest", cascade = [CascadeType.ALL], fetch = FetchType.EAGER, orphanRemoval = true)
     var itineraryTarget: PermitItineraryTarget? = null
 
+    @OneToOne(mappedBy = "permitSearchRequest", cascade = [CascadeType.ALL], fetch = FetchType.EAGER, orphanRemoval = true)
+    var trailheadTarget: PermitTrailheadTarget? = null
+
     override var lastAvailabilityState: AvailabilityState?
         get() = state.lastAvailabilityState
         set(value) {

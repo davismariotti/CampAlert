@@ -68,7 +68,19 @@ class PermitClassificationServiceTest {
         return call
     }
 
-    private fun mapping(itinerary: List<String> = emptyList(), dayUse: List<String> = emptyList()) = PermitMappingPayload(itineraryPermitIds = itinerary, dayUsePermitIds = dayUse)
+    private fun mapping(
+        itinerary: List<String> = emptyList(),
+        dayUse: List<String> = emptyList(),
+        hunting: List<String> = emptyList(),
+        land: List<String> = emptyList(),
+        lottery: List<String> = emptyList(),
+    ) = PermitMappingPayload(
+        itineraryPermitIds = itinerary,
+        dayUsePermitIds = dayUse,
+        huntingPermitIds = hunting,
+        landPermitIds = land,
+        lotteryPermitIds = lottery,
+    )
 
     /** Stubs getPermitMapping(); note: the Call must be built *before* opening the when(...) stub below,
      *  since mockCall() itself calls when(...) internally — nesting it would corrupt Mockito's stubbing state. */
@@ -113,6 +125,65 @@ class PermitClassificationServiceTest {
         val result = service.classify("233261")
 
         assertEquals(SearchType.ZONE, result)
+    }
+
+    @Test
+    fun `permit with entry point division classifies as TRAILHEAD`() {
+        `when`(valueOps.get("permit:mapping")).thenReturn(null)
+        stubMapping(mapping())
+        `when`(permitContentCache.get("445859")).thenReturn(
+            PermitContentPayload(
+                divisions = mapOf("44585901" to PermitDivisionContent(id = "44585901", type = PermitDivisionType.ENTRY_POINT)),
+                rules = emptyList(),
+            ),
+        )
+
+        val result = service.classify("445859")
+
+        assertEquals(SearchType.TRAILHEAD, result)
+    }
+
+    @Test
+    fun `land bucket membership alone does not force unsupported, falls through to structural check`() {
+        `when`(valueOps.get("permit:mapping")).thenReturn(null)
+        stubMapping(mapping(land = listOf("445859")))
+        `when`(permitContentCache.get("445859")).thenReturn(
+            PermitContentPayload(
+                divisions = mapOf("44585901" to PermitDivisionContent(id = "44585901", type = PermitDivisionType.ENTRY_POINT)),
+                rules = emptyList(),
+            ),
+        )
+
+        val result = service.classify("445859")
+
+        assertEquals(SearchType.TRAILHEAD, result)
+    }
+
+    @Test
+    fun `lottery bucket membership alone does not force unsupported, falls through to structural check`() {
+        `when`(valueOps.get("permit:mapping")).thenReturn(null)
+        stubMapping(mapping(lottery = listOf("445859")))
+        `when`(permitContentCache.get("445859")).thenReturn(
+            PermitContentPayload(
+                divisions = mapOf("44585901" to PermitDivisionContent(id = "44585901", type = PermitDivisionType.ENTRY_POINT)),
+                rules = emptyList(),
+            ),
+        )
+
+        val result = service.classify("445859")
+
+        assertEquals(SearchType.TRAILHEAD, result)
+    }
+
+    @Test
+    fun `hunting bucket membership forces unsupported regardless of division shape`() {
+        `when`(valueOps.get("permit:mapping")).thenReturn(null)
+        stubMapping(mapping(hunting = listOf("5141414")))
+
+        val result = service.classify("5141414")
+
+        assertNull(result)
+        verify(permitContentCache, never()).get(anyString())
     }
 
     @Test

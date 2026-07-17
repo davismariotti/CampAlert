@@ -61,6 +61,12 @@ class PermitAlertNotification(
                     ?.legs
                     ?.size
                     ?.let { "$it-night itinerary" }
+            SearchType.TRAILHEAD -> {
+                val divisionId = request.state.matchedDivisionId
+                val date = request.state.matchedDate
+                val divisionLabel = n.matchedDivisionName ?: divisionId
+                if (divisionLabel != null && date != null) "$divisionLabel on $date" else null
+            }
         }
     }
 }

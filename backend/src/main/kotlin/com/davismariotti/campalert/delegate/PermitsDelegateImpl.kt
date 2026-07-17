@@ -90,6 +90,7 @@ class PermitsDelegateImpl(
             .map { division ->
                 PermitDivision(
                     id = division.id,
+                    code = division.code,
                     name = division.name ?: division.id,
                     description = division.description,
                     district = division.district,

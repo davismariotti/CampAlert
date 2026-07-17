@@ -10,5 +10,6 @@ interface PermitAvailabilityProvider {
         request: PermitSearchRequest,
         zoneCache: ZoneAvailabilityCache,
         itineraryCache: ItineraryAvailabilityCache,
+        trailheadCache: TrailheadAvailabilityCache,
     ): PermitAvailabilityResult
 }

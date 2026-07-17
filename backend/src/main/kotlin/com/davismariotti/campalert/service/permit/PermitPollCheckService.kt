@@ -59,6 +59,7 @@ class PermitPollCheckService(
 
         val zoneCache: ZoneAvailabilityCache = ConcurrentHashMap()
         val itineraryCache: ItineraryAvailabilityCache = ConcurrentHashMap()
+        val trailheadCache: TrailheadAvailabilityCache = ConcurrentHashMap()
         val resultsByUser = valid
             .mapNotNull { it.userId }
             .distinct()
@@ -68,7 +69,7 @@ class PermitPollCheckService(
         valid.forEach { request ->
             val uid = request.userId!!
             try {
-                val result = permitAvailabilityMatcher.check(request, zoneCache, itineraryCache)
+                val result = permitAvailabilityMatcher.check(request, zoneCache, itineraryCache, trailheadCache)
                 resultsByUser[uid]!!.add(result)
             } catch (e: Exception) {
                 log.error("Error processing permit requestId={}", request.id, e)
@@ -92,6 +93,7 @@ class PermitPollCheckService(
         when (request.searchType) {
             SearchType.ZONE -> request.zoneTarget?.endDay
             SearchType.ITINERARY -> request.itineraryTarget?.legs?.maxOfOrNull { it.date }
+            SearchType.TRAILHEAD -> request.trailheadTarget?.endDay
         }
 
     private fun today(permitTimezone: String?): LocalDate = LocalDate.now(permitTimezone?.let { ZoneId.of(it) } ?: ZoneOffset.UTC)
