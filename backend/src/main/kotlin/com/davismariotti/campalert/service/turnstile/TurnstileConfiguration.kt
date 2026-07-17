@@ -43,7 +43,7 @@ class TurnstileConfiguration(
         // apply here.
         val okHttpClient = providerHttpClientFactory.buildSimple(
             vendor = TURNSTILE_VENDOR,
-            metricsInterceptor = MetricsInterceptor("Custom/Turnstile/Verify"),
+            metricsInterceptor = MetricsInterceptor.byRetrofitMethod(prefix = "Custom/Turnstile/"),
         )
         val retrofit = Retrofit
             .Builder()
