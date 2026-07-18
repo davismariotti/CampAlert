@@ -1,6 +1,7 @@
 package com.davismariotti.campalert.service.scheduling
 
 import com.davismariotti.campalert.repository.PollTargetStateDao
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
@@ -15,7 +16,11 @@ class PollTargetCleanupJob(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @Scheduled(fixedDelayString = $$"${campfinder.polling.cleanup-interval-ms:86400000}")
+    @Scheduled(
+        initialDelayString = $$"${campfinder.polling.cleanup-interval-ms:86400000}",
+        fixedDelayString = $$"${campfinder.polling.cleanup-interval-ms:86400000}",
+    )
+    @SchedulerLock(name = "pollTargetCleanup", lockAtMostFor = "PT5M", lockAtLeastFor = "PT10S")
     fun cleanup() {
         val deleted = pollTargetStateDao.deleteStaleOrphans(Instant.now(), cleanupThresholdMs)
         if (deleted > 0) {
