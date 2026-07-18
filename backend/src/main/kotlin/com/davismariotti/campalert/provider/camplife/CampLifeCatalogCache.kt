@@ -51,6 +51,17 @@ class CampLifeCatalogCache(
         return refreshDirectory() ?: emptyList()
     }
 
+    /**
+     * True if the scheduled backstop refresh is actually due: the cache is empty (first start, or
+     * evicted past its TTL with no read traffic to repopulate it) or the cached value is older than
+     * [intervalMs]. Lets the backstop job behave as if it had been running continuously across
+     * restarts/deploys instead of firing on every startup.
+     */
+    fun isDirectoryRefreshDue(intervalMs: Long): Boolean {
+        val cached = redisJsonCache.get(DIRECTORY_KEY, directoryEntryTypeRef)
+        return cached == null || Duration.between(cached.fetchedAt, Instant.now()).toMillis() >= intervalMs
+    }
+
     /** Fetches the directory from CampLife and replaces the cached value. On failure, the prior cached value (if any) is left untouched. Called both synchronously (cold cache) and from the scheduled backstop job / async stale-read refresh. */
     fun refreshDirectory(): List<CampLifeDirectoryEntry>? =
         try {

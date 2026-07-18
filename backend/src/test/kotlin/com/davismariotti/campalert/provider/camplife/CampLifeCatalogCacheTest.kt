@@ -159,6 +159,35 @@ class CampLifeCatalogCacheTest {
     }
 
     @Test
+    fun `refresh is due when the cache is empty`() {
+        `when`(redisJsonCache.get(any<String>(), any<tools.jackson.core.type.TypeReference<CampLifeCachedEntry<List<CampLifeDirectoryEntry>>>>())).thenReturn(null)
+
+        assertTrue(cache.isDirectoryRefreshDue(TimeUnit.DAYS.toMillis(7)))
+    }
+
+    @Test
+    fun `refresh is due when the cached value is older than the interval`() {
+        val old = CampLifeCachedEntry(
+            Instant.now().minus(8, java.time.temporal.ChronoUnit.DAYS),
+            emptyList<CampLifeDirectoryEntry>()
+        )
+        `when`(redisJsonCache.get(any<String>(), any<tools.jackson.core.type.TypeReference<CampLifeCachedEntry<List<CampLifeDirectoryEntry>>>>())).thenReturn(old)
+
+        assertTrue(cache.isDirectoryRefreshDue(TimeUnit.DAYS.toMillis(7)))
+    }
+
+    @Test
+    fun `refresh is not due when the cached value is within the interval`() {
+        val recent = CampLifeCachedEntry(
+            Instant.now().minus(1, java.time.temporal.ChronoUnit.DAYS),
+            emptyList<CampLifeDirectoryEntry>()
+        )
+        `when`(redisJsonCache.get(any<String>(), any<tools.jackson.core.type.TypeReference<CampLifeCachedEntry<List<CampLifeDirectoryEntry>>>>())).thenReturn(recent)
+
+        assertTrue(!cache.isDirectoryRefreshDue(TimeUnit.DAYS.toMillis(7)))
+    }
+
+    @Test
     fun `failed refresh leaves the prior cached value in place`() {
         @Suppress("UNCHECKED_CAST")
         val call = mock(Call::class.java) as Call<List<CampLifeDirectoryEntry>>
