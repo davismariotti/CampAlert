@@ -2,6 +2,7 @@ package com.davismariotti.campalert.provider.recreation
 
 import com.davismariotti.campalert.httpclient.MetricsInterceptor
 import com.davismariotti.campalert.httpclient.ProviderHttpClientFactory
+import com.davismariotti.campalert.httpclient.UpstreamSource
 import com.davismariotti.campalert.httpclient.baseProviderObjectMapper
 import com.davismariotti.campalert.provider.CallProtection
 import com.davismariotti.campalert.provider.Provider
@@ -55,7 +56,7 @@ class RecreationConfiguration(
         providerHttpClientFactory.build(
             provider = Provider.RECREATION_GOV,
             refererOrigin = "https://www.recreation.gov",
-            metricsInterceptor = MetricsInterceptor.byRetrofitMethod(prefix = "Custom/RecreationGov/"),
+            metricsInterceptor = MetricsInterceptor.byRetrofitMethod(source = UpstreamSource.provider("RecreationGov")),
             RawBodyCapturingInterceptor(),
         )
 
@@ -87,7 +88,7 @@ class RecreationConfiguration(
                     .addHeader("apikey", ridbApiKey)
                     .build()
                 chain.proceed(request)
-            }.addInterceptor(MetricsInterceptor.byRetrofitMethod(prefix = "Custom/Ridb/"))
+            }.addInterceptor(MetricsInterceptor.byRetrofitMethod(source = UpstreamSource.integration("Ridb")))
             .build()
         val retrofit = Retrofit
             .Builder()
