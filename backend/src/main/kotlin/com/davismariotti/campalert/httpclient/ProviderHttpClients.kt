@@ -24,7 +24,7 @@ data class ProviderHttpClientProperties(
 
 /**
  * Builds each provider's browser-mimicking [OkHttpClient]: its own [InMemoryCookieJar] plus
- * [BrowserHeadersInterceptor] and [MetricsInterceptor] scoped to `refererOrigin`/`metricName`, with
+ * [BrowserHeadersInterceptor] and a caller-supplied [MetricsInterceptor] scoped to `refererOrigin`, with
  * per-[provider] timeout overrides (keyed by [Provider.configName]) resolved from
  * [ProviderHttpClientProperties] (30s default). Every [build] call returns a fresh instance — never
  * share the result across providers (see [InMemoryCookieJar]'s and [BrowserHeadersInterceptor]'s docs).
@@ -33,13 +33,6 @@ data class ProviderHttpClientProperties(
 class ProviderHttpClientFactory(
     private val timeouts: ProviderHttpClientProperties
 ) {
-    fun build(
-        provider: Provider,
-        refererOrigin: String,
-        metricName: String,
-        vararg additionalInterceptors: Interceptor,
-    ): OkHttpClient = build(provider, refererOrigin, MetricsInterceptor(metricName), *additionalInterceptors)
-
     fun build(
         provider: Provider,
         refererOrigin: String,

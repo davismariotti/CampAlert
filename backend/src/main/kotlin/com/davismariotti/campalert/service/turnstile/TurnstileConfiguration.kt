@@ -2,6 +2,7 @@ package com.davismariotti.campalert.service.turnstile
 
 import com.davismariotti.campalert.httpclient.MetricsInterceptor
 import com.davismariotti.campalert.httpclient.ProviderHttpClientFactory
+import com.davismariotti.campalert.httpclient.UpstreamSource
 import com.davismariotti.campalert.httpclient.baseProviderObjectMapper
 import com.davismariotti.campalert.provider.CallProtection
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
@@ -43,7 +44,7 @@ class TurnstileConfiguration(
         // apply here.
         val okHttpClient = providerHttpClientFactory.buildSimple(
             vendor = TURNSTILE_VENDOR,
-            metricsInterceptor = MetricsInterceptor.byRetrofitMethod(prefix = "Custom/Turnstile/"),
+            metricsInterceptor = MetricsInterceptor.byRetrofitMethod(source = UpstreamSource.integration("Turnstile")),
         )
         val retrofit = Retrofit
             .Builder()

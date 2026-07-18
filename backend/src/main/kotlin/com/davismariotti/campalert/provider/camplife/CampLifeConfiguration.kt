@@ -2,6 +2,7 @@ package com.davismariotti.campalert.provider.camplife
 
 import com.davismariotti.campalert.httpclient.MetricsInterceptor
 import com.davismariotti.campalert.httpclient.ProviderHttpClientFactory
+import com.davismariotti.campalert.httpclient.UpstreamSource
 import com.davismariotti.campalert.httpclient.baseProviderObjectMapper
 import com.davismariotti.campalert.provider.CallProtection
 import com.davismariotti.campalert.provider.Provider
@@ -27,7 +28,7 @@ class CampLifeConfiguration(
         providerHttpClientFactory.build(
             provider = Provider.CAMPLIFE,
             refererOrigin = CAMPLIFE_ORIGIN,
-            metricsInterceptor = MetricsInterceptor.byRetrofitMethod(prefix = "Custom/CampLife/"),
+            metricsInterceptor = MetricsInterceptor.byRetrofitMethod(source = UpstreamSource.provider("CampLife")),
         )
 
     /**
