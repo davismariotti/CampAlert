@@ -1,7 +1,5 @@
 package com.davismariotti.campalert
 
-import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics
 import net.javacrumbs.shedlock.core.LockProvider
 import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider
 import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock
@@ -38,7 +36,6 @@ class CampFinderApplication {
     fun availabilityCheckerExecutor(
         @Value("\${campfinder.checker.thread-pool-size:20}") poolSize: Int,
         @Value("\${campfinder.checker.thread-pool-queue-capacity:100}") queueCapacity: Int,
-        meterRegistry: MeterRegistry,
     ): TaskExecutor =
         ThreadPoolTaskExecutor().apply {
             corePoolSize = poolSize
@@ -47,29 +44,26 @@ class CampFinderApplication {
             setRejectedExecutionHandler(ThreadPoolExecutor.CallerRunsPolicy())
             setThreadNamePrefix("availability-checker-")
             initialize()
-            ExecutorServiceMetrics.monitor(meterRegistry, threadPoolExecutor, "availability-checker")
         }
 
     @Bean("timezoneResolutionExecutor")
-    fun timezoneResolutionExecutor(meterRegistry: MeterRegistry): TaskExecutor =
+    fun timezoneResolutionExecutor(): TaskExecutor =
         ThreadPoolTaskExecutor().apply {
             corePoolSize = 2
             maxPoolSize = 2
             queueCapacity = 50
             setThreadNamePrefix("tz-resolution-")
             initialize()
-            ExecutorServiceMetrics.monitor(meterRegistry, threadPoolExecutor, "tz-resolution")
         }
 
     @Bean("campLifeCatalogExecutor")
-    fun campLifeCatalogExecutor(meterRegistry: MeterRegistry): TaskExecutor =
+    fun campLifeCatalogExecutor(): TaskExecutor =
         ThreadPoolTaskExecutor().apply {
             corePoolSize = 1
             maxPoolSize = 2
             queueCapacity = 10
             setThreadNamePrefix("camplife-catalog-")
             initialize()
-            ExecutorServiceMetrics.monitor(meterRegistry, threadPoolExecutor, "camplife-catalog")
         }
 }
 
