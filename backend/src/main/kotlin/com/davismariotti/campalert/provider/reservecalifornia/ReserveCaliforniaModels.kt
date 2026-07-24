@@ -28,9 +28,16 @@ data class ReserveCaliforniaFacility(
     val name: String = "",
 )
 
-/** `GET /rdr/search/filters/{placeId}` — only `UnitTypesGroups` (the loop-equivalent grouping, D5) is consumed. */
+/**
+ * `GET /rdr/search/filters/{placeId}` — only `UnitTypesGroups` (the loop-equivalent grouping, D5) is
+ * consumed. Nullable, not defaulted to an empty list: verified live that ReserveCalifornia sends an
+ * explicit JSON `null` for some array fields on some responses (see [ReserveCaliforniaGridUnit]'s own
+ * note) rather than always `[]` — jackson-module-kotlin throws `KotlinInvalidNullException` binding an
+ * explicit null to a non-nullable Kotlin collection property, so every field deserialized directly
+ * from this API's real responses must be nullable regardless of whether a sane default "should" apply.
+ */
 data class ReserveCaliforniaFiltersResponse(
-    val unitTypesGroups: List<ReserveCaliforniaUnitTypesGroup> = emptyList(),
+    val unitTypesGroups: List<ReserveCaliforniaUnitTypesGroup>? = null,
 )
 
 data class ReserveCaliforniaUnitTypesGroup(
@@ -72,7 +79,8 @@ data class ReserveCaliforniaGridFacility(
     val longitude: Double? = null,
     val unitCount: Int? = null,
     val availableUnitCount: Int? = null,
-    val units: Map<String, ReserveCaliforniaGridUnit> = emptyMap(),
+    /** Nullable, not defaulted — see [ReserveCaliforniaGridUnit]'s note on why every collection field deserialized from this API must be. */
+    val units: Map<String, ReserveCaliforniaGridUnit>? = null,
 )
 
 /**
@@ -81,6 +89,13 @@ data class ReserveCaliforniaGridFacility(
  * to never be omitted from the response for failing a filter or being fully unavailable (D8); a
  * candidate only matches when `isFiltered == false`. No occupancy field exists on this object —
  * that's only available via [ReserveCaliforniaApi.getUnitDetails] (design.md D9).
+ *
+ * Deliberately carries no `sleepingUnitIds` field (unused, and it's exactly what caused a real 404:
+ * a group/non-standard unit — e.g. "Group Tent Campsite #KAYK" at Angel Island facility 407 —
+ * returned `"SleepingUnitIds": null` rather than `[]`, and jackson-module-kotlin throws
+ * `KotlinInvalidNullException` binding an explicit JSON null to a non-nullable Kotlin collection
+ * property, which `fetchFacilityRoster`'s catch-and-log-null swallowed into a silent empty roster and
+ * a 404. [slices] is nullable for the same reason, verified live to matter for this exact unit type.
  */
 data class ReserveCaliforniaGridUnit(
     val unitId: Int = 0,
@@ -90,9 +105,8 @@ data class ReserveCaliforniaGridUnit(
     val unitCategoryId: Int? = null,
     val unitTypeGroupId: Int? = null,
     val unitTypeId: Int? = null,
-    val sleepingUnitIds: List<Int> = emptyList(),
     val availableCount: Int? = null,
-    val slices: Map<String, ReserveCaliforniaSlice> = emptyMap(),
+    val slices: Map<String, ReserveCaliforniaSlice>? = null,
 )
 
 data class ReserveCaliforniaSlice(

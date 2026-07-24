@@ -118,7 +118,7 @@ class ReserveCaliforniaCatalogCache(
                 facilityName = facility.name,
                 latitude = facility.latitude,
                 longitude = facility.longitude,
-                units = facility.units.values.map {
+                units = facility.units.orEmpty().values.map {
                     ReserveCaliforniaRosterUnit(
                         unitId = it.unitId,
                         name = it.name,
