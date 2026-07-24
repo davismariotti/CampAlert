@@ -65,6 +65,32 @@ class CampFinderApplication {
             setThreadNamePrefix("camplife-catalog-")
             initialize()
         }
+
+    @Bean("reserveCaliforniaCatalogExecutor")
+    fun reserveCaliforniaCatalogExecutor(): TaskExecutor =
+        ThreadPoolTaskExecutor().apply {
+            corePoolSize = 1
+            maxPoolSize = 2
+            queueCapacity = 10
+            setThreadNamePrefix("reserveca-catalog-")
+            initialize()
+        }
+
+    /**
+     * One task per facility currently warming up (design.md D14) — a facility's fan-out loops
+     * through its PENDING units sequentially, paced by reserveCaliforniaWarmupCallProtection's rate
+     * limiter, so this pool's size bounds how many facilities can warm up concurrently, not how fast
+     * any single facility warms up.
+     */
+    @Bean("reserveCaliforniaOccupancyExecutor")
+    fun reserveCaliforniaOccupancyExecutor(): TaskExecutor =
+        ThreadPoolTaskExecutor().apply {
+            corePoolSize = 2
+            maxPoolSize = 4
+            queueCapacity = 50
+            setThreadNamePrefix("reserveca-occupancy-")
+            initialize()
+        }
 }
 
 fun main(args: Array<String>) {

@@ -6,6 +6,7 @@ import com.davismariotti.campalert.api.model.VerifyEmailBody
 import com.davismariotti.campalert.provider.camplife.CampLifeApi
 import com.davismariotti.campalert.provider.recreation.RecreationApi
 import com.davismariotti.campalert.provider.recreation.RidbApi
+import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaApi
 import com.davismariotti.campalert.service.sms.TwilioVerifyService
 import com.davismariotti.campalert.service.turnstile.SiteverifyResponse
 import com.davismariotti.campalert.service.turnstile.TurnstileApi
@@ -94,6 +95,12 @@ open class IntegrationTestBase {
     @MockitoBean
     protected lateinit var campLifeApi: CampLifeApi
 
+    // Same reasoning as campLifeApi above — unstubbed calls return null Retrofit Call objects, which
+    // ReserveCaliforniaCatalogCache/ReserveCaliforniaOccupancyService already treat as a failed
+    // fetch (caught, logged, empty/null result).
+    @MockitoBean
+    protected lateinit var reserveCaliforniaApi: ReserveCaliforniaApi
+
     // Replaces the real Cloudflare Turnstile client so no real network call is made during tests —
     // mirrors how recreationApi/ridbApi/campLifeApi are mocked above rather than pointed at a real
     // (or test-key) external endpoint. Defaulted to always-succeed in resetState() below.
@@ -138,7 +145,7 @@ open class IntegrationTestBase {
     @BeforeEach
     fun resetState() {
         jdbcTemplate.execute(
-            "TRUNCATE TABLE notification_outbox, search_request_state, search_requests, " +
+            "TRUNCATE TABLE notification_outbox, search_request_state, reserve_california_unit_occupancy, search_requests, " +
                 "permit_search_request_state, permit_zone_target, permit_itinerary_target, permit_trailhead_target, " +
                 "permit_search_requests, persistent_logins, phone_numbers, email_verifications, password_resets, " +
                 "users, shedlock, poll_target_state CASCADE"

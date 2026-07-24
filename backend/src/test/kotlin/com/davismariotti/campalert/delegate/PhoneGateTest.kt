@@ -5,6 +5,8 @@ import com.davismariotti.campalert.exception.NoVerifiedPhoneException
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.provider.camplife.CampLifeCatalogCache
+import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaCatalogCache
+import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaOccupancyService
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
@@ -30,6 +32,8 @@ class PhoneGateTest {
     private val timezoneResolutionService = mock(TimezoneResolutionService::class.java)
     private val pollTargetRegistrationService = mock(PollTargetRegistrationService::class.java)
     private val campLifeCatalogCache = mock(CampLifeCatalogCache::class.java)
+    private val reserveCaliforniaCatalogCache = mock(ReserveCaliforniaCatalogCache::class.java)
+    private val reserveCaliforniaOccupancyService = mock(ReserveCaliforniaOccupancyService::class.java)
     private val providerSearchWindowProperties = mock(ProviderSearchWindowProperties::class.java)
     private val turnstileService = mock(TurnstileService::class.java)
     private val delegate =
@@ -41,6 +45,8 @@ class PhoneGateTest {
             timezoneResolutionService,
             pollTargetRegistrationService,
             campLifeCatalogCache,
+            reserveCaliforniaCatalogCache,
+            reserveCaliforniaOccupancyService,
             providerSearchWindowProperties,
             turnstileService,
         )
