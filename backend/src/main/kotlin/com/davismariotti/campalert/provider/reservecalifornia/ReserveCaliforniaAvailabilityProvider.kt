@@ -101,10 +101,12 @@ class ReserveCaliforniaAvailabilityProvider(
 
         // IsFiltered resolves category/amenity/vehicle-length matching server-side (D8) — never
         // re-derived here. A candidate site must also be free for every night of the stay.
-        val rawMatches = facility.units.values
+        val rawMatches = facility.units
+            .orEmpty()
+            .values
             .asSequence()
             .filterNot { it.isFiltered }
-            .filter { unit -> nightKeys.all { key -> unit.slices[key]?.isFree == true } }
+            .filter { unit -> nightKeys.all { key -> unit.slices?.get(key)?.isFree == true } }
             .filter { unit -> siteIds == null || unit.unitId.toString() in siteIds }
             .map { it.unitId }
             .toSet()
