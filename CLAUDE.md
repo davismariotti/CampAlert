@@ -106,6 +106,9 @@ Hibernate 6 binds `AttributeConverter<List<String>, String>` as `VARCHAR`, which
 **Never edit files under `backend/build/generated/openapi/`**
 They are regenerated on every `compileKotlin`. The `org.openapitools.Application` entry point is suppressed via `.openapi-generator-ignore` — do not remove that file.
 
+**Bump the Redis cache key version suffix when a cached value's shape changes**
+Any time a class serialized into Redis via `RedisJsonCache` changes shape (fields added/removed/renamed, nesting changed, a field's type changed), old keys written by the previous version are still sitting in Redis with their prior TTL and will fail to deserialize under the new type once the new code reads them — Jackson doesn't fail gracefully on a structural mismatch, it throws. This already happened with `ZoneAvailabilityBaselineService`'s `ZoneBaselineSnapshot`: changing `confirmed`/`pending` from `Map<String, PermitZoneAvailabilityCell>` to `Map<String, Map<String, AvailabilityQuotaGate>>` (commit `484211f`) caused `MismatchedInputException` on every read of a pre-deploy key until it aged out. When changing the shape of any Redis-cached value, add or increment a version suffix on that cache key (e.g. `permit:zone-baseline:v2:$permitId:$divisionId:$month`) in the same commit, so the new code never tries to read an old-shaped value under the same key.
+
 ## Branch and PR workflow
 
 Only follow this workflow when explicitly asked to commit, open a PR, or otherwise interact with git.

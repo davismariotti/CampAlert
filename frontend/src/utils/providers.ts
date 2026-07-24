@@ -3,7 +3,8 @@ import type { Provider } from '../api/generated/types.gen'
 // No "list providers" endpoint exists — this mirrors the backend's Provider enum for UI purposes.
 export const ALL_PROVIDERS: Provider[] = [
   { type: 'RECREATION_GOV', name: 'Recreation.gov' },
-  { type: 'CAMPLIFE', name: 'CampLife' }
+  { type: 'CAMPLIFE', name: 'CampLife' },
+  { type: 'RESERVE_CALIFORNIA', name: 'ReserveCalifornia' }
 ]
 
 // Permit search only ever supports Recreation.gov (CampLife permit support is out of scope) — kept

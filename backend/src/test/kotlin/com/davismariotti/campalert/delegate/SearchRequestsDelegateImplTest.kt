@@ -9,6 +9,8 @@ import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.provider.camplife.CampLifeCatalogCache
+import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaCatalogCache
+import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaOccupancyService
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
@@ -42,6 +44,8 @@ class SearchRequestsDelegateImplTest {
     private val timezoneResolutionService = mock(TimezoneResolutionService::class.java)
     private val pollTargetRegistrationService = mock(PollTargetRegistrationService::class.java)
     private val campLifeCatalogCache = mock(CampLifeCatalogCache::class.java)
+    private val reserveCaliforniaCatalogCache = mock(ReserveCaliforniaCatalogCache::class.java)
+    private val reserveCaliforniaOccupancyService = mock(ReserveCaliforniaOccupancyService::class.java)
     private val providerSearchWindowProperties = mock(ProviderSearchWindowProperties::class.java).also {
         `when`(it.maxRangeWidthDaysFor(Provider.RECREATION_GOV)).thenReturn(30)
         `when`(it.maxRangeWidthDaysFor(Provider.CAMPLIFE)).thenReturn(9)
@@ -56,6 +60,8 @@ class SearchRequestsDelegateImplTest {
         timezoneResolutionService,
         pollTargetRegistrationService,
         campLifeCatalogCache,
+        reserveCaliforniaCatalogCache,
+        reserveCaliforniaOccupancyService,
         providerSearchWindowProperties,
         turnstileService,
     )
@@ -122,6 +128,28 @@ class SearchRequestsDelegateImplTest {
         assertEquals(ApiProviderType.RECREATION_GOV, result.body!!.provider.type)
         assertEquals("Recreation.gov", result.body!!.provider.name)
         verify(pollTargetRegistrationService).ensureCampgroundTarget(233359, Provider.RECREATION_GOV)
+    }
+
+    @Test
+    fun `creating a ReserveCalifornia any-site groupSize search registers the poll target immediately, regardless of occupancy warm-up state`() {
+        // D18: registration must never be gated on occupancy warm-up completing — this is the
+        // regression guard for that decision, since it would be easy for a future change to
+        // reintroduce a gate here without realizing it breaks concurrent site_ids-scoped searches
+        // against the same facility (see reserve-california-unit-occupancy-warmup spec).
+        `when`(reserveCaliforniaCatalogCache.getDirectory()).thenReturn(
+            listOf(
+                com.davismariotti.campalert.provider.reservecalifornia
+                    .ReserveCaliforniaDirectoryEntry(facilityId = 233359, facilityName = "Test", placeId = 683, placeName = "Test Park")
+            ),
+        )
+        `when`(reserveCaliforniaCatalogCache.getFacilityRoster(233359)).thenReturn(null)
+
+        val result = delegate.createSearchRequest(
+            createBody(provider = ApiProvider(type = ApiProviderType.RESERVE_CALIFORNIA, name = "ignored")).copy(groupSize = 6),
+        )
+
+        assertEquals(ApiProviderType.RESERVE_CALIFORNIA, result.body!!.provider.type)
+        verify(pollTargetRegistrationService).ensureCampgroundTarget(233359, Provider.RESERVE_CALIFORNIA)
     }
 
     @Test

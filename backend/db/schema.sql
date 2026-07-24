@@ -34,7 +34,7 @@ CREATE TABLE "public"."search_requests" (
   PRIMARY KEY ("id"),
   -- atlas:renamed_from fk_search_requests_v2_user
   CONSTRAINT "fk_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
-  CONSTRAINT "chk_search_requests_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE'))
+  CONSTRAINT "chk_search_requests_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
 );
 CREATE INDEX ON "public"."search_requests" ("user_id");
 -- Create "recreation_gov_search_request_details" table
@@ -54,6 +54,35 @@ CREATE TABLE "public"."camplife_search_request_details" (
   PRIMARY KEY ("search_request_id"),
   CONSTRAINT "fk_camplife_search_request_details_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests" ("id") ON DELETE CASCADE
 );
+-- Create "reserve_california_search_request_details" table
+CREATE TABLE "public"."reserve_california_search_request_details" (
+  "search_request_id" bigint NOT NULL,
+  "unit_category_id" integer NULL,
+  "unit_type_group_ids" json NULL,
+  "sleeping_unit_id" integer NULL,
+  "min_vehicle_length" integer NULL,
+  "amenity_ids" json NULL,
+  "place_id" integer NOT NULL,
+  PRIMARY KEY ("search_request_id"),
+  CONSTRAINT "fk_reserve_california_search_request_details_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests" ("id") ON DELETE CASCADE
+);
+-- Create "reserve_california_unit_occupancy" table
+CREATE TABLE "public"."reserve_california_unit_occupancy" (
+  "facility_id" integer NOT NULL,
+  "unit_id" integer NOT NULL,
+  "unit_name" character varying(255) NOT NULL,
+  "max_occupancy" integer NULL,
+  "min_occupancy" integer NULL,
+  "status" character varying(16) NOT NULL DEFAULT 'PENDING',
+  "attempts" integer NOT NULL DEFAULT 0,
+  "next_attempt_at" timestamptz NULL,
+  "fetched_at" timestamptz NULL,
+  "next_reconcile_at" timestamptz NULL,
+  PRIMARY KEY ("facility_id", "unit_id"),
+  CONSTRAINT "chk_reserve_california_unit_occupancy_status" CHECK (status IN ('PENDING', 'FETCHED', 'FAILED', 'EXCLUDED'))
+);
+CREATE INDEX ON "public"."reserve_california_unit_occupancy" ("status", "next_attempt_at");
+CREATE INDEX ON "public"."reserve_california_unit_occupancy" ("next_reconcile_at");
 -- Create "notification_outbox" table
 CREATE TABLE "public"."notification_outbox" (
   "id" bigserial NOT NULL,
@@ -172,7 +201,7 @@ CREATE TABLE "public"."poll_target_state" (
   "last_error" text NULL,
   PRIMARY KEY ("target_type", "provider", "target_id"),
   CONSTRAINT "chk_poll_target_state_target_type" CHECK (target_type IN ('CAMPGROUND', 'PERMIT')),
-  CONSTRAINT "chk_poll_target_state_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE'))
+  CONSTRAINT "chk_poll_target_state_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
 );
 CREATE INDEX ON "public"."poll_target_state" ("next_due_at", "locked_until");
 -- Create "shedlock" table

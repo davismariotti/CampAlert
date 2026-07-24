@@ -7,12 +7,13 @@ export type DateMode = 'exact' | 'flexible'
 export const MAX_NIGHTS = 21
 
 // Mirrors the backend's campfinder.search.providers.<key>.max-range-width-days — latestStartDay -
-// startDay, i.e. candidate count minus one, independent of nights. CampLife has no per-day
-// availability calendar, so every candidate window costs its own API call (fired in parallel),
-// hence the much tighter cap than Recreation.gov's month-cached, in-memory scan.
+// startDay, i.e. candidate count minus one, independent of nights. CampLife and ReserveCalifornia
+// both fire one API call per candidate window (in parallel), hence the much tighter cap than
+// Recreation.gov's month-cached, in-memory scan.
 const MAX_RANGE_WIDTH_DAYS: Record<ProviderType, number> = {
   RECREATION_GOV: 30,
-  CAMPLIFE: 9
+  CAMPLIFE: 9,
+  RESERVE_CALIFORNIA: 9
 }
 
 export function maxRangeWidthDaysFor(providerType: ProviderType): number {
