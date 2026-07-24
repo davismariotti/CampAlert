@@ -12,10 +12,13 @@ import com.davismariotti.campalert.model.CampLifeSearchRequestDetails
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.RecreationGovSearchRequestDetails
 import com.davismariotti.campalert.model.RequestType
+import com.davismariotti.campalert.model.ReserveCaliforniaSearchRequestDetails
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.provider.camplife.CampLifeCatalogCache
+import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaCatalogCache
+import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaOccupancyService
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
@@ -42,6 +45,8 @@ class SearchRequestsDelegateImpl(
     private val timezoneResolutionService: TimezoneResolutionService,
     private val pollTargetRegistrationService: PollTargetRegistrationService,
     private val campLifeCatalogCache: CampLifeCatalogCache,
+    private val reserveCaliforniaCatalogCache: ReserveCaliforniaCatalogCache,
+    private val reserveCaliforniaOccupancyService: ReserveCaliforniaOccupancyService,
     private val providerSearchWindowProperties: ProviderSearchWindowProperties,
     private val turnstileService: TurnstileService,
 ) : SearchRequestsApiDelegate {
@@ -158,6 +163,7 @@ class SearchRequestsDelegateImpl(
         updated.state.completed = updateSearchRequestBody.completed
         updated.recreationGovDetails = existing.recreationGovDetails
         updated.campLifeDetails = existing.campLifeDetails
+        updated.reserveCaliforniaDetails = existing.reserveCaliforniaDetails
         applyProviderDetails(updated, provider, updateSearchRequestBody.loops, updateSearchRequestBody.amenityIds)
         val saved = searchRequestRepository.save(updated)
         pollTargetRegistrationService.ensureCampgroundTarget(saved.campsiteId, saved.provider)
@@ -253,6 +259,34 @@ class SearchRequestsDelegateImpl(
                     null
                 }
             }
+            Provider.RESERVE_CALIFORNIA -> {
+                entity.recreationGovDetails = null
+                entity.campLifeDetails = null
+                val placeId = reserveCaliforniaCatalogCache
+                    .getDirectory()
+                    .find { it.facilityId == entity.campsiteId }
+                    ?.placeId
+                    ?: throw NotFoundException("ReserveCalifornia facility not found")
+                val groupIds = loops
+                    ?.let { resolveReserveCaliforniaGroupIds(entity.campsiteId, it) }
+                    ?.takeIf { it.isNotEmpty() }
+                val nonEmptyAmenityIds = amenityIds?.takeIf { it.isNotEmpty() }
+                val details = entity.reserveCaliforniaDetails ?: ReserveCaliforniaSearchRequestDetails()
+                details.searchRequest = entity
+                details.placeId = placeId
+                details.unitTypeGroupIds = groupIds
+                details.amenityIds = nonEmptyAmenityIds
+                entity.reserveCaliforniaDetails = details
+
+                // D13: any-site groupSize-scoped searches need the facility's whole roster warmed up;
+                // site_ids-scoped searches resolve occupancy lazily inside checkAvailability itself
+                // (D17) and never trigger this.
+                if (entity.siteIds.isNullOrEmpty() && entity.groupSize > 1) {
+                    reserveCaliforniaCatalogCache.getFacilityRoster(entity.campsiteId)?.let { roster ->
+                        reserveCaliforniaOccupancyService.ensureWarmingUp(entity.campsiteId, roster.units)
+                    }
+                }
+            }
         }
     }
 
@@ -272,6 +306,26 @@ class SearchRequestsDelegateImpl(
             ?.find { it.id == siteTypeId }
             ?.name
 
+    /** ReserveCalifornia's loop concept (D5) is `UnitTypeGroupId`, scoped per parent park — resolved via the facility's directory entry then that park's cached filters. */
+    private fun reserveCaliforniaGroupNamesByGroupId(facilityId: Int): Map<Int, String> {
+        val placeId = reserveCaliforniaCatalogCache.getDirectory().find { it.facilityId == facilityId }?.placeId ?: return emptyMap()
+        return reserveCaliforniaCatalogCache
+            .getParkFilters(placeId)
+            ?.unitTypesGroups
+            ?.associate { it.unitTypesGroupId to it.unitTypesGroupName }
+            ?: emptyMap()
+    }
+
+    private fun resolveReserveCaliforniaGroupIds(facilityId: Int, loopNames: List<String>): List<Int> {
+        val idsByName = reserveCaliforniaGroupNamesByGroupId(facilityId).entries.associate { (id, name) -> name.lowercase() to id }
+        return loopNames.mapNotNull { idsByName[it.lowercase()] }
+    }
+
+    private fun resolveReserveCaliforniaGroupNames(facilityId: Int, groupIds: List<Int>): List<String> {
+        val namesById = reserveCaliforniaGroupNamesByGroupId(facilityId)
+        return groupIds.mapNotNull { namesById[it] }
+    }
+
     private fun SearchRequest.resolveLoops(): List<String>? =
         when (provider) {
             Provider.RECREATION_GOV -> recreationGovDetails?.loops
@@ -280,6 +334,12 @@ class SearchRequestsDelegateImpl(
                     ?.siteTypeId
                     ?.let { resolveCampLifeSiteTypeName(campsiteId, it) }
                     ?.let { listOf(it) }
+            Provider.RESERVE_CALIFORNIA ->
+                reserveCaliforniaDetails
+                    ?.unitTypeGroupIds
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { resolveReserveCaliforniaGroupNames(campsiteId, it) }
+                    ?.takeIf { it.isNotEmpty() }
         }
 
     private fun SearchRequest.toResponse(stats: SearchRequestStats): SearchRequestResponse =
@@ -292,7 +352,11 @@ class SearchRequestsDelegateImpl(
             campgroundName = this.campgroundName,
             loops = this.resolveLoops(),
             siteIds = this.siteIds,
-            amenityIds = this.campLifeDetails?.amenityIds,
+            amenityIds = when (this.provider) {
+                Provider.CAMPLIFE -> this.campLifeDetails?.amenityIds
+                Provider.RESERVE_CALIFORNIA -> this.reserveCaliforniaDetails?.amenityIds
+                Provider.RECREATION_GOV -> null
+            },
             name = this.name,
             completed = this.state.completed,
             pauseReason = this.state.pauseReason,

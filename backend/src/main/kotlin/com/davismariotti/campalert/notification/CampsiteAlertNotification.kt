@@ -31,7 +31,7 @@ class CampsiteAlertNotification(
         notifications.forEach { n ->
             val (startDay, endDay) = n.matchedOrExactDates()
             sb.appendLine("${n.request.campgroundName} — $startDay to $endDay")
-            sb.appendLine(n.request.provider.bookingLink(n.request.campsiteId))
+            sb.appendLine(n.request.provider.bookingLink(n.request))
             sb.appendLine()
         }
         sb.append("Reply PAUSE to snooze. Reply STOP to unsubscribe.")
