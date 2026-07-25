@@ -35,38 +35,91 @@ class ReserveCaliforniaCatalogCache(
 
     fun getDirectory(): List<ReserveCaliforniaDirectoryEntry> {
         val cached = redisJsonCache.get(DIRECTORY_KEY, directoryEntryTypeRef)
-        if (cached != null) return cached.value
-        return refreshDirectory() ?: emptyList()
+        if (cached != null && cached.value.isNotEmpty()) return cached.value
+        return refreshDirectory() ?: cached?.value ?: emptyList()
     }
 
     /**
      * True if the scheduled refresh is actually due: the cache is empty (first start, or evicted
-     * past its TTL with no read traffic to repopulate it) or the cached value is older than
-     * [intervalMs] — mirrors CampLifeCatalogRefreshJob's own backstop-due check.
+     * past its TTL with no read traffic to repopulate it), the cached value is older than
+     * [intervalMs], or the cached value is itself empty — mirrors CampLifeCatalogRefreshJob's own
+     * backstop-due check, plus the empty check so a directory poisoned by a call that failed without
+     * throwing (see [refreshDirectory]) retries on the very next run instead of sitting on a known-bad
+     * cached value for the rest of its TTL.
      */
     fun isDirectoryRefreshDue(intervalMs: Long): Boolean {
         val cached = redisJsonCache.get(DIRECTORY_KEY, directoryEntryTypeRef)
-        return cached == null || Instant.now().toEpochMilli() - cached.fetchedAt.toEpochMilli() >= intervalMs
+        return cached == null || cached.value.isEmpty() || Instant.now().toEpochMilli() - cached.fetchedAt.toEpochMilli() >= intervalMs
     }
 
-    /** Fetches and joins ReserveCalifornia's park/facility lists, replacing the cached directory. On failure, the prior cached value (if any) is left untouched. */
+    /**
+     * True if there's no usable cached directory right now — first start, evicted past TTL, or
+     * poisoned empty by a prior refresh that failed without throwing (see [refreshDirectory]). Used
+     * only to distinguish a repair attempt from a routine scheduled refresh in
+     * [ReserveCaliforniaCatalogRefreshJob]'s logging.
+     */
+    fun isDirectoryEmpty(): Boolean {
+        val cached = redisJsonCache.get(DIRECTORY_KEY, directoryEntryTypeRef)
+        return cached == null || cached.value.isEmpty()
+    }
+
+    /**
+     * Fetches and joins ReserveCalifornia's park/facility lists, replacing the cached directory. On
+     * failure, the prior cached value (if any) is left untouched.
+     *
+     * Retrofit does not throw for a non-2xx HTTP response — `.body()` is simply `null` — so a null
+     * body here must be treated as a failed call, never coerced to `emptyList()`: doing so previously
+     * let a single blocked/rate-limited/transient-error response (e.g. CloudFront bot mitigation
+     * against a datacenter egress IP — confirmed live: identical headers get HTTP 200 from a
+     * residential IP and HTTP 403 direct-from-CloudFront, `x-cache: Error from cloudfront`, i.e.
+     * blocked before ever reaching origin, from the production droplet) silently cache an empty
+     * directory for a full [ReserveCaliforniaCatalogProperties.ttlDays], with nothing logged since no
+     * exception was ever thrown (`Scheduled ReserveCalifornia directory refresh populated cache
+     * count=0` was the only visible symptom). The HTTP status + error body are logged on failure now
+     * so a recurrence is diagnosable from logs alone instead of requiring a live curl to reproduce.
+     */
     fun refreshDirectory(): List<ReserveCaliforniaDirectoryEntry>? =
         try {
-            val places = callProtection.execute { reserveCaliforniaApi.getPlaces().execute().body() } ?: emptyList()
-            val facilities = callProtection.execute { reserveCaliforniaApi.getFacilities().execute().body() } ?: emptyList()
-            val placesById = places.associateBy { it.placeId }
-            val entries = facilities.mapNotNull { facility ->
-                val place = placesById[facility.placeId] ?: return@mapNotNull null
-                ReserveCaliforniaDirectoryEntry(
-                    facilityId = facility.facilityId,
-                    facilityName = facility.name,
-                    placeId = place.placeId,
-                    placeName = place.name,
-                    placeLatitude = place.latitude,
-                    placeLongitude = place.longitude,
+            val placesResponse = callProtection.execute { reserveCaliforniaApi.getPlaces().execute() }
+            val places = placesResponse.body() ?: run {
+                log.warn(
+                    "ReserveCalifornia directory refresh: getPlaces failed httpStatus={} errorBody={}; leaving prior cache in place",
+                    placesResponse.code(),
+                    placesResponse.errorBody()?.string()?.take(ERROR_BODY_LOG_LIMIT),
                 )
+                return null
+            }
+            val facilitiesResponse = callProtection.execute { reserveCaliforniaApi.getFacilities().execute() }
+            val facilities = facilitiesResponse.body() ?: run {
+                log.warn(
+                    "ReserveCalifornia directory refresh: getFacilities failed httpStatus={} errorBody={}; leaving prior cache in place",
+                    facilitiesResponse.code(),
+                    facilitiesResponse.errorBody()?.string()?.take(ERROR_BODY_LOG_LIMIT),
+                )
+                return null
+            }
+            val placesById = places.associateBy { it.placeId }
+            val entries = facilities
+                .mapNotNull { facility ->
+                    val place = placesById[facility.placeId] ?: return@mapNotNull null
+                    ReserveCaliforniaDirectoryEntry(
+                        facilityId = facility.facilityId,
+                        facilityName = facility.name,
+                        placeId = place.placeId,
+                        placeName = place.name,
+                        placeLatitude = place.latitude,
+                        placeLongitude = place.longitude,
+                    )
+                }.ifEmpty {
+                    log.warn("ReserveCalifornia directory refresh joined to zero entries (places={}, facilities={}); leaving prior cache in place", places.size, facilities.size)
+                    return null
+                }
+            val droppedFacilityCount = facilities.size - entries.size
+            if (droppedFacilityCount > 0) {
+                log.warn("ReserveCalifornia directory refresh dropped {} of {} facilities with no matching place", droppedFacilityCount, facilities.size)
             }
             redisJsonCache.set(DIRECTORY_KEY, ReserveCaliforniaCachedEntry(Instant.now(), entries), properties.ttlDays, TimeUnit.DAYS)
+            log.info("ReserveCalifornia directory refresh populated cache count={}", entries.size)
             entries
         } catch (e: Exception) {
             log.warn("Failed to refresh ReserveCalifornia directory cache", e)
@@ -134,6 +187,7 @@ class ReserveCaliforniaCatalogCache(
 
     companion object {
         private const val DIRECTORY_KEY = "reservecalifornia:catalog:directory"
+        private const val ERROR_BODY_LOG_LIMIT = 500
         private val DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
         private val directoryEntryTypeRef = object : tools.jackson.core.type.TypeReference<ReserveCaliforniaCachedEntry<List<ReserveCaliforniaDirectoryEntry>>>() {}
 

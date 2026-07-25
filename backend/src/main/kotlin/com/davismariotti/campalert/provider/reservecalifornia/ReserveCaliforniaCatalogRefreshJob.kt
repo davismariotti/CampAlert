@@ -8,10 +8,14 @@ import org.springframework.stereotype.Component
 
 /**
  * Weekly backstop refresh of the ReserveCalifornia directory cache — mirrors
- * CampLifeCatalogRefreshJob. `fixedDelay` scheduling fires immediately on every app startup, so this
- * only actually refreshes when it's due per [ReserveCaliforniaCatalogCache.isDirectoryRefreshDue] —
- * cache empty (first start) or older than the refresh interval — rather than on every deploy.
- * `@SchedulerLock` ensures only one instance does it when several start at once.
+ * CampLifeCatalogRefreshJob. `fixedDelay` scheduling fires immediately on every app startup (Spring's
+ * default when only `fixedDelay`/no `initialDelay` is set), so this job doubles as the "check on
+ * startup and repair if empty" mechanism: combined with
+ * [ReserveCaliforniaCatalogCache.isDirectoryRefreshDue] treating an empty cached directory as always
+ * due, an app instance that starts up with a poisoned/empty directory (e.g. from the CDN/WAF-blocked
+ * refresh failure documented on [ReserveCaliforniaCatalogCache.refreshDirectory]) attempts a repair
+ * immediately rather than waiting out the rest of the weekly interval. `@SchedulerLock` ensures only
+ * one instance does it when several start at once.
  */
 @Component
 class ReserveCaliforniaCatalogRefreshJob(
@@ -27,11 +31,16 @@ class ReserveCaliforniaCatalogRefreshJob(
             log.debug("ReserveCalifornia directory refresh skipped; cached value is still within the refresh interval")
             return
         }
+        val repairing = reserveCaliforniaCatalogCache.isDirectoryEmpty()
+        if (repairing) {
+            log.warn("ReserveCalifornia directory cache is empty (first start, evicted, or previously poisoned by a failed refresh); attempting repair")
+        }
         val entries = reserveCaliforniaCatalogCache.refreshDirectory()
-        if (entries == null) {
-            log.warn("Scheduled ReserveCalifornia directory refresh failed; previous cached value (if any) left in place")
-        } else {
-            log.info("Scheduled ReserveCalifornia directory refresh populated cache count={}", entries.size)
+        when {
+            entries == null && repairing -> log.warn("ReserveCalifornia directory repair attempt failed; cache remains empty until the next scheduled attempt")
+            entries == null -> log.warn("Scheduled ReserveCalifornia directory refresh failed; previous cached value (if any) left in place")
+            repairing -> log.info("ReserveCalifornia directory cache repaired count={}", entries.size)
+            else -> log.info("Scheduled ReserveCalifornia directory refresh populated cache count={}", entries.size)
         }
     }
 }
