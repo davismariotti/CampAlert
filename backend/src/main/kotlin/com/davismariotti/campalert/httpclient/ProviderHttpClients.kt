@@ -9,6 +9,7 @@ import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.stereotype.Component
+import java.net.Proxy
 import java.time.Duration
 
 /**
@@ -38,6 +39,7 @@ class ProviderHttpClientFactory(
         refererOrigin: String,
         metricsInterceptor: MetricsInterceptor,
         vararg additionalInterceptors: Interceptor,
+        proxy: Proxy? = null,
     ): OkHttpClient {
         val vendor = provider.configName()
         return OkHttpClient
@@ -46,6 +48,7 @@ class ProviderHttpClientFactory(
             .addInterceptor(BrowserHeadersInterceptor(refererOrigin = refererOrigin))
             .addInterceptor(metricsInterceptor)
             .apply { additionalInterceptors.forEach { addInterceptor(it) } }
+            .apply { proxy?.let { proxy(it) } }
             .connectTimeout(timeouts.connectTimeout[vendor] ?: DEFAULT_TIMEOUT)
             .readTimeout(timeouts.readTimeout[vendor] ?: DEFAULT_TIMEOUT)
             .writeTimeout(timeouts.writeTimeout[vendor] ?: DEFAULT_TIMEOUT)
