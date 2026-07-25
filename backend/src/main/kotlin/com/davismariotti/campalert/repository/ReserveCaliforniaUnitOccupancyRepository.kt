@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
+import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 interface ReserveCaliforniaUnitOccupancyRepository : JpaRepository<ReserveCaliforniaUnitOccupancy, ReserveCaliforniaUnitOccupancyId> {
@@ -45,6 +46,7 @@ interface ReserveCaliforniaUnitOccupancyRepository : JpaRepository<ReserveCalifo
 
     /** D20: resets stale FETCHED/EXCLUDED rows (jittered per-unit freshness window elapsed) back to PENDING. */
     @Modifying
+    @Transactional
     @Query(
         """
         UPDATE ReserveCaliforniaUnitOccupancy o
@@ -59,6 +61,7 @@ interface ReserveCaliforniaUnitOccupancyRepository : JpaRepository<ReserveCalifo
     ): Int
 
     @Modifying
+    @Transactional
     @Query("DELETE FROM ReserveCaliforniaUnitOccupancy o WHERE o.id.facilityId = :facilityId AND o.id.unitId IN :unitIds")
     fun deleteByFacilityIdAndUnitIds(
         @Param("facilityId") facilityId: Int,
