@@ -15,6 +15,8 @@ import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PermitSearchRequestRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.UserRepository
+import com.davismariotti.campalert.service.ResourceReconciliationService
+import com.davismariotti.campalert.service.SearchRequestCreationGuard
 import com.davismariotti.campalert.service.permit.PermitClassificationService
 import com.davismariotti.campalert.service.permit.PermitContentCache
 import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
@@ -45,6 +47,8 @@ class PermitSearchRequestsDelegateImplTest {
     private val permitContentCache = mock(PermitContentCache::class.java)
     private val pollTargetRegistrationService = mock(PollTargetRegistrationService::class.java)
     private val turnstileService = mock(TurnstileService::class.java)
+    private val searchRequestCreationGuard = mock(SearchRequestCreationGuard::class.java)
+    private val resourceReconciliationService = mock(ResourceReconciliationService::class.java)
 
     private val delegate = PermitSearchRequestsDelegateImpl(
         permitSearchRequestRepository,
@@ -55,6 +59,8 @@ class PermitSearchRequestsDelegateImplTest {
         permitContentCache,
         pollTargetRegistrationService,
         turnstileService,
+        searchRequestCreationGuard,
+        resourceReconciliationService,
     )
 
     private val user = User(id = 1L, email = "user@example.com", passwordHash = "hash")

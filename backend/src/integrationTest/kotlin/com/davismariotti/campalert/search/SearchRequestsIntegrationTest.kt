@@ -387,6 +387,45 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
         ).isEqualTo(404)
     }
 
+    @Test
+    fun `delete search request soft-deletes the row rather than removing it`() {
+        val session = registerAndLogin()
+        val request = seedRequest(userRepository.findByEmail("user@test.com")!!.id!!)
+        assertThat(doDelete("/api/search-requests/${request.id}", session).response.status).isEqualTo(204)
+
+        val stored = searchRequestRepository.findById(request.id!!).orElse(null)
+        assertThat(stored).isNotNull
+        assertThat(stored.deletedAt).isNotNull
+    }
+
+    @Test
+    fun `deleted search request does not appear in the default or completed list`() {
+        val session = registerAndLogin()
+        val request = seedRequest(userRepository.findByEmail("user@test.com")!!.id!!)
+        doDelete("/api/search-requests/${request.id}", session)
+
+        assertThat(
+            mockMvc
+                .perform(get("/api/search-requests").cookie(session))
+                .andReturn()
+                .response.contentAsString
+        ).doesNotContain("\"id\":${request.id}")
+    }
+
+    @Test
+    fun `deleted search request appears in the deleted list`() {
+        val session = registerAndLogin()
+        val request = seedRequest(userRepository.findByEmail("user@test.com")!!.id!!)
+        doDelete("/api/search-requests/${request.id}", session)
+
+        assertThat(
+            mockMvc
+                .perform(get("/api/search-requests?deleted=true").cookie(session))
+                .andReturn()
+                .response.contentAsString
+        ).contains("\"id\":${request.id}")
+    }
+
     // --- flexible search range validation ---
 
     @Test
@@ -468,7 +507,7 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
     }
 
     @Test
-    fun `delete search request removes its outbox rows`() {
+    fun `delete search request retains its outbox rows (soft delete, no cascading removal)`() {
         val session = registerAndLogin()
         val userId = userRepository.findByEmail("user@test.com")!!.id!!
         val request = seedRequest(userId)
@@ -484,6 +523,6 @@ class SearchRequestsIntegrationTest : IntegrationTestBase() {
 
         assertThat(doDelete("/api/search-requests/${request.id}", session).response.status).isEqualTo(204)
 
-        assertThat(notificationOutboxRepository.findById(outboxRow.id!!)).isEmpty()
+        assertThat(notificationOutboxRepository.findById(outboxRow.id!!)).isPresent
     }
 }
