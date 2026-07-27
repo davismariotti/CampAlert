@@ -16,7 +16,8 @@ function AuthDisplay() {
             email: 'a@b.com',
             timezone: 'America/Los_Angeles',
             verificationStatus: 'VERIFIED',
-            pushoverOverrideEnabled: false
+            pushoverOverrideEnabled: false,
+            permissions: []
           })
         }
       >

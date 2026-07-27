@@ -5,6 +5,7 @@ import type { AxiosError } from 'axios'
 import { AuthProvider } from './features/auth/AuthContext'
 import { useAuth } from './features/auth/useAuth'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { AdminRoute } from './components/AdminRoute'
 import { Nav } from './components/Nav'
 import { RegisterPage } from './features/auth/RegisterPage'
 import { VerifyEmailPage } from './features/auth/VerifyEmailPage'
@@ -14,6 +15,9 @@ import { LandingPage } from './pages/LandingPage'
 import { RequestsPage } from './features/requests/RequestsPage'
 import { PhoneNumbersPage } from './features/phones/PhoneNumbersPage'
 import { AccountSettingsPage } from './features/account/AccountSettingsPage'
+import { AdminHomePage } from './features/admin/AdminHomePage'
+import { AdminUsersPage } from './features/admin/AdminUsersPage'
+import { AdminUserDetailPage } from './features/admin/AdminUserDetailPage'
 import { TermsPage } from './pages/TermsPage'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { getMe } from './api/generated/sdk.gen'
@@ -101,6 +105,30 @@ function AuthGate() {
             <ProtectedRoute>
               <AccountSettingsPage />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminHomePage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <AdminRoute>
+              <AdminUsersPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/users/:id"
+          element={
+            <AdminRoute>
+              <AdminUserDetailPage />
+            </AdminRoute>
           }
         />
         <Route path="/terms" element={<TermsPage />} />
