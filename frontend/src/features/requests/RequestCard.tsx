@@ -1,7 +1,12 @@
 import { useRef, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { deleteSearchRequest, deletePermitSearchRequest } from '../../api/generated/sdk.gen'
+import {
+  deleteSearchRequest,
+  deletePermitSearchRequest,
+  adminDeleteUserSearchRequest,
+  adminDeleteUserPermitSearchRequest
+} from '../../api/generated/sdk.gen'
 import { Button } from '../../components/ui/Button'
 import { RequestEditModal } from './RequestEditModal'
 import { PermitRequestEditModal } from '../permit/PermitRequestEditModal'
@@ -18,6 +23,10 @@ type AnyRequest = SearchRequestResponse | PermitSearchRequestResponse
 
 interface Props {
   request: AnyRequest
+  /** When set, this card manages another user's request via the admin API instead of the caller's own. */
+  userId?: number
+  /** Deleted requests are shown for history but can't be edited/deleted/paused-around. */
+  readOnly?: boolean
 }
 
 function isPermitRequest(request: AnyRequest): request is PermitSearchRequestResponse {
@@ -173,7 +182,7 @@ function StatsModal({
   )
 }
 
-export function RequestCard({ request }: Props) {
+export function RequestCard({ request, userId, readOnly }: Props) {
   const [showEdit, setShowEdit] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [showStats, setShowStats] = useState(false)
@@ -189,15 +198,23 @@ export function RequestCard({ request }: Props) {
   const deleteMutation = useApiMutation({
     mutationFn: async () => {
       if (isPermit) {
-        const result = await deletePermitSearchRequest({ path: { id: request.id } })
+        const result = userId
+          ? await adminDeleteUserPermitSearchRequest({ path: { id: userId, requestId: request.id } })
+          : await deletePermitSearchRequest({ path: { id: request.id } })
         if (result.error) throw result
       } else {
-        const result = await deleteSearchRequest({ path: { id: request.id } })
+        const result = userId
+          ? await adminDeleteUserSearchRequest({ path: { id: userId, requestId: request.id } })
+          : await deleteSearchRequest({ path: { id: request.id } })
         if (result.error) throw result
       }
     },
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: isPermit ? ['permit-search-requests'] : ['search-requests'] }),
+      queryClient.invalidateQueries({
+        queryKey: userId
+          ? [isPermit ? 'admin-user-permit-search-requests' : 'admin-user-search-requests', userId]
+          : [isPermit ? 'permit-search-requests' : 'search-requests']
+      }),
     errorMessage: 'Failed to delete alert. Please try again.'
   })
 
@@ -257,7 +274,7 @@ export function RequestCard({ request }: Props) {
             >
               Stats
             </button>
-            <OverflowMenu onEdit={() => setShowEdit(true)} onDelete={() => setShowConfirm(true)} />
+            {!readOnly && <OverflowMenu onEdit={() => setShowEdit(true)} onDelete={() => setShowConfirm(true)} />}
           </div>
         </div>
 
@@ -325,22 +342,31 @@ export function RequestCard({ request }: Props) {
         )}
 
         {/* Pause warning */}
-        {request.pauseReason === 'NO_VERIFIED_PHONE' && (
-          <p className="mt-2 text-xs text-amber-700">
-            Paused — no verified phone.{' '}
-            <Link to="/phone-numbers" className="font-medium underline hover:text-amber-900">
-              Add one
-            </Link>{' '}
-            to resume.
-          </p>
+        {request.pauseReason === 'NO_VERIFIED_PHONE' &&
+          (userId ? (
+            <p className="mt-2 text-xs text-amber-700">Paused — no verified phone.</p>
+          ) : (
+            <p className="mt-2 text-xs text-amber-700">
+              Paused — no verified phone.{' '}
+              <Link to="/phone-numbers" className="font-medium underline hover:text-amber-900">
+                Add one
+              </Link>{' '}
+              to resume.
+            </p>
+          ))}
+        {request.pauseReason === 'QUOTA_EXCEEDED' && (
+          <p className="mt-2 text-xs text-amber-700">Paused — over your active alert limit.</p>
+        )}
+        {request.pauseReason === 'PROVIDER_DISABLED' && (
+          <p className="mt-2 text-xs text-amber-700">Paused — not available on your current plan.</p>
         )}
       </div>
 
       {showEdit &&
         (isPermit ? (
-          <PermitRequestEditModal request={request} onClose={() => setShowEdit(false)} />
+          <PermitRequestEditModal request={request} onClose={() => setShowEdit(false)} userId={userId} />
         ) : (
-          <RequestEditModal request={request} onClose={() => setShowEdit(false)} />
+          <RequestEditModal request={request} onClose={() => setShowEdit(false)} userId={userId} />
         ))}
 
       {showStats && <StatsModal request={request} stats={request.stats} onClose={() => setShowStats(false)} />}

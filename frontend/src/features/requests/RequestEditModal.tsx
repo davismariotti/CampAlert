@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getCampground, updateSearchRequest } from '../../api/generated/sdk.gen'
+import { getCampground, updateSearchRequest, adminUpdateUserSearchRequest } from '../../api/generated/sdk.gen'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -15,9 +15,11 @@ import { validateDateWindow, type DateMode } from '../../utils/dateWindow'
 interface Props {
   request: SearchRequestResponse
   onClose: () => void
+  /** When set, edits go through the admin API against this user's request instead of the caller's own. */
+  userId?: number
 }
 
-export function RequestEditModal({ request, onClose }: Props) {
+export function RequestEditModal({ request, onClose, userId }: Props) {
   const queryClient = useQueryClient()
   const [name, setName] = useState(request.name)
   const [dateMode, setDateMode] = useState<DateMode>(request.latestStartDay ? 'flexible' : 'exact')
@@ -71,26 +73,26 @@ export function RequestEditModal({ request, onClose }: Props) {
 
   const mutation = useApiMutation({
     mutationFn: async () => {
-      const result = await updateSearchRequest({
-        path: { id: request.id },
-        body: {
-          name,
-          startDay,
-          nights,
-          groupSize,
-          campsiteId: request.campsiteId,
-          loops: loops ?? undefined,
-          siteIds: siteIds ?? undefined,
-          amenityIds: amenityIds ?? undefined,
-          completed,
-          latestStartDay: dateMode === 'flexible' ? latestStartDay : undefined
-        }
-      })
+      const body = {
+        name,
+        startDay,
+        nights,
+        groupSize,
+        campsiteId: request.campsiteId,
+        loops: loops ?? undefined,
+        siteIds: siteIds ?? undefined,
+        amenityIds: amenityIds ?? undefined,
+        completed,
+        latestStartDay: dateMode === 'flexible' ? latestStartDay : undefined
+      }
+      const result = userId
+        ? await adminUpdateUserSearchRequest({ path: { id: userId, requestId: request.id }, body })
+        : await updateSearchRequest({ path: { id: request.id }, body })
       if (result.error) throw result
       return result.data!
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['search-requests'] })
+      queryClient.invalidateQueries({ queryKey: userId ? ['admin-user-search-requests', userId] : ['search-requests'] })
       onClose()
     },
     onError: () => setError('Failed to update. Please try again.')

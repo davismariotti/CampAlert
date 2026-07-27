@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { updatePermitSearchRequest } from '../../api/generated/sdk.gen'
+import { updatePermitSearchRequest, adminUpdateUserPermitSearchRequest } from '../../api/generated/sdk.gen'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -21,9 +21,11 @@ function formatDate(dateStr: string) {
 interface Props {
   request: PermitSearchRequestResponse
   onClose: () => void
+  /** When set, edits go through the admin API against this user's request instead of the caller's own. */
+  userId?: number
 }
 
-export function PermitRequestEditModal({ request, onClose }: Props) {
+export function PermitRequestEditModal({ request, onClose, userId }: Props) {
   const queryClient = useQueryClient()
   const { data: permitDetail } = usePermit(request.permitId)
   const isZone = request.searchType === 'ZONE'
@@ -61,28 +63,30 @@ export function PermitRequestEditModal({ request, onClose }: Props) {
 
   const mutation = useApiMutation({
     mutationFn: async () => {
-      const result = await updatePermitSearchRequest({
-        path: { id: request.id },
-        body: {
-          name,
-          permitId: request.permitId,
-          permitName: request.permitName,
-          groupSize,
-          searchType: request.searchType,
-          // Zone/trailhead quota is only consumed on the first night — startDay/endDay model a
-          // flexibility window, but date-range flexibility isn't built yet, so both are set to the
-          // same night.
-          zoneTarget: isZone ? { divisionIds, startDay: night, endDay: night } : undefined,
-          trailheadTarget: isTrailhead ? { divisionIds, startDay: night, endDay: night } : undefined,
-          itineraryTarget: !usesDivisionPicker ? { legs } : undefined,
-          completed
-        }
-      })
+      const body = {
+        name,
+        permitId: request.permitId,
+        permitName: request.permitName,
+        groupSize,
+        searchType: request.searchType,
+        // Zone/trailhead quota is only consumed on the first night — startDay/endDay model a
+        // flexibility window, but date-range flexibility isn't built yet, so both are set to the
+        // same night.
+        zoneTarget: isZone ? { divisionIds, startDay: night, endDay: night } : undefined,
+        trailheadTarget: isTrailhead ? { divisionIds, startDay: night, endDay: night } : undefined,
+        itineraryTarget: !usesDivisionPicker ? { legs } : undefined,
+        completed
+      }
+      const result = userId
+        ? await adminUpdateUserPermitSearchRequest({ path: { id: userId, requestId: request.id }, body })
+        : await updatePermitSearchRequest({ path: { id: request.id }, body })
       if (result.error) throw result
       return result.data!
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['permit-search-requests'] })
+      queryClient.invalidateQueries({
+        queryKey: userId ? ['admin-user-permit-search-requests', userId] : ['permit-search-requests']
+      })
       onClose()
     },
     onError: () => setError('Failed to update. Please try again.')
