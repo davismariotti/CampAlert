@@ -5,7 +5,7 @@ import { listSearchRequests, listPermitSearchRequests, listPhoneNumbers } from '
 import { RequestCard } from './RequestCard'
 import { AddAlertModal } from './AddAlertModal'
 
-type Filter = 'watching' | 'done'
+type Filter = 'watching' | 'done' | 'deleted'
 
 function SkeletonCard() {
   return (
@@ -21,7 +21,8 @@ export function RequestsPage() {
   const [filter, setFilter] = useState<Filter>('watching')
   const [showAddModal, setShowAddModal] = useState(false)
 
-  const completed = filter === 'done'
+  const deleted = filter === 'deleted'
+  const completed = deleted ? undefined : filter === 'done'
 
   const {
     data: campgroundRequests,
@@ -30,7 +31,7 @@ export function RequestsPage() {
     refetch: refetchCampgrounds
   } = useQuery({
     queryKey: ['search-requests', filter],
-    queryFn: () => listSearchRequests({ query: { completed } }).then((r) => r.data ?? [])
+    queryFn: () => listSearchRequests({ query: { completed, deleted } }).then((r) => r.data ?? [])
   })
 
   const {
@@ -40,7 +41,7 @@ export function RequestsPage() {
     refetch: refetchPermits
   } = useQuery({
     queryKey: ['permit-search-requests', filter],
-    queryFn: () => listPermitSearchRequests({ query: { completed } }).then((r) => r.data ?? [])
+    queryFn: () => listPermitSearchRequests({ query: { completed, deleted } }).then((r) => r.data ?? [])
   })
 
   const { data: phones } = useQuery({
@@ -64,7 +65,8 @@ export function RequestsPage() {
 
   const tabs: { key: Filter; label: string }[] = [
     { key: 'watching', label: 'Watching' },
-    { key: 'done', label: 'History' }
+    { key: 'done', label: 'History' },
+    { key: 'deleted', label: 'Deleted' }
   ]
 
   return (
@@ -137,7 +139,11 @@ export function RequestsPage() {
         </div>
       )}
 
-      {!isLoading && !isError && all.length === 0 && (
+      {!isLoading && !isError && all.length === 0 && deleted && (
+        <p className="text-center text-forest-600">No deleted alerts.</p>
+      )}
+
+      {!isLoading && !isError && all.length === 0 && !deleted && (
         <div className="text-center">
           <p className="text-forest-600">No alerts here yet.</p>
           <button
@@ -153,10 +159,10 @@ export function RequestsPage() {
       {!isLoading && !isError && all.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {(campgroundRequests ?? []).map((request) => (
-            <RequestCard key={`campground-${request.id}`} request={request} />
+            <RequestCard key={`campground-${request.id}`} request={request} readOnly={deleted} />
           ))}
           {(permitRequests ?? []).map((request) => (
-            <RequestCard key={`permit-${request.id}`} request={request} />
+            <RequestCard key={`permit-${request.id}`} request={request} readOnly={deleted} />
           ))}
         </div>
       )}
