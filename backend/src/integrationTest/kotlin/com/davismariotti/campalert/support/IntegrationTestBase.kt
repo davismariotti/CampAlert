@@ -7,6 +7,7 @@ import com.davismariotti.campalert.provider.camplife.CampLifeApi
 import com.davismariotti.campalert.provider.recreation.RecreationApi
 import com.davismariotti.campalert.provider.recreation.RidbApi
 import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaApi
+import com.davismariotti.campalert.security.GroupSeeder
 import com.davismariotti.campalert.service.sms.TwilioVerifyService
 import com.davismariotti.campalert.service.turnstile.SiteverifyResponse
 import com.davismariotti.campalert.service.turnstile.TurnstileApi
@@ -22,6 +23,7 @@ import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.DefaultApplicationArguments
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.data.redis.connection.RedisConnectionFactory
@@ -125,7 +127,7 @@ open class IntegrationTestBase {
     protected lateinit var mockMvc: MockMvc
 
     @Autowired
-    private lateinit var jdbcTemplate: JdbcTemplate
+    protected lateinit var jdbcTemplate: JdbcTemplate
 
     @Autowired
     private lateinit var redisConnectionFactory: RedisConnectionFactory
@@ -135,6 +137,9 @@ open class IntegrationTestBase {
 
     @Autowired
     protected lateinit var mapper: ObjectMapper
+
+    @Autowired
+    private lateinit var groupSeeder: GroupSeeder
 
     /** All params maps passed to templateRenderer.render() during this test, in the order rendered. */
     protected val sentEmailVarsList = CopyOnWriteArrayList<Map<String, Any>>()
@@ -148,8 +153,14 @@ open class IntegrationTestBase {
             "TRUNCATE TABLE notification_outbox, search_request_state, reserve_california_unit_occupancy, search_requests, " +
                 "permit_search_request_state, permit_zone_target, permit_itinerary_target, permit_trailhead_target, " +
                 "permit_search_requests, persistent_logins, phone_numbers, email_verifications, password_resets, " +
-                "users, shedlock, poll_target_state CASCADE"
+                "users, shedlock, poll_target_state, groups, global_quota_defaults, global_provider_quota_defaults, " +
+                "global_provider_access CASCADE"
         )
+        // groups/global_* aren't tied to users by FK, so they survive a plain "users CASCADE" truncate
+        // and any admin-test mutation to them (e.g. changing the global quota default) would otherwise
+        // leak into every later test in the run. GroupSeeder is idempotent, so re-running it here
+        // restores Standard/Admin plus the seeded global defaults from a clean slate every time.
+        groupSeeder.run(DefaultApplicationArguments())
         redisConnectionFactory.connection.use { it.serverCommands().flushAll() }
         listOf("ridb", "recreation-gov", "twilio").forEach { name ->
             circuitBreakerRegistry.circuitBreaker(name).reset()
@@ -193,13 +204,13 @@ open class IntegrationTestBase {
         return mockMvc.perform(req).andReturn()
     }
 
-    protected fun doPut(path: String, session: Cookie? = null, body: Any): MvcResult {
+    protected fun doPut(path: String, session: Cookie? = null, body: Any? = null): MvcResult {
         val csrf = getCsrfToken()
         var req = put(path)
             .cookie(Cookie("XSRF-TOKEN", csrf))
             .header("X-XSRF-TOKEN", csrf)
             .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(body))
+        if (body != null) req = req.content(mapper.writeValueAsString(body))
         if (session != null) req = req.cookie(session)
         return mockMvc.perform(req).andReturn()
     }
@@ -292,6 +303,24 @@ open class IntegrationTestBase {
     protected fun registerAndLogin(email: String = "user@test.com", password: String = "password1"): Cookie {
         val verificationId = registerOnly(email, password)
         verifyLatestEmail(verificationId)
+        val result = doPost("/api/auth/login", body = LoginBody(email = email, password = password))
+        return result.response.getCookie("SESSION") ?: error("SESSION cookie not found after login for $email")
+    }
+
+    /** Adds the user to the pre-seeded "Admin" group (design.md Appendix's manual grant step). */
+    protected fun promoteToAdmin(email: String) {
+        jdbcTemplate.update(
+            "INSERT INTO group_members (user_id, group_id) " +
+                "SELECT u.id, g.id FROM users u, groups g WHERE u.email = ? AND g.group_name = 'Admin'",
+            email,
+        )
+    }
+
+    /** Registers, verifies, grants Admin group membership, then logs in so the session picks up admin authorities. */
+    protected fun registerAndLoginAsAdmin(email: String = "admin@test.com", password: String = "password1"): Cookie {
+        val verificationId = registerOnly(email, password)
+        verifyLatestEmail(verificationId)
+        promoteToAdmin(email)
         val result = doPost("/api/auth/login", body = LoginBody(email = email, password = password))
         return result.response.getCookie("SESSION") ?: error("SESSION cookie not found after login for $email")
     }
