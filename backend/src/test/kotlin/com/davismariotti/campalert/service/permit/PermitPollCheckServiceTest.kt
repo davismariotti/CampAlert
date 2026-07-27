@@ -8,6 +8,7 @@ import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.repository.PermitSearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
+import com.davismariotti.campalert.service.ResourceReconciliationService
 import com.davismariotti.campalert.service.scheduling.UserAvailabilityProcessedEvent
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
@@ -32,6 +33,7 @@ class PermitPollCheckServiceTest {
     private val registry = PermitAvailabilityProviderRegistry(listOf(permitAvailabilityMatcher))
     private val permitAvailabilityStateService = mock(PermitAvailabilityStateService::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
+    private val resourceReconciliationService = mock(ResourceReconciliationService::class.java)
 
     private val service = PermitPollCheckService(
         permitSearchRequestRepository,
@@ -39,6 +41,7 @@ class PermitPollCheckServiceTest {
         registry,
         permitAvailabilityStateService,
         eventPublisher,
+        resourceReconciliationService,
     )
 
     private val permitId = "233261"

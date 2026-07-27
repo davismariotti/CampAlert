@@ -5,6 +5,7 @@ import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.repository.PermitSearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
+import com.davismariotti.campalert.service.ResourceReconciliationService
 import com.davismariotti.campalert.service.scheduling.UserAvailabilityProcessedEvent
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
@@ -26,12 +27,25 @@ class PermitPollCheckService(
     private val permitAvailabilityProviderRegistry: PermitAvailabilityProviderRegistry,
     private val permitAvailabilityStateService: PermitAvailabilityStateService,
     private val eventPublisher: ApplicationEventPublisher,
+    private val resourceReconciliationService: ResourceReconciliationService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     /** Returns the number of active requests evaluated this cycle (for instrumentation). */
     fun check(provider: Provider, permitId: String): Int {
         val permitAvailabilityMatcher = permitAvailabilityProviderRegistry.forProvider(provider)
+        val preliminary = permitSearchRequestRepository.findByPermitIdAndProviderAndCompletedFalse(permitId, provider)
+        if (preliminary.isEmpty()) return 0
+
+        // Poll-cycle guard (design D4): see CampgroundPollCheckService for rationale.
+        preliminary.mapNotNull { it.userId }.distinct().forEach { uid ->
+            try {
+                resourceReconciliationService.reconcileUser(uid)
+            } catch (e: Exception) {
+                log.error("Error reconciling resource limits for userId={}", uid, e)
+            }
+        }
+
         val allRequests = permitSearchRequestRepository.findByPermitIdAndProviderAndCompletedFalse(permitId, provider)
         if (allRequests.isEmpty()) return 0
 
