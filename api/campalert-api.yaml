@@ -1825,6 +1825,7 @@ components:
         - timezone
         - verificationStatus
         - pushoverOverrideEnabled
+        - permissions
       properties:
         id:
           type: integer
@@ -1843,6 +1844,10 @@ components:
           nullable: true
         pushoverOverrideEnabled:
           type: boolean
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Permission'
 
     RegisterResponse:
       type: object
@@ -2293,6 +2298,24 @@ components:
     ProviderType:
       type: string
       enum: [RECREATION_GOV, CAMPLIFE, RESERVE_CALIFORNIA]
+
+    Permission:
+      type: string
+      description: Granular granted-authority values (see the backend Permission enum). Admins have the admin-only values in addition to the ordinary ones.
+      enum:
+        - VIEW_PROFILE
+        - EDIT_PROFILE
+        - VIEW_SEARCH_REQUESTS
+        - MANAGE_SEARCH_REQUESTS
+        - VIEW_PHONE_NUMBERS
+        - MANAGE_PHONE_NUMBERS
+        - VIEW_CAMPGROUNDS
+        - VIEW_PERMITS
+        - VIEW_ADMIN_DASHBOARD
+        - MANAGE_USERS
+        - MANAGE_GLOBAL_SETTINGS
+        - VIEW_AUDIT_LOG
+        - MANAGE_USER_SEARCH_REQUESTS
 
     Provider:
       type: object

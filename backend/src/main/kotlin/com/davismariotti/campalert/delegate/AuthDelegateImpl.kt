@@ -5,6 +5,7 @@ import com.davismariotti.campalert.api.model.AuthResponse
 import com.davismariotti.campalert.api.model.ChangePasswordBody
 import com.davismariotti.campalert.api.model.ForgotPasswordBody
 import com.davismariotti.campalert.api.model.LoginBody
+import com.davismariotti.campalert.api.model.Permission
 import com.davismariotti.campalert.api.model.RegisterBody
 import com.davismariotti.campalert.api.model.RegisterResponse
 import com.davismariotti.campalert.api.model.ResendVerificationBody
@@ -113,7 +114,7 @@ class AuthDelegateImpl(
             rememberMeServices.loginSuccessForced(request, response, auth)
         }
 
-        return ResponseEntity.ok(user.toAuthResponse())
+        return ResponseEntity.ok(user.toAuthResponse(userDetails.authorities.mapNotNull { it.authority }))
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -129,7 +130,7 @@ class AuthDelegateImpl(
     override fun getMe(): ResponseEntity<AuthResponse> {
         val auth = SecurityContextHolder.getContext().authentication!!
         val user = userRepository.findByEmail(auth.name)!!
-        return ResponseEntity.ok(user.toAuthResponse())
+        return ResponseEntity.ok(user.toAuthResponse(auth.authorities.mapNotNull { it.authority }))
     }
 
     @PreAuthorize("hasAuthority('EDIT_PROFILE')")
@@ -148,7 +149,7 @@ class AuthDelegateImpl(
         }
 
         val updated = userRepository.save(merged)
-        return ResponseEntity.ok(updated.toAuthResponse())
+        return ResponseEntity.ok(updated.toAuthResponse(auth.authorities.mapNotNull { it.authority }))
     }
 
     override fun resendVerification(resendVerificationBody: ResendVerificationBody): ResponseEntity<Unit> {
@@ -164,7 +165,7 @@ class AuthDelegateImpl(
                 val user = outcome.user!!
                 val userDetails = userDetailsService.loadUserByUsername(user.email)
                 establishSession(userDetails)
-                ResponseEntity.ok(user.toAuthResponse())
+                ResponseEntity.ok(user.toAuthResponse(userDetails.authorities.mapNotNull { it.authority }))
             }
             VerifyResult.ATTEMPTS_EXCEEDED -> throw EmailVerificationException.AttemptsExceeded()
             VerifyResult.WRONG_CODE -> throw EmailVerificationException.CodeInvalid()
@@ -224,7 +225,7 @@ class AuthDelegateImpl(
             ResetResult.PASSWORD_SAME_AS_CURRENT -> throw PasswordResetException.SameAsCurrent()
         }
 
-    private fun UserEntity.toAuthResponse() =
+    private fun UserEntity.toAuthResponse(authorities: List<String>) =
         AuthResponse(
             id = id!!,
             email = email,
@@ -233,5 +234,6 @@ class AuthDelegateImpl(
             pushoverUserKey = pushoverUserKey,
             pushoverApiToken = pushoverApiToken,
             pushoverOverrideEnabled = pushoverOverrideEnabled,
+            permissions = authorities.mapNotNull { name -> runCatching { Permission.valueOf(name) }.getOrNull() },
         )
 }
