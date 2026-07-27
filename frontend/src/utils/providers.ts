@@ -1,4 +1,4 @@
-import type { Provider } from '../api/generated/types.gen'
+import type { Provider, ProviderType } from '../api/generated/types.gen'
 
 // No "list providers" endpoint exists — this mirrors the backend's Provider enum for UI purposes.
 export const ALL_PROVIDERS: Provider[] = [
@@ -14,3 +14,7 @@ export const ALL_PROVIDERS: Provider[] = [
 export const PERMIT_PROVIDERS: Provider[] = ALL_PROVIDERS.filter((p) => p.type === 'RECREATION_GOV')
 
 export const DEFAULT_PERMIT_PROVIDER: Provider = PERMIT_PROVIDERS[0]
+
+export function providerName(type: ProviderType): string {
+  return ALL_PROVIDERS.find((p) => p.type === type)?.name ?? type
+}
