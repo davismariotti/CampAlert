@@ -6,6 +6,7 @@ import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
+import com.davismariotti.campalert.service.ResourceReconciliationService
 import com.davismariotti.campalert.service.availability.AvailabilityResult
 import com.davismariotti.campalert.service.availability.CampgroundAvailabilityProvider
 import com.davismariotti.campalert.service.availability.CampgroundAvailabilityProviderRegistry
@@ -33,6 +34,7 @@ class CampgroundPollCheckServiceTest {
     private val registry = CampgroundAvailabilityProviderRegistry(listOf(availabilityProvider))
     private val availabilityStateService = mock(AvailabilityStateService::class.java)
     private val eventPublisher = mock(ApplicationEventPublisher::class.java)
+    private val resourceReconciliationService = mock(ResourceReconciliationService::class.java)
 
     private val service = CampgroundPollCheckService(
         searchRequestRepository,
@@ -40,6 +42,7 @@ class CampgroundPollCheckServiceTest {
         registry,
         availabilityStateService,
         eventPublisher,
+        resourceReconciliationService,
     )
 
     private val campsiteId = 233359

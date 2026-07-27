@@ -1,5 +1,6 @@
 package com.davismariotti.campalert.service
 
+import com.davismariotti.campalert.model.PauseReason
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
@@ -15,14 +16,14 @@ class PhoneNumberService(
         if (!hasVerified) {
             val active = searchRequestRepository.findActiveUnpausedByUserId(userId)
             active.forEach {
-                it.state.pauseReason = NO_PHONE
+                it.state.pauseReason = PauseReason.NO_VERIFIED_PHONE.name
                 searchRequestRepository.save(it)
             }
         }
     }
 
     fun resumeRequestsIfVerifiedPhone(userId: Long) {
-        val paused = searchRequestRepository.findByUserIdAndPauseReason(userId, NO_PHONE)
+        val paused = searchRequestRepository.findByUserIdAndPauseReason(userId, PauseReason.NO_VERIFIED_PHONE.name)
         paused.forEach {
             it.state.pauseReason = null
             searchRequestRepository.save(it)
@@ -34,9 +35,5 @@ class PhoneNumberService(
             .findByUserIdAndStatus(userId, PhoneNumberStatus.VERIFIED)
             .filter { it.id != keepId }
         phoneNumberRepository.deleteAll(previous)
-    }
-
-    companion object {
-        const val NO_PHONE = "NO_VERIFIED_PHONE"
     }
 }

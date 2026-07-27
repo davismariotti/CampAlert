@@ -4,6 +4,7 @@ import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
+import com.davismariotti.campalert.service.ResourceReconciliationService
 import com.davismariotti.campalert.service.availability.AvailabilityResult
 import com.davismariotti.campalert.service.availability.CampgroundAvailabilityProviderRegistry
 import com.davismariotti.campalert.service.state.AvailabilityStateService
@@ -28,12 +29,27 @@ class CampgroundPollCheckService(
     private val campgroundAvailabilityProviderRegistry: CampgroundAvailabilityProviderRegistry,
     private val availabilityStateService: AvailabilityStateService,
     private val eventPublisher: ApplicationEventPublisher,
+    private val resourceReconciliationService: ResourceReconciliationService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     /** Returns the number of active requests evaluated this cycle (for instrumentation). */
     fun check(provider: Provider, campsiteId: Int): Int {
         val availabilityProvider = campgroundAvailabilityProviderRegistry.forProvider(provider)
+        val preliminary = searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, provider)
+        if (preliminary.isEmpty()) return 0
+
+        // Poll-cycle guard (design D4): re-validate each distinct owner's quota/provider-access
+        // before treating their requests as active this cycle — the only reconciliation path for
+        // admin changes (e.g. a group/global default edit) that don't have a single per-user trigger.
+        preliminary.mapNotNull { it.userId }.distinct().forEach { uid ->
+            try {
+                resourceReconciliationService.reconcileUser(uid)
+            } catch (e: Exception) {
+                log.error("Error reconciling resource limits for userId={}", uid, e)
+            }
+        }
+
         val allRequests = searchRequestRepository.findByCampsiteIdAndProviderAndCompletedFalse(campsiteId, provider)
         if (allRequests.isEmpty()) return 0
 
