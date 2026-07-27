@@ -128,6 +128,58 @@ class ResourceReconciliationServiceTest {
     }
 
     @Test
+    fun `resumes only as many oldest requests as headroom allows, newest stays paused`() {
+        val oldest = request(1, Provider.RECREATION_GOV, ageMinutesAgo = 30, pauseReason = PauseReason.QUOTA_EXCEEDED.name)
+        val middle = request(2, Provider.RECREATION_GOV, ageMinutesAgo = 20, pauseReason = PauseReason.QUOTA_EXCEEDED.name)
+        val newest = request(3, Provider.RECREATION_GOV, ageMinutesAgo = 10, pauseReason = PauseReason.QUOTA_EXCEEDED.name)
+        `when`(searchRequestRepository.findActiveByUserId(userId)).thenReturn(listOf(oldest, middle, newest))
+        `when`(permitSearchRequestRepository.findActiveByUserId(userId)).thenReturn(emptyList())
+        allow(Provider.RECREATION_GOV)
+        providerLimit(Provider.RECREATION_GOV, null)
+        combinedLimit(2)
+
+        service.reconcileUser(userId)
+
+        assertNull(oldest.state.pauseReason)
+        assertNull(middle.state.pauseReason)
+        assertEquals(PauseReason.QUOTA_EXCEEDED.name, newest.state.pauseReason)
+    }
+
+    @Test
+    fun `provider-disabled takes precedence over quota-exceeded when both would apply`() {
+        val older = request(1, Provider.RESERVE_CALIFORNIA, ageMinutesAgo = 20)
+        val newer = request(2, Provider.RESERVE_CALIFORNIA, ageMinutesAgo = 10)
+        `when`(searchRequestRepository.findActiveByUserId(userId)).thenReturn(listOf(older, newer))
+        `when`(permitSearchRequestRepository.findActiveByUserId(userId)).thenReturn(emptyList())
+        // Provider disabled AND (hypothetically) over its per-provider quota - disabled must win for both,
+        // not just the newer one that quota-exceeded alone would have picked.
+        deny(Provider.RESERVE_CALIFORNIA)
+        providerLimit(Provider.RESERVE_CALIFORNIA, 1)
+        combinedLimit(5)
+
+        service.reconcileUser(userId)
+
+        assertEquals(PauseReason.PROVIDER_DISABLED.name, older.state.pauseReason)
+        assertEquals(PauseReason.PROVIDER_DISABLED.name, newer.state.pauseReason)
+    }
+
+    @Test
+    fun `a request paused for missing verified phone is excluded from quota competition among other requests`() {
+        val phonePaused = request(1, Provider.RECREATION_GOV, ageMinutesAgo = 30, pauseReason = PauseReason.NO_VERIFIED_PHONE.name)
+        val other = request(2, Provider.RECREATION_GOV, ageMinutesAgo = 10)
+        `when`(searchRequestRepository.findActiveByUserId(userId)).thenReturn(listOf(phonePaused, other))
+        `when`(permitSearchRequestRepository.findActiveByUserId(userId)).thenReturn(emptyList())
+        allow(Provider.RECREATION_GOV)
+        providerLimit(Provider.RECREATION_GOV, null)
+        combinedLimit(5)
+
+        service.reconcileUser(userId)
+
+        assertEquals(PauseReason.NO_VERIFIED_PHONE.name, phonePaused.state.pauseReason)
+        assertNull(other.state.pauseReason)
+    }
+
+    @Test
     fun `per-provider quota is enforced independently of combined headroom`() {
         val rc1 = request(1, Provider.RESERVE_CALIFORNIA, ageMinutesAgo = 20)
         val rc2 = request(2, Provider.RESERVE_CALIFORNIA, ageMinutesAgo = 10)
