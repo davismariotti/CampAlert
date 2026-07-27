@@ -12,6 +12,7 @@ CREATE TABLE "public"."users" (
   "pushover_override_enabled" boolean NOT NULL DEFAULT false,
   "timezone" character varying(64) NOT NULL DEFAULT 'America/Los_Angeles',
   "email_verified_at" timestamptz NULL,
+  "last_login_at" timestamptz NULL,
   PRIMARY KEY ("id"),
   UNIQUE ("email")
 );
@@ -31,6 +32,8 @@ CREATE TABLE "public"."search_requests" (
   "campground_timezone" character varying(64) NULL,
   "provider" character varying(32) NOT NULL DEFAULT 'RECREATION_GOV',
   "latest_start_day" date NULL,
+  "deleted_at" timestamptz NULL,
+  "created_at" timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY ("id"),
   -- atlas:renamed_from fk_search_requests_v2_user
   CONSTRAINT "fk_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
@@ -134,6 +137,8 @@ CREATE TABLE "public"."permit_search_requests" (
   "user_id" bigint NULL,
   "search_type" character varying(16) NOT NULL,
   "provider" character varying(32) NOT NULL DEFAULT 'RECREATION_GOV',
+  "deleted_at" timestamptz NULL,
+  "created_at" timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_permit_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
   CONSTRAINT "chk_permit_search_requests_search_type" CHECK (search_type IN ('ZONE', 'ITINERARY', 'TRAILHEAD')),
@@ -265,3 +270,116 @@ CREATE TABLE "public"."password_resets" (
   CONSTRAINT "fk_password_resets_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id")
 );
 CREATE INDEX ON "public"."password_resets" ("user_id", "consumed_at", "expires_at");
+-- Create "groups" table
+CREATE TABLE "public"."groups" (
+  "id" bigserial NOT NULL,
+  "group_name" character varying(64) NOT NULL,
+  PRIMARY KEY ("id"),
+  UNIQUE ("group_name")
+);
+-- Create "group_members" table
+CREATE TABLE "public"."group_members" (
+  "user_id" bigint NOT NULL,
+  "group_id" bigint NOT NULL,
+  PRIMARY KEY ("user_id", "group_id"),
+  CONSTRAINT "fk_group_members_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id") ON DELETE CASCADE,
+  CONSTRAINT "fk_group_members_group" FOREIGN KEY ("group_id") REFERENCES "public"."groups" ("id") ON DELETE CASCADE
+);
+CREATE INDEX ON "public"."group_members" ("group_id");
+-- Create "group_authorities" table
+CREATE TABLE "public"."group_authorities" (
+  "group_id" bigint NOT NULL,
+  "authority" character varying(64) NOT NULL,
+  PRIMARY KEY ("group_id", "authority"),
+  CONSTRAINT "fk_group_authorities_group" FOREIGN KEY ("group_id") REFERENCES "public"."groups" ("id") ON DELETE CASCADE
+);
+-- Create "group_quota_defaults" table
+-- Combined (total) active-search-request default for a group, one row per group that defines one.
+CREATE TABLE "public"."group_quota_defaults" (
+  "group_id" bigint NOT NULL,
+  "max_active" integer NOT NULL,
+  PRIMARY KEY ("group_id"),
+  CONSTRAINT "fk_group_quota_defaults_group" FOREIGN KEY ("group_id") REFERENCES "public"."groups" ("id") ON DELETE CASCADE
+);
+-- Create "group_provider_quota_defaults" table
+-- Per-provider active-search-request default for a group; absence of a row means uncapped at this level.
+CREATE TABLE "public"."group_provider_quota_defaults" (
+  "group_id" bigint NOT NULL,
+  "provider" character varying(32) NOT NULL,
+  "max_active" integer NOT NULL,
+  PRIMARY KEY ("group_id", "provider"),
+  CONSTRAINT "fk_group_provider_quota_defaults_group" FOREIGN KEY ("group_id") REFERENCES "public"."groups" ("id") ON DELETE CASCADE,
+  CONSTRAINT "chk_group_provider_quota_defaults_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
+);
+-- Create "group_provider_access" table
+CREATE TABLE "public"."group_provider_access" (
+  "group_id" bigint NOT NULL,
+  "provider" character varying(32) NOT NULL,
+  "enabled" boolean NOT NULL,
+  PRIMARY KEY ("group_id", "provider"),
+  CONSTRAINT "fk_group_provider_access_group" FOREIGN KEY ("group_id") REFERENCES "public"."groups" ("id") ON DELETE CASCADE,
+  CONSTRAINT "chk_group_provider_access_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
+);
+-- Create "global_quota_defaults" table
+-- Singleton row (id always 1) holding the combined active-search-request default used when no
+-- per-user override or group default applies.
+CREATE TABLE "public"."global_quota_defaults" (
+  "id" smallint NOT NULL DEFAULT 1,
+  "max_active" integer NOT NULL DEFAULT 5,
+  PRIMARY KEY ("id"),
+  CONSTRAINT "chk_global_quota_defaults_singleton" CHECK (id = 1)
+);
+-- Create "global_provider_quota_defaults" table
+-- Per-provider global default cap; absence of a row means uncapped at this level.
+CREATE TABLE "public"."global_provider_quota_defaults" (
+  "provider" character varying(32) NOT NULL,
+  "max_active" integer NOT NULL,
+  PRIMARY KEY ("provider"),
+  CONSTRAINT "chk_global_provider_quota_defaults_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
+);
+-- Create "global_provider_access" table
+CREATE TABLE "public"."global_provider_access" (
+  "provider" character varying(32) NOT NULL,
+  "enabled" boolean NOT NULL,
+  PRIMARY KEY ("provider"),
+  CONSTRAINT "chk_global_provider_access_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
+);
+-- Create "user_quota_overrides" table
+CREATE TABLE "public"."user_quota_overrides" (
+  "user_id" bigint NOT NULL,
+  "max_active" integer NOT NULL,
+  PRIMARY KEY ("user_id"),
+  CONSTRAINT "fk_user_quota_overrides_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id") ON DELETE CASCADE
+);
+-- Create "user_provider_quota_overrides" table
+CREATE TABLE "public"."user_provider_quota_overrides" (
+  "user_id" bigint NOT NULL,
+  "provider" character varying(32) NOT NULL,
+  "max_active" integer NOT NULL,
+  PRIMARY KEY ("user_id", "provider"),
+  CONSTRAINT "fk_user_provider_quota_overrides_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id") ON DELETE CASCADE,
+  CONSTRAINT "chk_user_provider_quota_overrides_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
+);
+-- Create "user_provider_access" table
+CREATE TABLE "public"."user_provider_access" (
+  "user_id" bigint NOT NULL,
+  "provider" character varying(32) NOT NULL,
+  "enabled" boolean NOT NULL,
+  PRIMARY KEY ("user_id", "provider"),
+  CONSTRAINT "fk_user_provider_access_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id") ON DELETE CASCADE,
+  CONSTRAINT "chk_user_provider_access_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
+);
+-- Create "admin_audit_log" table
+CREATE TABLE "public"."admin_audit_log" (
+  "id" bigserial NOT NULL,
+  "actor_user_id" bigint NOT NULL,
+  "target_user_id" bigint NULL,
+  "action" character varying(64) NOT NULL,
+  "detail" text NULL,
+  "created_at" timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY ("id"),
+  CONSTRAINT "fk_admin_audit_log_actor" FOREIGN KEY ("actor_user_id") REFERENCES "public"."users" ("id"),
+  CONSTRAINT "fk_admin_audit_log_target" FOREIGN KEY ("target_user_id") REFERENCES "public"."users" ("id")
+);
+CREATE INDEX ON "public"."admin_audit_log" ("target_user_id");
+CREATE INDEX ON "public"."admin_audit_log" ("created_at");
