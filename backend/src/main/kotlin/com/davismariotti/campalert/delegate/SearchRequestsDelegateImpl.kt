@@ -23,6 +23,8 @@ import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
+import com.davismariotti.campalert.service.ResourceReconciliationService
+import com.davismariotti.campalert.service.SearchRequestCreationGuard
 import com.davismariotti.campalert.service.TimezoneResolutionService
 import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
 import com.davismariotti.campalert.service.scheduling.ProviderSearchWindowProperties
@@ -33,6 +35,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -49,15 +52,25 @@ class SearchRequestsDelegateImpl(
     private val reserveCaliforniaOccupancyService: ReserveCaliforniaOccupancyService,
     private val providerSearchWindowProperties: ProviderSearchWindowProperties,
     private val turnstileService: TurnstileService,
+    private val searchRequestCreationGuard: SearchRequestCreationGuard,
+    private val resourceReconciliationService: ResourceReconciliationService,
 ) : SearchRequestsApiDelegate {
     private val log = LoggerFactory.getLogger(javaClass)
 
     private fun currentUserId(): Long = currentUserId(userRepository)
 
-    @PreAuthorize("isAuthenticated()")
-    override fun listSearchRequests(completed: Boolean?): ResponseEntity<List<SearchRequestResponse>> {
-        val userId = currentUserId()
-        val results = if (completed != null) {
+    @PreAuthorize("hasAuthority('VIEW_SEARCH_REQUESTS')")
+    override fun listSearchRequests(completed: Boolean?, deleted: Boolean): ResponseEntity<List<SearchRequestResponse>> = listSearchRequestsAs(currentUserId(), completed, deleted)
+
+    /** Shared with [com.davismariotti.campalert.delegate.AdminDelegateImpl] — see [updateSearchRequestAs]. */
+    fun listSearchRequestsAs(userId: Long, completed: Boolean?, deleted: Boolean): ResponseEntity<List<SearchRequestResponse>> {
+        val results = if (deleted) {
+            if (completed != null) {
+                searchRequestRepository.findDeletedByCompletedAndUserId(completed, userId)
+            } else {
+                searchRequestRepository.findDeletedByUserId(userId)
+            }
+        } else if (completed != null) {
             searchRequestRepository.findByCompletedAndUserId(completed, userId)
         } else {
             searchRequestRepository.findByUserId(userId)
@@ -88,7 +101,7 @@ class SearchRequestsDelegateImpl(
         )
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('MANAGE_SEARCH_REQUESTS')")
     override fun createSearchRequest(
         createSearchRequestBody: CreateSearchRequestBody,
     ): ResponseEntity<SearchRequestResponse> {
@@ -98,6 +111,7 @@ class SearchRequestsDelegateImpl(
             throw NoVerifiedPhoneException()
         }
         val provider = createSearchRequestBody.provider?.type?.toModel() ?: Provider.RECREATION_GOV
+        searchRequestCreationGuard.checkCanCreate(userId, provider)
         validateLatestStartDay(createSearchRequestBody.startDay, createSearchRequestBody.latestStartDay, provider)
         val entity = SearchRequest(
             startDay = createSearchRequestBody.startDay,
@@ -122,27 +136,37 @@ class SearchRequestsDelegateImpl(
         return ResponseEntity.status(201).body(savedRequest.toResponse(fetchStats(savedRequest)))
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('VIEW_SEARCH_REQUESTS')")
     override fun getSearchRequest(id: Long): ResponseEntity<SearchRequestResponse> {
         val userId = currentUserId()
         val entity = searchRequestRepository
             .findById(id)
             .orElse(null)
-            ?.takeIf { it.userId == userId }
+            ?.takeIf { it.userId == userId && it.deletedAt == null }
             ?: throw NotFoundException("Search request not found")
         return ResponseEntity.ok(entity.toResponse(fetchStats(entity)))
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('MANAGE_SEARCH_REQUESTS')")
     override fun updateSearchRequest(
         id: Long,
         updateSearchRequestBody: UpdateSearchRequestBody,
+    ): ResponseEntity<SearchRequestResponse> = updateSearchRequestAs(currentUserId(), id, updateSearchRequestBody)
+
+    /**
+     * Shared with [com.davismariotti.campalert.delegate.AdminDelegateImpl] (D7: an admin can do
+     * anything to a user's search requests that the user themself can do, via the same code path,
+     * parameterized by an explicit target [userId] instead of the caller's own).
+     */
+    fun updateSearchRequestAs(
+        userId: Long,
+        id: Long,
+        updateSearchRequestBody: UpdateSearchRequestBody,
     ): ResponseEntity<SearchRequestResponse> {
-        val userId = currentUserId()
         val existing = searchRequestRepository
             .findById(id)
             .orElse(null)
-            ?.takeIf { it.userId == userId }
+            ?.takeIf { it.userId == userId && it.deletedAt == null }
             ?: throw NotFoundException("Search request not found")
         val provider = updateSearchRequestBody.provider?.type?.toModel() ?: existing.provider
         validateLatestStartDay(updateSearchRequestBody.startDay, updateSearchRequestBody.latestStartDay, provider)
@@ -171,17 +195,35 @@ class SearchRequestsDelegateImpl(
     }
 
     @Transactional
-    @PreAuthorize("isAuthenticated()")
-    override fun deleteSearchRequest(id: Long): ResponseEntity<Unit> {
-        val userId = currentUserId()
-        searchRequestRepository
+    @PreAuthorize("hasAuthority('MANAGE_SEARCH_REQUESTS')")
+    override fun deleteSearchRequest(id: Long): ResponseEntity<Unit> = deleteSearchRequestAs(currentUserId(), id)
+
+    /** Shared with [com.davismariotti.campalert.delegate.AdminDelegateImpl] — see [updateSearchRequestAs]. */
+    @Transactional
+    fun deleteSearchRequestAs(userId: Long, id: Long): ResponseEntity<Unit> {
+        val existing = searchRequestRepository
             .findById(id)
             .orElse(null)
-            ?.takeIf { it.userId == userId }
+            ?.takeIf { it.userId == userId && it.deletedAt == null }
             ?: throw NotFoundException("Search request not found")
-        notificationOutboxRepository.deleteByRequestTypeAndRequestId(RequestType.CAMPGROUND, id)
-        searchRequestRepository.deleteById(id)
+        softDelete(existing)
+        resourceReconciliationService.reconcileUser(userId)
         return ResponseEntity.noContent().build()
+    }
+
+    /**
+     * Soft-deletes [existing] in place: sets `deletedAt` instead of removing the row, so history
+     * (including notification_outbox) is retained per specs/soft-delete-search-requests.md.
+     * `state`/`*Details` are body properties excluded from `copy()` — transferred before saving so
+     * orphanRemoval doesn't delete-then-reinsert them on the same PK (same pattern as updateSearchRequest).
+     */
+    private fun softDelete(existing: SearchRequest) {
+        val updated = existing.copy(deletedAt = Instant.now())
+        updated.state = existing.state
+        updated.recreationGovDetails = existing.recreationGovDetails
+        updated.campLifeDetails = existing.campLifeDetails
+        updated.reserveCaliforniaDetails = existing.reserveCaliforniaDetails
+        searchRequestRepository.save(updated)
     }
 
     /**

@@ -16,6 +16,7 @@ import com.davismariotti.campalert.provider.recreation.PermitDivisionType
 import com.davismariotti.campalert.provider.recreation.PermitMappingPayload
 import com.davismariotti.campalert.provider.recreation.PermitMappingResponse
 import com.davismariotti.campalert.provider.recreation.PermitRuleContent
+import com.davismariotti.campalert.repository.PermitSearchRequestRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.support.IntegrationTestBase
@@ -37,6 +38,9 @@ class PermitSearchRequestsIntegrationTest : IntegrationTestBase() {
 
     @Autowired
     private lateinit var phoneNumberRepository: PhoneNumberRepository
+
+    @Autowired
+    private lateinit var permitSearchRequestRepository: PermitSearchRequestRepository
 
     // --- helpers ---
 
@@ -378,6 +382,34 @@ class PermitSearchRequestsIntegrationTest : IntegrationTestBase() {
                 .andReturn()
                 .response.status
         ).isEqualTo(404)
+    }
+
+    @Test
+    fun `delete permit search request soft-deletes the row and it appears only in the deleted list`() {
+        val session = registerAndLogin()
+        seedVerifiedPhone(userRepository.findByEmail("user@test.com")!!.id!!)
+        stubZonePermit("233261")
+        val created = createRequest(session, zoneCreateBody)
+        val id = extractId(created)
+
+        assertThat(doDelete("/api/permit-search-requests/$id", session).response.status).isEqualTo(204)
+
+        val stored = permitSearchRequestRepository.findById(id).orElse(null)
+        assertThat(stored).isNotNull
+        assertThat(stored.deletedAt).isNotNull
+
+        assertThat(
+            mockMvc
+                .perform(get("/api/permit-search-requests").cookie(session))
+                .andReturn()
+                .response.contentAsString
+        ).doesNotContain("\"id\":$id")
+        assertThat(
+            mockMvc
+                .perform(get("/api/permit-search-requests?deleted=true").cookie(session))
+                .andReturn()
+                .response.contentAsString
+        ).contains("\"id\":$id")
     }
 
     // --- TRAILHEAD lifecycle ---

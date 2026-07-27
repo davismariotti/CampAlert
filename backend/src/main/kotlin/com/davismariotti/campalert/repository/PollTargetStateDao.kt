@@ -78,6 +78,7 @@ class PollTargetStateDao(
                     AND sr.user_id IS NOT NULL
                     AND srs.completed = false
                     AND srs.pause_reason IS NULL
+                    AND sr.deleted_at IS NULL
               ))
               OR
               (p.target_type = 'PERMIT' AND EXISTS (
@@ -88,6 +89,7 @@ class PollTargetStateDao(
                     AND psr.user_id IS NOT NULL
                     AND psrs.completed = false
                     AND psrs.pause_reason IS NULL
+                    AND psr.deleted_at IS NULL
               ))
             )
             """.trimIndent()

@@ -15,6 +15,8 @@ import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.repository.UserRepository
+import com.davismariotti.campalert.service.ResourceReconciliationService
+import com.davismariotti.campalert.service.SearchRequestCreationGuard
 import com.davismariotti.campalert.service.TimezoneResolutionService
 import com.davismariotti.campalert.service.scheduling.PollTargetRegistrationService
 import com.davismariotti.campalert.service.scheduling.ProviderSearchWindowProperties
@@ -51,6 +53,8 @@ class SearchRequestsDelegateImplTest {
         `when`(it.maxRangeWidthDaysFor(Provider.CAMPLIFE)).thenReturn(9)
     }
     private val turnstileService = mock(TurnstileService::class.java)
+    private val searchRequestCreationGuard = mock(SearchRequestCreationGuard::class.java)
+    private val resourceReconciliationService = mock(ResourceReconciliationService::class.java)
 
     private val delegate = SearchRequestsDelegateImpl(
         searchRequestRepository,
@@ -64,6 +68,8 @@ class SearchRequestsDelegateImplTest {
         reserveCaliforniaOccupancyService,
         providerSearchWindowProperties,
         turnstileService,
+        searchRequestCreationGuard,
+        resourceReconciliationService,
     )
 
     private val user = User(id = 1L, email = "user@example.com", passwordHash = "hash")

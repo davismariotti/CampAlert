@@ -46,6 +46,14 @@ data class PermitSearchRequest(
     @Enumerated(EnumType.STRING)
     @Column(name = "provider")
     val provider: Provider = Provider.RECREATION_GOV,
+
+    /** Soft-delete marker; non-null means the request is deleted and excluded from active/quota/poll queries but retained for the owner's Deleted view. */
+    @Column(name = "deleted_at")
+    val deletedAt: Instant? = null,
+
+    /** Drives pause-newest-first/resume-oldest-first ordering when reconciling against a user's quota. */
+    @Column(name = "created_at")
+    val createdAt: Instant = Instant.now(),
 ) : AlertableRequest {
     // Body properties: excluded from equals/hashCode/copy/toString to prevent circular reference.
     @OneToOne(mappedBy = "permitSearchRequest", cascade = [CascadeType.ALL], fetch = FetchType.EAGER, orphanRemoval = true)

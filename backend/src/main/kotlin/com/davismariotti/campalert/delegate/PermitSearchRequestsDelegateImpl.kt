@@ -27,6 +27,8 @@ import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PermitSearchRequestRepository
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.UserRepository
+import com.davismariotti.campalert.service.ResourceReconciliationService
+import com.davismariotti.campalert.service.SearchRequestCreationGuard
 import com.davismariotti.campalert.service.permit.IllegalLegSequenceException
 import com.davismariotti.campalert.service.permit.ItineraryLegValidator
 import com.davismariotti.campalert.service.permit.LegValidationResult
@@ -41,6 +43,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 
 @Service
 class PermitSearchRequestsDelegateImpl(
@@ -52,15 +55,25 @@ class PermitSearchRequestsDelegateImpl(
     private val permitContentCache: PermitContentCache,
     private val pollTargetRegistrationService: PollTargetRegistrationService,
     private val turnstileService: TurnstileService,
+    private val searchRequestCreationGuard: SearchRequestCreationGuard,
+    private val resourceReconciliationService: ResourceReconciliationService,
 ) : PermitSearchRequestsApiDelegate {
     private val log = LoggerFactory.getLogger(javaClass)
 
     private fun currentUserId(): Long = currentUserId(userRepository)
 
-    @PreAuthorize("isAuthenticated()")
-    override fun listPermitSearchRequests(completed: Boolean?): ResponseEntity<List<PermitSearchRequestResponse>> {
-        val userId = currentUserId()
-        val results = if (completed != null) {
+    @PreAuthorize("hasAuthority('VIEW_SEARCH_REQUESTS')")
+    override fun listPermitSearchRequests(completed: Boolean?, deleted: Boolean): ResponseEntity<List<PermitSearchRequestResponse>> = listPermitSearchRequestsAs(currentUserId(), completed, deleted)
+
+    /** Shared with [com.davismariotti.campalert.delegate.AdminDelegateImpl] — see [SearchRequestsDelegateImpl.updateSearchRequestAs]. */
+    fun listPermitSearchRequestsAs(userId: Long, completed: Boolean?, deleted: Boolean): ResponseEntity<List<PermitSearchRequestResponse>> {
+        val results = if (deleted) {
+            if (completed != null) {
+                permitSearchRequestRepository.findDeletedByCompletedAndUserId(completed, userId)
+            } else {
+                permitSearchRequestRepository.findDeletedByUserId(userId)
+            }
+        } else if (completed != null) {
             permitSearchRequestRepository.findByCompletedAndUserId(completed, userId)
         } else {
             permitSearchRequestRepository.findByUserId(userId)
@@ -69,7 +82,7 @@ class PermitSearchRequestsDelegateImpl(
     }
 
     @Transactional
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('MANAGE_SEARCH_REQUESTS')")
     override fun createPermitSearchRequest(
         createPermitSearchRequestBody: CreatePermitSearchRequestBody,
     ): ResponseEntity<PermitSearchRequestResponse> {
@@ -80,6 +93,8 @@ class PermitSearchRequestsDelegateImpl(
         }
 
         val body = createPermitSearchRequestBody
+        val provider = body.provider?.type?.toModel() ?: Provider.RECREATION_GOV
+        searchRequestCreationGuard.checkCanCreate(userId, provider)
         validateShape(body.searchType, body.zoneTarget != null, body.itineraryTarget != null, body.trailheadTarget != null)
 
         val classifiedType = permitClassificationService.classify(body.permitId)
@@ -99,7 +114,7 @@ class PermitSearchRequestsDelegateImpl(
             name = body.name,
             userId = userId,
             searchType = classifiedType,
-            provider = body.provider?.type?.toModel() ?: Provider.RECREATION_GOV,
+            provider = provider,
         )
         val state = PermitSearchRequestState()
         state.permitSearchRequest = entity
@@ -112,28 +127,34 @@ class PermitSearchRequestsDelegateImpl(
         return ResponseEntity.status(201).body(saved.toResponse(fetchStats(saved)))
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('VIEW_SEARCH_REQUESTS')")
     override fun getPermitSearchRequest(id: Long): ResponseEntity<PermitSearchRequestResponse> {
         val userId = currentUserId()
         val entity = permitSearchRequestRepository
             .findById(id)
             .orElse(null)
-            ?.takeIf { it.userId == userId }
+            ?.takeIf { it.userId == userId && it.deletedAt == null }
             ?: throw NotFoundException("Permit search request not found")
         return ResponseEntity.ok(entity.toResponse(fetchStats(entity)))
     }
 
     @Transactional
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('MANAGE_SEARCH_REQUESTS')")
     override fun updatePermitSearchRequest(
         id: Long,
         updatePermitSearchRequestBody: UpdatePermitSearchRequestBody,
+    ): ResponseEntity<PermitSearchRequestResponse> = updatePermitSearchRequestAs(currentUserId(), id, updatePermitSearchRequestBody)
+
+    /** Shared with [com.davismariotti.campalert.delegate.AdminDelegateImpl] — see [SearchRequestsDelegateImpl.updateSearchRequestAs]. */
+    fun updatePermitSearchRequestAs(
+        userId: Long,
+        id: Long,
+        updatePermitSearchRequestBody: UpdatePermitSearchRequestBody,
     ): ResponseEntity<PermitSearchRequestResponse> {
-        val userId = currentUserId()
         val existing = permitSearchRequestRepository
             .findById(id)
             .orElse(null)
-            ?.takeIf { it.userId == userId }
+            ?.takeIf { it.userId == userId && it.deletedAt == null }
             ?: throw NotFoundException("Permit search request not found")
 
         val body = updatePermitSearchRequestBody
@@ -173,17 +194,35 @@ class PermitSearchRequestsDelegateImpl(
     }
 
     @Transactional
-    @PreAuthorize("isAuthenticated()")
-    override fun deletePermitSearchRequest(id: Long): ResponseEntity<Unit> {
-        val userId = currentUserId()
-        permitSearchRequestRepository
+    @PreAuthorize("hasAuthority('MANAGE_SEARCH_REQUESTS')")
+    override fun deletePermitSearchRequest(id: Long): ResponseEntity<Unit> = deletePermitSearchRequestAs(currentUserId(), id)
+
+    /** Shared with [com.davismariotti.campalert.delegate.AdminDelegateImpl] — see [SearchRequestsDelegateImpl.updateSearchRequestAs]. */
+    @Transactional
+    fun deletePermitSearchRequestAs(userId: Long, id: Long): ResponseEntity<Unit> {
+        val existing = permitSearchRequestRepository
             .findById(id)
             .orElse(null)
-            ?.takeIf { it.userId == userId }
+            ?.takeIf { it.userId == userId && it.deletedAt == null }
             ?: throw NotFoundException("Permit search request not found")
-        notificationOutboxRepository.deleteByRequestTypeAndRequestId(RequestType.PERMIT, id)
-        permitSearchRequestRepository.deleteById(id)
+        softDelete(existing)
+        resourceReconciliationService.reconcileUser(userId)
         return ResponseEntity.noContent().build()
+    }
+
+    /**
+     * Soft-deletes [existing] in place: sets `deletedAt` instead of removing the row, so history
+     * (including notification_outbox) is retained per specs/soft-delete-search-requests.md.
+     * `state`/`*Target` are body properties excluded from `copy()` — transferred before saving so
+     * orphanRemoval doesn't delete-then-reinsert them on the same PK (same pattern as updatePermitSearchRequest).
+     */
+    private fun softDelete(existing: PermitSearchRequest) {
+        val updated = existing.copy(deletedAt = Instant.now())
+        updated.state = existing.state
+        updated.zoneTarget = existing.zoneTarget
+        updated.itineraryTarget = existing.itineraryTarget
+        updated.trailheadTarget = existing.trailheadTarget
+        permitSearchRequestRepository.save(updated)
     }
 
     // --- validation helpers ---
