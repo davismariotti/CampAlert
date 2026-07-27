@@ -13,10 +13,10 @@ interface UserRepository : JpaRepository<User, Long> {
     fun findUsersWithNoGroup(): List<User>
 
     @Query(
-        "SELECT u FROM User u WHERE :query IS NULL OR LOWER(u.email) LIKE LOWER(CONCAT('%', :query, '%')) " +
+        "SELECT u FROM User u WHERE LOWER(u.email) LIKE LOWER(CONCAT('%', :query, '%')) " +
             "OR EXISTS (SELECT 1 FROM PhoneNumber p WHERE p.userId = u.id AND p.phone LIKE CONCAT('%', :query, '%'))",
     )
-    fun searchUsers(query: String?, pageable: Pageable): Page<User>
+    fun searchUsersByQuery(query: String, pageable: Pageable): Page<User>
 
     fun countByLastLoginAtAfter(threshold: java.time.Instant): Long
 }

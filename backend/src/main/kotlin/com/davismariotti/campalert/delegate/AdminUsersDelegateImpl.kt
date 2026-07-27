@@ -85,7 +85,8 @@ class AdminUsersDelegateImpl(
     @PreAuthorize("hasAuthority('MANAGE_USERS')")
     override fun adminListUsers(query: String?, page: Int, pageSize: Int): ResponseEntity<AdminUserListResponse> {
         val normalizedQuery = query?.takeIf { it.isNotBlank() }
-        val result = userRepository.searchUsers(normalizedQuery, PageRequest.of(page, pageSize))
+        val pageable = PageRequest.of(page, pageSize)
+        val result = normalizedQuery?.let { userRepository.searchUsersByQuery(it, pageable) } ?: userRepository.findAll(pageable)
         val items = result.content.map { AdminUserSummary(it.id!!, it.email, it.lastLoginAt.toApi()) }
         return ResponseEntity.ok(AdminUserListResponse(items, result.totalElements, page, pageSize))
     }
