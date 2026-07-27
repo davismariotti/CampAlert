@@ -65,7 +65,7 @@ class PermitSearchRequestsDelegateImpl(
     @PreAuthorize("hasAuthority('VIEW_SEARCH_REQUESTS')")
     override fun listPermitSearchRequests(completed: Boolean?, deleted: Boolean): ResponseEntity<List<PermitSearchRequestResponse>> = listPermitSearchRequestsAs(currentUserId(), completed, deleted)
 
-    /** Shared with [com.davismariotti.campalert.delegate.AdminDelegateImpl] — see [SearchRequestsDelegateImpl.updateSearchRequestAs]. */
+    /** Shared with [com.davismariotti.campalert.delegate.AdminUserRequestsDelegateImpl] — see [SearchRequestsDelegateImpl.updateSearchRequestAs]. */
     fun listPermitSearchRequestsAs(userId: Long, completed: Boolean?, deleted: Boolean): ResponseEntity<List<PermitSearchRequestResponse>> {
         val results = if (deleted) {
             if (completed != null) {
@@ -145,7 +145,7 @@ class PermitSearchRequestsDelegateImpl(
         updatePermitSearchRequestBody: UpdatePermitSearchRequestBody,
     ): ResponseEntity<PermitSearchRequestResponse> = updatePermitSearchRequestAs(currentUserId(), id, updatePermitSearchRequestBody)
 
-    /** Shared with [com.davismariotti.campalert.delegate.AdminDelegateImpl] — see [SearchRequestsDelegateImpl.updateSearchRequestAs]. */
+    /** Shared with [com.davismariotti.campalert.delegate.AdminUserRequestsDelegateImpl] — see [SearchRequestsDelegateImpl.updateSearchRequestAs]. */
     fun updatePermitSearchRequestAs(
         userId: Long,
         id: Long,
@@ -197,7 +197,7 @@ class PermitSearchRequestsDelegateImpl(
     @PreAuthorize("hasAuthority('MANAGE_SEARCH_REQUESTS')")
     override fun deletePermitSearchRequest(id: Long): ResponseEntity<Unit> = deletePermitSearchRequestAs(currentUserId(), id)
 
-    /** Shared with [com.davismariotti.campalert.delegate.AdminDelegateImpl] — see [SearchRequestsDelegateImpl.updateSearchRequestAs]. */
+    /** Shared with [com.davismariotti.campalert.delegate.AdminUserRequestsDelegateImpl] — see [SearchRequestsDelegateImpl.updateSearchRequestAs]. */
     @Transactional
     fun deletePermitSearchRequestAs(userId: Long, id: Long): ResponseEntity<Unit> {
         val existing = permitSearchRequestRepository
