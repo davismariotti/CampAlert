@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../features/auth/useAuth'
+import { isAdmin } from '../features/auth/permissions'
 import { ProfileDropdown } from './ProfileDropdown'
 
 export function Nav() {
@@ -18,6 +19,11 @@ export function Nav() {
         <Link to="/requests" className="text-sm font-medium text-white/90 hover:text-white">
           My Alerts
         </Link>
+        {isAdmin(user) && (
+          <Link to="/admin" className="text-sm font-medium text-white/90 hover:text-white">
+            Admin
+          </Link>
+        )}
       </div>
 
       <ProfileDropdown />

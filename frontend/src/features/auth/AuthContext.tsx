@@ -21,7 +21,8 @@ function loadFromStorage(): AuthUser | null {
       verificationStatus: 'VERIFIED',
       pushoverUserKey: parsed.pushoverUserKey ?? null,
       pushoverApiToken: parsed.pushoverApiToken ?? null,
-      pushoverOverrideEnabled: parsed.pushoverOverrideEnabled ?? false
+      pushoverOverrideEnabled: parsed.pushoverOverrideEnabled ?? false,
+      permissions: parsed.permissions ?? []
     }
   } catch {
     return null
