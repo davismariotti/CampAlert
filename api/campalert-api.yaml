@@ -14,7 +14,11 @@ tags:
   - name: Permits
   - name: PermitSearchRequests
   - name: PhoneNumbers
-  - name: Admin
+  - name: AdminDashboard
+  - name: AdminUsers
+  - name: AdminGlobalSettings
+  - name: AdminAuditLog
+  - name: AdminUserRequests
 
 paths:
   /auth/register:
@@ -1045,7 +1049,7 @@ paths:
 
   /admin/stats:
     get:
-      tags: [Admin]
+      tags: [AdminDashboard]
       operationId: adminGetStats
       summary: Aggregate usage stats for the admin overview tab
       responses:
@@ -1064,7 +1068,7 @@ paths:
 
   /admin/users:
     get:
-      tags: [Admin]
+      tags: [AdminUsers]
       operationId: adminListUsers
       summary: Paginated user search (matches email or any associated phone number)
       parameters:
@@ -1101,7 +1105,7 @@ paths:
 
   /admin/users/{id}:
     get:
-      tags: [Admin]
+      tags: [AdminUsers]
       operationId: adminGetUser
       summary: User detail, including phone history, group membership, and effective quota/provider settings
       parameters:
@@ -1133,7 +1137,7 @@ paths:
 
   /admin/groups:
     get:
-      tags: [Admin]
+      tags: [AdminUsers]
       operationId: adminListGroups
       summary: List all groups (for the membership picker)
       responses:
@@ -1154,7 +1158,7 @@ paths:
 
   /admin/users/{id}/groups/{groupId}:
     put:
-      tags: [Admin]
+      tags: [AdminUsers]
       operationId: adminAddUserToGroup
       summary: Add a user to a group
       parameters:
@@ -1186,7 +1190,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
     delete:
-      tags: [Admin]
+      tags: [AdminUsers]
       operationId: adminRemoveUserFromGroup
       summary: Remove a user from a group
       parameters:
@@ -1220,7 +1224,7 @@ paths:
 
   /admin/users/{id}/quota:
     put:
-      tags: [Admin]
+      tags: [AdminUsers]
       operationId: adminSetUserQuota
       summary: Set a per-user combined active-search-request quota override
       parameters:
@@ -1252,7 +1256,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
     delete:
-      tags: [Admin]
+      tags: [AdminUsers]
       operationId: adminClearUserQuota
       summary: Clear a per-user combined quota override (falls back to group/global default)
       parameters:
@@ -1280,7 +1284,7 @@ paths:
 
   /admin/users/{id}/providers/{provider}/quota:
     put:
-      tags: [Admin]
+      tags: [AdminUsers]
       operationId: adminSetUserProviderQuota
       summary: Set a per-user, per-provider active-search-request quota override
       parameters:
@@ -1317,7 +1321,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
     delete:
-      tags: [Admin]
+      tags: [AdminUsers]
       operationId: adminClearUserProviderQuota
       summary: Clear a per-user, per-provider quota override
       parameters:
@@ -1350,7 +1354,7 @@ paths:
 
   /admin/users/{id}/providers/{provider}/access:
     put:
-      tags: [Admin]
+      tags: [AdminUsers]
       operationId: adminSetUserProviderAccess
       summary: Set a per-user, per-provider access override
       parameters:
@@ -1387,7 +1391,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
     delete:
-      tags: [Admin]
+      tags: [AdminUsers]
       operationId: adminClearUserProviderAccess
       summary: Clear a per-user, per-provider access override
       parameters:
@@ -1420,7 +1424,7 @@ paths:
 
   /admin/global-settings:
     get:
-      tags: [Admin]
+      tags: [AdminGlobalSettings]
       operationId: adminGetGlobalSettings
       summary: Current global quota/provider-access defaults
       responses:
@@ -1439,7 +1443,7 @@ paths:
 
   /admin/global-settings/quota:
     put:
-      tags: [Admin]
+      tags: [AdminGlobalSettings]
       operationId: adminSetGlobalQuota
       summary: Set the global combined active-search-request default
       requestBody:
@@ -1460,7 +1464,7 @@ paths:
 
   /admin/global-settings/providers/{provider}/quota:
     put:
-      tags: [Admin]
+      tags: [AdminGlobalSettings]
       operationId: adminSetGlobalProviderQuota
       summary: Set the global per-provider active-search-request default
       parameters:
@@ -1485,7 +1489,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
     delete:
-      tags: [Admin]
+      tags: [AdminGlobalSettings]
       operationId: adminClearGlobalProviderQuota
       summary: Clear the global per-provider default (uncapped at the global level)
       parameters:
@@ -1506,7 +1510,7 @@ paths:
 
   /admin/global-settings/providers/{provider}/access:
     put:
-      tags: [Admin]
+      tags: [AdminGlobalSettings]
       operationId: adminSetGlobalProviderAccess
       summary: Set the global per-provider access default
       parameters:
@@ -1533,7 +1537,7 @@ paths:
 
   /admin/audit-log:
     get:
-      tags: [Admin]
+      tags: [AdminAuditLog]
       operationId: adminListAuditLog
       summary: Paginated admin audit log, optionally filtered to one target user
       parameters:
@@ -1571,7 +1575,7 @@ paths:
 
   /admin/users/{id}/search-requests:
     get:
-      tags: [Admin]
+      tags: [AdminUserRequests]
       operationId: adminListUserSearchRequests
       summary: A user's campground search requests (active/historical/deleted)
       parameters:
@@ -1616,7 +1620,7 @@ paths:
 
   /admin/users/{id}/search-requests/{requestId}:
     put:
-      tags: [Admin]
+      tags: [AdminUserRequests]
       operationId: adminUpdateUserSearchRequest
       summary: Edit a user's campground search request, exactly as the user themself could
       parameters:
@@ -1658,7 +1662,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
     delete:
-      tags: [Admin]
+      tags: [AdminUserRequests]
       operationId: adminDeleteUserSearchRequest
       summary: Soft-delete a user's campground search request
       parameters:
@@ -1692,7 +1696,7 @@ paths:
 
   /admin/users/{id}/permit-search-requests:
     get:
-      tags: [Admin]
+      tags: [AdminUserRequests]
       operationId: adminListUserPermitSearchRequests
       summary: A user's permit search requests (active/historical/deleted)
       parameters:
@@ -1737,7 +1741,7 @@ paths:
 
   /admin/users/{id}/permit-search-requests/{requestId}:
     put:
-      tags: [Admin]
+      tags: [AdminUserRequests]
       operationId: adminUpdateUserPermitSearchRequest
       summary: Edit a user's permit search request, exactly as the user themself could
       parameters:
@@ -1779,7 +1783,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
     delete:
-      tags: [Admin]
+      tags: [AdminUserRequests]
       operationId: adminDeleteUserPermitSearchRequest
       summary: Soft-delete a user's permit search request
       parameters:

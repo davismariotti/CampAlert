@@ -62,7 +62,7 @@ class SearchRequestsDelegateImpl(
     @PreAuthorize("hasAuthority('VIEW_SEARCH_REQUESTS')")
     override fun listSearchRequests(completed: Boolean?, deleted: Boolean): ResponseEntity<List<SearchRequestResponse>> = listSearchRequestsAs(currentUserId(), completed, deleted)
 
-    /** Shared with [com.davismariotti.campalert.delegate.AdminDelegateImpl] — see [updateSearchRequestAs]. */
+    /** Shared with [com.davismariotti.campalert.delegate.AdminUserRequestsDelegateImpl] — see [updateSearchRequestAs]. */
     fun listSearchRequestsAs(userId: Long, completed: Boolean?, deleted: Boolean): ResponseEntity<List<SearchRequestResponse>> {
         val results = if (deleted) {
             if (completed != null) {
@@ -154,7 +154,7 @@ class SearchRequestsDelegateImpl(
     ): ResponseEntity<SearchRequestResponse> = updateSearchRequestAs(currentUserId(), id, updateSearchRequestBody)
 
     /**
-     * Shared with [com.davismariotti.campalert.delegate.AdminDelegateImpl] (D7: an admin can do
+     * Shared with [com.davismariotti.campalert.delegate.AdminUserRequestsDelegateImpl] (D7: an admin can do
      * anything to a user's search requests that the user themself can do, via the same code path,
      * parameterized by an explicit target [userId] instead of the caller's own).
      */
@@ -198,7 +198,7 @@ class SearchRequestsDelegateImpl(
     @PreAuthorize("hasAuthority('MANAGE_SEARCH_REQUESTS')")
     override fun deleteSearchRequest(id: Long): ResponseEntity<Unit> = deleteSearchRequestAs(currentUserId(), id)
 
-    /** Shared with [com.davismariotti.campalert.delegate.AdminDelegateImpl] — see [updateSearchRequestAs]. */
+    /** Shared with [com.davismariotti.campalert.delegate.AdminUserRequestsDelegateImpl] — see [updateSearchRequestAs]. */
     @Transactional
     fun deleteSearchRequestAs(userId: Long, id: Long): ResponseEntity<Unit> {
         val existing = searchRequestRepository
