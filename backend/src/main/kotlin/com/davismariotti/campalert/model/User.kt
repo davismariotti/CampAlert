@@ -35,4 +35,7 @@ data class User(
 
     @Column(name = "email_verified_at")
     val emailVerifiedAt: Instant? = null,
+
+    @Column(name = "last_login_at")
+    val lastLoginAt: Instant? = null,
 )

@@ -18,6 +18,7 @@ import com.davismariotti.campalert.exception.RateLimitExceededException
 import com.davismariotti.campalert.exception.UnauthorizedException
 import com.davismariotti.campalert.notification.PasswordChangedNotification
 import com.davismariotti.campalert.repository.UserRepository
+import com.davismariotti.campalert.security.GroupMembershipService
 import com.davismariotti.campalert.security.RememberMeServices
 import com.davismariotti.campalert.security.UserDetailsServiceImpl
 import com.davismariotti.campalert.service.SessionRevocationService
@@ -65,6 +66,7 @@ class AuthDelegateImpl(
     private val notificationService: NotificationService,
     private val forgotPasswordRateLimiter: ForgotPasswordRateLimiter,
     private val turnstileService: TurnstileService,
+    private val groupMembershipService: GroupMembershipService,
     @Value("\${campfinder.email.frontend-base-url}") private val frontendBaseUrl: String,
 ) : AuthApiDelegate {
     override fun register(registerBody: RegisterBody): ResponseEntity<RegisterResponse> {
@@ -79,6 +81,7 @@ class AuthDelegateImpl(
                 timezone = registerBody.timezone ?: "America/Los_Angeles",
             ),
         )
+        groupMembershipService.assignToStandardGroup(user.id!!)
         val verificationId = emailVerificationService.issueVerification(user.id!!, user.email)
         return ResponseEntity.status(HttpStatus.CREATED).body(
             RegisterResponse(
@@ -122,14 +125,14 @@ class AuthDelegateImpl(
         return ResponseEntity.noContent().build()
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('VIEW_PROFILE')")
     override fun getMe(): ResponseEntity<AuthResponse> {
         val auth = SecurityContextHolder.getContext().authentication!!
         val user = userRepository.findByEmail(auth.name)!!
         return ResponseEntity.ok(user.toAuthResponse())
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('EDIT_PROFILE')")
     override fun updateMe(updateMeBody: UpdateMeBody): ResponseEntity<AuthResponse> {
         val auth = SecurityContextHolder.getContext().authentication!!
         val user = userRepository.findByEmail(auth.name)!!
@@ -178,7 +181,7 @@ class AuthDelegateImpl(
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context)
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('EDIT_PROFILE')")
     override fun changePassword(changePasswordBody: ChangePasswordBody): ResponseEntity<Unit> {
         val auth = SecurityContextHolder.getContext().authentication!!
         val user = userRepository.findByEmail(auth.name)!!

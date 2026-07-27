@@ -33,13 +33,13 @@ class PhoneNumbersDelegateImpl(
 ) : PhoneNumbersApiDelegate {
     private fun currentUserId(): Long = currentUserId(userRepository)
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('VIEW_PHONE_NUMBERS')")
     override fun listPhoneNumbers(): ResponseEntity<List<PhoneNumberResponse>> {
         val userId = currentUserId()
         return ResponseEntity.ok(phoneNumberRepository.findByUserId(userId).map { it.toResponse() })
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('MANAGE_PHONE_NUMBERS')")
     override fun addPhoneNumber(addPhoneNumberBody: AddPhoneNumberBody): ResponseEntity<PhoneNumberResponse> {
         turnstileService.verify(addPhoneNumberBody.turnstileToken)
         if (!addPhoneNumberBody.smsConsent) {
@@ -72,7 +72,7 @@ class PhoneNumbersDelegateImpl(
         }
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('MANAGE_PHONE_NUMBERS')")
     override fun verifyPhoneNumber(
         id: Long,
         verifyPhoneNumberBody: VerifyPhoneNumberBody,
@@ -107,7 +107,7 @@ class PhoneNumbersDelegateImpl(
         }
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('MANAGE_PHONE_NUMBERS')")
     override fun deletePhoneNumber(id: Long): ResponseEntity<Unit> {
         val userId = currentUserId()
         val phoneNumber =

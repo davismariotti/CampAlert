@@ -39,7 +39,7 @@ class PermitsDelegateImpl(
     private val log = LoggerFactory.getLogger(javaClass)
     private val recreationCb by lazy { circuitBreakerRegistry.circuitBreaker("recreation-gov") }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('VIEW_PERMITS')")
     override fun searchPermits(q: String, provider: ProviderType?): ResponseEntity<List<PermitSearchResult>> {
         if (q.isBlank()) {
             throw BadRequestException("Query parameter 'q' must not be blank")
@@ -78,7 +78,7 @@ class PermitsDelegateImpl(
         return ResponseEntity.ok(results)
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('VIEW_PERMITS')")
     override fun getPermit(id: String): ResponseEntity<PermitResponse> {
         val type = permitClassificationService.classify(id)
             ?: throw PermitClassificationException.UnsupportedPermitType()
@@ -113,7 +113,7 @@ class PermitsDelegateImpl(
         )
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('VIEW_PERMITS')")
     override fun getPermitAvailability(id: String, startDate: LocalDate): ResponseEntity<PermitZoneAvailabilityPreviewResponse> {
         val type = permitClassificationService.classify(id) ?: throw PermitClassificationException.UnsupportedPermitType()
         if (type != SearchType.ZONE) {
@@ -153,7 +153,7 @@ class PermitsDelegateImpl(
         return ResponseEntity.ok(PermitZoneAvailabilityPreviewResponse(divisions = divisions))
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('VIEW_PERMITS')")
     override fun getPermitDivisionAvailability(
         id: String,
         divisionId: String,
