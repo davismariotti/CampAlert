@@ -14,6 +14,7 @@ tags:
   - name: Permits
   - name: PermitSearchRequests
   - name: PhoneNumbers
+  - name: Admin
 
 paths:
   /auth/register:
@@ -379,6 +380,13 @@ paths:
           required: false
           schema:
             type: boolean
+        - name: deleted
+          in: query
+          required: false
+          description: When true, return only the caller's soft-deleted requests (default false).
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
           description: List of search requests
@@ -737,6 +745,13 @@ paths:
           required: false
           schema:
             type: boolean
+        - name: deleted
+          in: query
+          required: false
+          description: When true, return only the caller's soft-deleted requests (default false).
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
           description: List of permit search requests
@@ -1017,6 +1032,774 @@ paths:
           description: Deleted
         "401":
           description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/stats:
+    get:
+      tags: [Admin]
+      operationId: adminGetStats
+      summary: Aggregate usage stats for the admin overview tab
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminStatsResponse'
+        "403":
+          description: Missing VIEW_ADMIN_DASHBOARD permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      operationId: adminListUsers
+      summary: Paginated user search (matches email or any associated phone number)
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserListResponse'
+        "403":
+          description: Missing MANAGE_USERS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/users/{id}:
+    get:
+      tags: [Admin]
+      operationId: adminGetUser
+      summary: User detail, including phone history, group membership, and effective quota/provider settings
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserDetailResponse'
+        "403":
+          description: Missing MANAGE_USERS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/groups:
+    get:
+      tags: [Admin]
+      operationId: adminListGroups
+      summary: List all groups (for the membership picker)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminGroupSummary'
+        "403":
+          description: Missing MANAGE_USERS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/users/{id}/groups/{groupId}:
+    put:
+      tags: [Admin]
+      operationId: adminAddUserToGroup
+      summary: Add a user to a group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Added
+        "403":
+          description: Missing MANAGE_USERS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: User or group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Admin]
+      operationId: adminRemoveUserFromGroup
+      summary: Remove a user from a group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Removed
+        "403":
+          description: Missing MANAGE_USERS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: User or group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/users/{id}/quota:
+    put:
+      tags: [Admin]
+      operationId: adminSetUserQuota
+      summary: Set a per-user combined active-search-request quota override
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSetQuotaBody'
+      responses:
+        "204":
+          description: Set
+        "403":
+          description: Missing MANAGE_USERS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Admin]
+      operationId: adminClearUserQuota
+      summary: Clear a per-user combined quota override (falls back to group/global default)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Cleared
+        "403":
+          description: Missing MANAGE_USERS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/users/{id}/providers/{provider}/quota:
+    put:
+      tags: [Admin]
+      operationId: adminSetUserProviderQuota
+      summary: Set a per-user, per-provider active-search-request quota override
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: provider
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ProviderType'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSetQuotaBody'
+      responses:
+        "204":
+          description: Set
+        "403":
+          description: Missing MANAGE_USERS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Admin]
+      operationId: adminClearUserProviderQuota
+      summary: Clear a per-user, per-provider quota override
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: provider
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ProviderType'
+      responses:
+        "204":
+          description: Cleared
+        "403":
+          description: Missing MANAGE_USERS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/users/{id}/providers/{provider}/access:
+    put:
+      tags: [Admin]
+      operationId: adminSetUserProviderAccess
+      summary: Set a per-user, per-provider access override
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: provider
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ProviderType'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSetProviderAccessBody'
+      responses:
+        "204":
+          description: Set
+        "403":
+          description: Missing MANAGE_USERS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Admin]
+      operationId: adminClearUserProviderAccess
+      summary: Clear a per-user, per-provider access override
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: provider
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ProviderType'
+      responses:
+        "204":
+          description: Cleared
+        "403":
+          description: Missing MANAGE_USERS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/global-settings:
+    get:
+      tags: [Admin]
+      operationId: adminGetGlobalSettings
+      summary: Current global quota/provider-access defaults
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminGlobalSettingsResponse'
+        "403":
+          description: Missing MANAGE_GLOBAL_SETTINGS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/global-settings/quota:
+    put:
+      tags: [Admin]
+      operationId: adminSetGlobalQuota
+      summary: Set the global combined active-search-request default
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSetQuotaBody'
+      responses:
+        "204":
+          description: Set
+        "403":
+          description: Missing MANAGE_GLOBAL_SETTINGS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/global-settings/providers/{provider}/quota:
+    put:
+      tags: [Admin]
+      operationId: adminSetGlobalProviderQuota
+      summary: Set the global per-provider active-search-request default
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ProviderType'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSetQuotaBody'
+      responses:
+        "204":
+          description: Set
+        "403":
+          description: Missing MANAGE_GLOBAL_SETTINGS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Admin]
+      operationId: adminClearGlobalProviderQuota
+      summary: Clear the global per-provider default (uncapped at the global level)
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ProviderType'
+      responses:
+        "204":
+          description: Cleared
+        "403":
+          description: Missing MANAGE_GLOBAL_SETTINGS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/global-settings/providers/{provider}/access:
+    put:
+      tags: [Admin]
+      operationId: adminSetGlobalProviderAccess
+      summary: Set the global per-provider access default
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ProviderType'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSetProviderAccessBody'
+      responses:
+        "204":
+          description: Set
+        "403":
+          description: Missing MANAGE_GLOBAL_SETTINGS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/audit-log:
+    get:
+      tags: [Admin]
+      operationId: adminListAuditLog
+      summary: Paginated admin audit log, optionally filtered to one target user
+      parameters:
+        - name: targetUserId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAuditLogListResponse'
+        "403":
+          description: Missing VIEW_AUDIT_LOG permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/users/{id}/search-requests:
+    get:
+      tags: [Admin]
+      operationId: adminListUserSearchRequests
+      summary: A user's campground search requests (active/historical/deleted)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: completed
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: deleted
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchRequestResponse'
+        "403":
+          description: Missing MANAGE_USER_SEARCH_REQUESTS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/users/{id}/search-requests/{requestId}:
+    put:
+      tags: [Admin]
+      operationId: adminUpdateUserSearchRequest
+      summary: Edit a user's campground search request, exactly as the user themself could
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSearchRequestBody'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchRequestResponse'
+        "403":
+          description: Missing MANAGE_USER_SEARCH_REQUESTS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Admin]
+      operationId: adminDeleteUserSearchRequest
+      summary: Soft-delete a user's campground search request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Missing MANAGE_USER_SEARCH_REQUESTS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/users/{id}/permit-search-requests:
+    get:
+      tags: [Admin]
+      operationId: adminListUserPermitSearchRequests
+      summary: A user's permit search requests (active/historical/deleted)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: completed
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: deleted
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PermitSearchRequestResponse'
+        "403":
+          description: Missing MANAGE_USER_SEARCH_REQUESTS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/users/{id}/permit-search-requests/{requestId}:
+    put:
+      tags: [Admin]
+      operationId: adminUpdateUserPermitSearchRequest
+      summary: Edit a user's permit search request, exactly as the user themself could
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePermitSearchRequestBody'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermitSearchRequestResponse'
+        "403":
+          description: Missing MANAGE_USER_SEARCH_REQUESTS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Admin]
+      operationId: adminDeleteUserPermitSearchRequest
+      summary: Soft-delete a user's permit search request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Missing MANAGE_USER_SEARCH_REQUESTS permission
           content:
             application/json:
               schema:
@@ -1967,3 +2750,286 @@ components:
       properties:
         code:
           type: string
+
+    AdminEffectiveValueSource:
+      type: string
+      description: Which level of the fallback chain (specs/user-resource-limits) produced an effective value.
+      enum: [USER_OVERRIDE, GROUP_DEFAULT, GLOBAL_DEFAULT]
+
+    AdminEffectiveQuota:
+      type: object
+      required:
+        - value
+        - source
+      properties:
+        value:
+          type: integer
+        source:
+          $ref: '#/components/schemas/AdminEffectiveValueSource'
+
+    AdminEffectiveProviderQuota:
+      type: object
+      required:
+        - provider
+        - source
+      properties:
+        provider:
+          $ref: '#/components/schemas/ProviderType'
+        value:
+          type: integer
+          nullable: true
+          description: Null means uncapped at this level.
+        source:
+          $ref: '#/components/schemas/AdminEffectiveValueSource'
+
+    AdminEffectiveProviderAccess:
+      type: object
+      required:
+        - provider
+        - value
+        - source
+      properties:
+        provider:
+          $ref: '#/components/schemas/ProviderType'
+        value:
+          type: boolean
+        source:
+          $ref: '#/components/schemas/AdminEffectiveValueSource'
+
+    AdminGroupSummary:
+      type: object
+      required:
+        - id
+        - groupName
+      properties:
+        id:
+          type: integer
+          format: int64
+        groupName:
+          type: string
+
+    AdminUserSummary:
+      type: object
+      required:
+        - id
+        - email
+      properties:
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    AdminUserListResponse:
+      type: object
+      required:
+        - items
+        - total
+        - page
+        - pageSize
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUserSummary'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    AdminUserDetailResponse:
+      type: object
+      required:
+        - id
+        - email
+        - timezone
+        - phoneNumbers
+        - groups
+        - effectiveCombinedQuota
+        - effectiveProviderQuotas
+        - effectiveProviderAccess
+      properties:
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+        timezone:
+          type: string
+        emailVerifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+        phoneNumbers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PhoneNumberResponse'
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminGroupSummary'
+        effectiveCombinedQuota:
+          $ref: '#/components/schemas/AdminEffectiveQuota'
+        effectiveProviderQuotas:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminEffectiveProviderQuota'
+        effectiveProviderAccess:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminEffectiveProviderAccess'
+
+    AdminSetQuotaBody:
+      type: object
+      required:
+        - maxActive
+      properties:
+        maxActive:
+          type: integer
+
+    AdminSetProviderAccessBody:
+      type: object
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+
+    AdminGlobalSettingsResponse:
+      type: object
+      required:
+        - combinedMaxActive
+        - providerQuotas
+        - providerAccess
+      properties:
+        combinedMaxActive:
+          type: integer
+        providerQuotas:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminGlobalProviderQuota'
+        providerAccess:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminGlobalProviderAccess'
+
+    AdminGlobalProviderQuota:
+      type: object
+      required:
+        - provider
+      properties:
+        provider:
+          $ref: '#/components/schemas/ProviderType'
+        maxActive:
+          type: integer
+          nullable: true
+          description: Null means uncapped at the global level.
+
+    AdminGlobalProviderAccess:
+      type: object
+      required:
+        - provider
+        - enabled
+      properties:
+        provider:
+          $ref: '#/components/schemas/ProviderType'
+        enabled:
+          type: boolean
+
+    AdminRequestCountByProvider:
+      type: object
+      required:
+        - provider
+        - campgroundCount
+        - permitCount
+      properties:
+        provider:
+          $ref: '#/components/schemas/ProviderType'
+        campgroundCount:
+          type: integer
+          format: int64
+        permitCount:
+          type: integer
+          format: int64
+
+    AdminStatsResponse:
+      type: object
+      required:
+        - totalUsers
+        - activeUsersLast30Days
+        - requestCounts
+      properties:
+        totalUsers:
+          type: integer
+          format: int64
+        activeUsersLast30Days:
+          type: integer
+          format: int64
+        requestCounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminRequestCountByProvider'
+
+    AdminAuditLogEntry:
+      type: object
+      required:
+        - id
+        - actorUserId
+        - action
+        - createdAt
+      properties:
+        id:
+          type: integer
+          format: int64
+        actorUserId:
+          type: integer
+          format: int64
+        actorEmail:
+          type: string
+          nullable: true
+        targetUserId:
+          type: integer
+          format: int64
+          nullable: true
+        targetEmail:
+          type: string
+          nullable: true
+        action:
+          type: string
+        detail:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminAuditLogListResponse:
+      type: object
+      required:
+        - items
+        - total
+        - page
+        - pageSize
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminAuditLogEntry'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+        pageSize:
+          type: integer
