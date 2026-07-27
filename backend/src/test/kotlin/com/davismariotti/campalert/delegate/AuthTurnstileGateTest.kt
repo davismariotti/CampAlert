@@ -46,6 +46,7 @@ class AuthTurnstileGateTest {
         notificationService = mock(NotificationService::class.java),
         forgotPasswordRateLimiter = mock(ForgotPasswordRateLimiter::class.java),
         turnstileService = turnstileService,
+        groupMembershipService = mock(com.davismariotti.campalert.security.GroupMembershipService::class.java),
         frontendBaseUrl = "http://localhost:5173",
     )
 

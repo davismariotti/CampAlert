@@ -21,13 +21,13 @@ class CampgroundsDelegateImpl(
 ) : CampgroundsApiDelegate {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('VIEW_CAMPGROUNDS')")
     override fun getCampground(id: Int, provider: ProviderType?): ResponseEntity<CampgroundResponse> {
         val response = campgroundCatalogProviderRegistry.forProvider(provider?.toModel() ?: Provider.RECREATION_GOV).getCampground(id)
         return response?.let { ResponseEntity.ok(it) } ?: throw NotFoundException("Campground not found")
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('VIEW_CAMPGROUNDS')")
     override fun getCampgroundLoops(id: Int, provider: ProviderType?): ResponseEntity<List<LoopInfo>> {
         val loops = try {
             campgroundCatalogProviderRegistry.forProvider(provider?.toModel() ?: Provider.RECREATION_GOV).getLoops(id)
@@ -38,7 +38,7 @@ class CampgroundsDelegateImpl(
         return ResponseEntity.ok(loops)
     }
 
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('VIEW_CAMPGROUNDS')")
     override fun searchCampgrounds(q: String, provider: ProviderType?): ResponseEntity<List<CampgroundSearchResult>> {
         if (q.isBlank()) {
             throw BadRequestException("Query parameter 'q' must not be blank")

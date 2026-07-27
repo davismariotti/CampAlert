@@ -62,6 +62,7 @@ class AuthLoginGatingTest {
         notificationService = notificationService,
         forgotPasswordRateLimiter = mock(ForgotPasswordRateLimiter::class.java),
         turnstileService = mock(TurnstileService::class.java),
+        groupMembershipService = mock(com.davismariotti.campalert.security.GroupMembershipService::class.java),
         frontendBaseUrl = "http://localhost:5173",
     )
 
