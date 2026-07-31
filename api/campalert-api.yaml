@@ -19,6 +19,7 @@ tags:
   - name: AdminGlobalSettings
   - name: AdminAuditLog
   - name: AdminUserRequests
+  - name: AdminInvites
 
 paths:
   /auth/register:
@@ -46,11 +47,30 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         "409":
-          description: Email already registered
+          description: Email already registered (open registration, or the invite's target email was registered through another path since the invite was created)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        "422":
+          description: Invite required, invalid/expired/exhausted/deactivated, or submitted email does not match an email-tied invite (code field contains INVITE_REQUIRED, INVITE_INVALID_OR_EXPIRED, INVITE_EXHAUSTED, INVITE_DEACTIVATED, or INVITE_EMAIL_MISMATCH)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/registration-config:
+    get:
+      tags: [Auth]
+      operationId: getRegistrationConfig
+      summary: Whether open registration is currently allowed (public, unauthenticated)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationConfigResponse'
 
   /auth/resend-verification:
     post:
@@ -1535,6 +1555,150 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /admin/global-settings/invite-only:
+    put:
+      tags: [AdminGlobalSettings]
+      operationId: adminSetInviteOnly
+      summary: Enable or disable invite-only mode platform-wide
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSetInviteOnlyBody'
+      responses:
+        "204":
+          description: Set
+        "403":
+          description: Missing MANAGE_GLOBAL_SETTINGS permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/invites/email:
+    post:
+      tags: [AdminInvites]
+      operationId: adminCreateEmailInvites
+      summary: Send email invites to a comma-separated (client-parsed) list of addresses
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateEmailInvitesBody'
+      responses:
+        "201":
+          description: Created (per-address results; addresses already registered are reported, not created)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCreateEmailInvitesResponse'
+        "403":
+          description: Missing MANAGE_INVITES permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/invites/link:
+    post:
+      tags: [AdminInvites]
+      operationId: adminCreateInviteLink
+      summary: Generate a capacity-based public invite link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateInviteLinkBody'
+      responses:
+        "201":
+          description: Created — the url is only ever returned here; it cannot be retrieved again later
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminInviteLinkResponse'
+        "403":
+          description: Missing MANAGE_INVITES permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/invites:
+    get:
+      tags: [AdminInvites]
+      operationId: adminListInvites
+      summary: Paginated list of email invites and public links
+      parameters:
+        - name: includeInactive
+          in: query
+          required: false
+          description: When true, includes EXPIRED, DEACTIVATED, and REDEEMED invites in the same paginated result alongside ACTIVE ones. Defaults to false (ACTIVE only).
+          schema:
+            type: boolean
+            default: false
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminInviteListResponse'
+        "403":
+          description: Missing MANAGE_INVITES permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/invites/{id}:
+    delete:
+      tags: [AdminInvites]
+      operationId: adminDeactivateInvite
+      summary: Deactivate an invite, immediately blocking further redemption
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deactivated
+        "403":
+          description: Missing MANAGE_INVITES permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "409":
+          description: Already deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /admin/audit-log:
     get:
       tags: [AdminAuditLog]
@@ -1852,14 +2016,23 @@ components:
     RegisterResponse:
       type: object
       required:
-        - verificationId
         - verificationStatus
       properties:
         verificationId:
           type: string
           format: uuid
+          nullable: true
+          description: Absent when verificationStatus is VERIFIED (redeeming an email-tied invite auto-verifies; there is no pending OTP verification to reference).
         verificationStatus:
           $ref: '#/components/schemas/VerificationStatus'
+
+    RegistrationConfigResponse:
+      type: object
+      required:
+        - inviteOnlyEnabled
+      properties:
+        inviteOnlyEnabled:
+          type: boolean
 
     VerificationStatus:
       type: string
@@ -1940,6 +2113,14 @@ components:
           type: string
         turnstileToken:
           type: string
+        inviteId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Present together with inviteToken when registering via an invite (email-tied or public link).
+        inviteToken:
+          type: string
+          nullable: true
 
     LoginBody:
       type: object
@@ -2316,6 +2497,7 @@ components:
         - MANAGE_GLOBAL_SETTINGS
         - VIEW_AUDIT_LOG
         - MANAGE_USER_SEARCH_REQUESTS
+        - MANAGE_INVITES
 
     Provider:
       type: object
@@ -2939,6 +3121,7 @@ components:
         - combinedMaxActive
         - providerQuotas
         - providerAccess
+        - inviteOnlyEnabled
       properties:
         combinedMaxActive:
           type: integer
@@ -2950,6 +3133,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AdminGlobalProviderAccess'
+        inviteOnlyEnabled:
+          type: boolean
+
+    AdminSetInviteOnlyBody:
+      type: object
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
 
     AdminGlobalProviderQuota:
       type: object
@@ -3060,3 +3253,146 @@ components:
           type: integer
         pageSize:
           type: integer
+
+    AdminInviteType:
+      type: string
+      enum:
+        - EMAIL
+        - LINK
+
+    AdminInviteStatus:
+      type: string
+      enum:
+        - ACTIVE
+        - EXPIRED
+        - DEACTIVATED
+        - REDEEMED
+
+    AdminInviteSummary:
+      type: object
+      required:
+        - id
+        - type
+        - status
+        - maxUses
+        - usedCount
+        - createdByEmail
+        - createdAt
+        - expiresAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/AdminInviteType'
+        email:
+          type: string
+          nullable: true
+          description: Null for public links.
+        status:
+          $ref: '#/components/schemas/AdminInviteStatus'
+        maxUses:
+          type: integer
+        usedCount:
+          type: integer
+        createdByEmail:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        deactivatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    AdminInviteListResponse:
+      type: object
+      required:
+        - items
+        - total
+        - page
+        - pageSize
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminInviteSummary'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    AdminCreateEmailInvitesBody:
+      type: object
+      required:
+        - emails
+      properties:
+        emails:
+          type: array
+          items:
+            type: string
+            pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+          minItems: 1
+          maxItems: 50
+        expiresInDays:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Defaults to 7 days when omitted.
+
+    AdminEmailInviteResult:
+      type: object
+      required:
+        - email
+        - created
+      properties:
+        email:
+          type: string
+        created:
+          type: boolean
+        reason:
+          type: string
+          nullable: true
+          description: Present when created is false, e.g. ALREADY_REGISTERED.
+
+    AdminCreateEmailInvitesResponse:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminEmailInviteResult'
+
+    AdminCreateInviteLinkBody:
+      type: object
+      required:
+        - maxUses
+      properties:
+        maxUses:
+          type: integer
+          minimum: 1
+        expiresInDays:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Defaults to 7 days when omitted.
+
+    AdminInviteLinkResponse:
+      type: object
+      required:
+        - invite
+        - url
+      properties:
+        invite:
+          $ref: '#/components/schemas/AdminInviteSummary'
+        url:
+          type: string
+          description: The one-time shareable registration URL. Not retrievable again after this response.

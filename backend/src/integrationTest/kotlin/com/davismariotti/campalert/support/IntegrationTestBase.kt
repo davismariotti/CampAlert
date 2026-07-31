@@ -154,7 +154,7 @@ open class IntegrationTestBase {
                 "permit_search_request_state, permit_zone_target, permit_itinerary_target, permit_trailhead_target, " +
                 "permit_search_requests, persistent_logins, phone_numbers, email_verifications, password_resets, " +
                 "users, shedlock, poll_target_state, groups, global_quota_defaults, global_provider_quota_defaults, " +
-                "global_provider_access CASCADE"
+                "global_provider_access, platform_settings CASCADE"
         )
         // groups/global_* aren't tied to users by FK, so they survive a plain "users CASCADE" truncate
         // and any admin-test mutation to them (e.g. changing the global quota default) would otherwise

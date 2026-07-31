@@ -8,6 +8,7 @@ import com.davismariotti.campalert.api.model.LoginBody
 import com.davismariotti.campalert.api.model.Permission
 import com.davismariotti.campalert.api.model.RegisterBody
 import com.davismariotti.campalert.api.model.RegisterResponse
+import com.davismariotti.campalert.api.model.RegistrationConfigResponse
 import com.davismariotti.campalert.api.model.ResendVerificationBody
 import com.davismariotti.campalert.api.model.ResetPasswordBody
 import com.davismariotti.campalert.api.model.UpdateMeBody
@@ -17,7 +18,9 @@ import com.davismariotti.campalert.exception.BadRequestException
 import com.davismariotti.campalert.exception.ConflictException
 import com.davismariotti.campalert.exception.RateLimitExceededException
 import com.davismariotti.campalert.exception.UnauthorizedException
+import com.davismariotti.campalert.model.PlatformSettings
 import com.davismariotti.campalert.notification.PasswordChangedNotification
+import com.davismariotti.campalert.repository.PlatformSettingsRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.security.GroupMembershipService
 import com.davismariotti.campalert.security.RememberMeServices
@@ -30,6 +33,8 @@ import com.davismariotti.campalert.service.email.EmailVerificationService.Verify
 import com.davismariotti.campalert.service.email.PasswordResetException
 import com.davismariotti.campalert.service.email.PasswordResetService
 import com.davismariotti.campalert.service.email.PasswordResetService.ResetResult
+import com.davismariotti.campalert.service.invite.InviteException
+import com.davismariotti.campalert.service.invite.InviteService
 import com.davismariotti.campalert.service.notification.NotificationService
 import com.davismariotti.campalert.service.redis.ForgotPasswordRateLimiter
 import com.davismariotti.campalert.service.turnstile.TurnstileService
@@ -37,6 +42,7 @@ import com.davismariotti.notifications.SimpleRecipient
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.annotation.Lazy
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -49,6 +55,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 import com.davismariotti.campalert.model.User as UserEntity
 
 @Service
@@ -68,13 +76,47 @@ class AuthDelegateImpl(
     private val forgotPasswordRateLimiter: ForgotPasswordRateLimiter,
     private val turnstileService: TurnstileService,
     private val groupMembershipService: GroupMembershipService,
+    private val inviteService: InviteService,
+    private val platformSettingsRepository: PlatformSettingsRepository,
     @Value("\${campfinder.email.frontend-base-url}") private val frontendBaseUrl: String,
+    @Lazy private val self: AuthDelegateImpl,
 ) : AuthApiDelegate {
+    override fun getRegistrationConfig(): ResponseEntity<RegistrationConfigResponse> {
+        val inviteOnly = platformSettingsRepository
+            .findById(PlatformSettings.SINGLETON_ID)
+            .map { it.inviteOnlyEnabled }
+            .orElse(false)
+        return ResponseEntity.ok(RegistrationConfigResponse(inviteOnly))
+    }
+
     override fun register(registerBody: RegisterBody): ResponseEntity<RegisterResponse> {
         turnstileService.verify(registerBody.turnstileToken)
+        return self.registerAfterTurnstile(registerBody)
+    }
+
+    /**
+     * Split from [register] so Turnstile's external HTTP call happens outside any DB transaction,
+     * while invite validation through redemption recording runs in one transaction — the pessimistic
+     * row lock `InviteService.validateAndLock` takes must be held until `recordRedemption` completes
+     * for capacity-limited public links to be race-safe (design.md D1).
+     */
+    @Transactional
+    fun registerAfterTurnstile(registerBody: RegisterBody): ResponseEntity<RegisterResponse> {
+        val invite = if (registerBody.inviteId != null && registerBody.inviteToken != null) {
+            inviteService.validateAndLock(registerBody.inviteId, registerBody.inviteToken, registerBody.email)
+        } else {
+            val inviteOnly = platformSettingsRepository
+                .findById(PlatformSettings.SINGLETON_ID)
+                .map { it.inviteOnlyEnabled }
+                .orElse(false)
+            if (inviteOnly) throw InviteException.Required()
+            null
+        }
+
         if (userRepository.findByEmail(registerBody.email) != null) {
             throw ConflictException("Email already registered")
         }
+
         val user = userRepository.save(
             UserEntity(
                 email = registerBody.email,
@@ -83,13 +125,24 @@ class AuthDelegateImpl(
             ),
         )
         groupMembershipService.assignToStandardGroup(user.id!!)
-        val verificationId = emailVerificationService.issueVerification(user.id!!, user.email)
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-            RegisterResponse(
-                verificationId = verificationId,
-                verificationStatus = VerificationStatus.PENDING_VERIFICATION,
-            ),
-        )
+
+        if (invite != null) {
+            inviteService.recordRedemption(invite, user.id!!)
+        }
+
+        return if (invite?.email != null) {
+            val verifiedUser = userRepository.save(user.copy(emailVerifiedAt = Instant.now()))
+            val userDetails = userDetailsService.loadUserByUsername(verifiedUser.email)
+            establishSession(userDetails)
+            ResponseEntity.status(HttpStatus.CREATED).body(
+                RegisterResponse(verificationId = null, verificationStatus = VerificationStatus.VERIFIED),
+            )
+        } else {
+            val verificationId = emailVerificationService.issueVerification(user.id!!, user.email)
+            ResponseEntity.status(HttpStatus.CREATED).body(
+                RegisterResponse(verificationId = verificationId, verificationStatus = VerificationStatus.PENDING_VERIFICATION),
+            )
+        }
     }
 
     override fun login(loginBody: LoginBody): ResponseEntity<AuthResponse> {

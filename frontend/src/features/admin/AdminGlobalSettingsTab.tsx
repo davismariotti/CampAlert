@@ -5,7 +5,8 @@ import {
   adminSetGlobalQuota,
   adminSetGlobalProviderQuota,
   adminClearGlobalProviderQuota,
-  adminSetGlobalProviderAccess
+  adminSetGlobalProviderAccess,
+  adminSetInviteOnly
 } from '../../api/generated/sdk.gen'
 import type { AdminGlobalSettingsResponse, ProviderType } from '../../api/generated/types.gen'
 import { useApiMutation } from '../../hooks/useApiMutation'
@@ -132,6 +133,35 @@ function ProviderRow({ provider, settings }: { provider: ProviderType; settings:
   )
 }
 
+function InviteOnlyRow({ settings }: { settings: AdminGlobalSettingsResponse }) {
+  const queryClient = useQueryClient()
+
+  const mutation = useApiMutation({
+    mutationFn: async (enabled: boolean) => {
+      const result = await adminSetInviteOnly({ body: { enabled } })
+      if (result.error) throw result
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    errorMessage: 'Failed to update invite-only mode. Please try again.'
+  })
+
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm">
+      <h2 className="mb-3 text-sm font-semibold text-forest-900">Invite-only mode</h2>
+      <Toggle
+        checked={settings.inviteOnlyEnabled}
+        disabled={mutation.isPending}
+        onChange={(checked) => mutation.mutate(checked)}
+        label={settings.inviteOnlyEnabled ? 'Registration requires an invite' : 'Open registration'}
+      />
+      <p className="mt-2 text-xs text-forest-500">
+        When enabled, new accounts can only be created via an admin-issued invite. Invite-based signup always works,
+        regardless of this setting.
+      </p>
+    </div>
+  )
+}
+
 export function AdminGlobalSettingsTab() {
   const { data, isLoading, isError } = useQuery({
     queryKey: QUERY_KEY,
@@ -147,6 +177,7 @@ export function AdminGlobalSettingsTab() {
 
   return (
     <div className="flex flex-col gap-6">
+      <InviteOnlyRow settings={data} />
       <p className="text-sm text-forest-500">
         These are the fallback values used when a user has no per-user or group override. Changes here take effect for
         affected users the next time their requests are checked, not immediately.

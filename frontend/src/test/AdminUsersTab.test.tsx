@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route, useSearchParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { AdminUsersPage } from '../features/admin/AdminUsersPage'
+import { AdminUsersTab } from '../features/admin/AdminUsersTab'
 import * as sdk from '../api/generated/sdk.gen'
 import type { AdminUserListResponse } from '../api/generated/types.gen'
 import type { ReactNode } from 'react'
@@ -12,7 +12,7 @@ function emptyList(): AdminUserListResponse {
   return { items: [], total: 0, page: 0, pageSize: 20 }
 }
 
-function Wrapper({ children, initialEntry = '/admin/users' }: { children: ReactNode; initialEntry?: string }) {
+function Wrapper({ children, initialEntry = '/admin' }: { children: ReactNode; initialEntry?: string }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return (
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -21,7 +21,7 @@ function Wrapper({ children, initialEntry = '/admin/users' }: { children: ReactN
   )
 }
 
-describe('AdminUsersPage', () => {
+describe('AdminUsersTab', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('debounces the search field instead of querying on every keystroke', async () => {
@@ -29,7 +29,7 @@ describe('AdminUsersPage', () => {
       .spyOn(sdk, 'adminListUsers')
       .mockResolvedValue({ data: emptyList(), error: undefined } as Awaited<ReturnType<typeof sdk.adminListUsers>>)
 
-    render(<AdminUsersPage />, { wrapper: Wrapper })
+    render(<AdminUsersTab />, { wrapper: Wrapper })
 
     await waitFor(() => expect(listSpy).toHaveBeenCalledWith({ query: { query: undefined, page: 0, pageSize: 20 } }))
     listSpy.mockClear()
@@ -49,7 +49,7 @@ describe('AdminUsersPage', () => {
       .spyOn(sdk, 'adminListUsers')
       .mockResolvedValue({ data: emptyList(), error: undefined } as Awaited<ReturnType<typeof sdk.adminListUsers>>)
 
-    render(<AdminUsersPage />, { wrapper: Wrapper })
+    render(<AdminUsersTab />, { wrapper: Wrapper })
     await waitFor(() => expect(listSpy).toHaveBeenCalled())
 
     const input = screen.getByPlaceholderText(/search by email or phone/i)
@@ -75,10 +75,10 @@ describe('AdminUsersPage', () => {
     }
 
     render(
-      <MemoryRouter initialEntries={['/admin/users?query=alice&page=1']}>
+      <MemoryRouter initialEntries={['/admin?query=alice&page=1']}>
         <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
           <Routes>
-            <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route path="/admin" element={<AdminUsersTab />} />
             <Route path="/admin/users/:id" element={<DetailStub />} />
           </Routes>
         </QueryClientProvider>
@@ -88,6 +88,6 @@ describe('AdminUsersPage', () => {
     await waitFor(() => expect(screen.getByText('target@test.com')).toBeInTheDocument())
     await userEvent.click(screen.getByText('target@test.com'))
 
-    expect(await screen.findByText('from=/admin/users?query=alice&page=1')).toBeInTheDocument()
+    expect(await screen.findByText('from=/admin?query=alice&page=1')).toBeInTheDocument()
   })
 })

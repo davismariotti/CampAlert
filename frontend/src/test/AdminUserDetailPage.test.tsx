@@ -78,3 +78,54 @@ describe('AdminUserDetailPage back-to-search-results link', () => {
     expect(screen.queryByRole('link', { name: /back to search results/i })).not.toBeInTheDocument()
   })
 })
+
+describe('AdminUserDetailPage group/override management', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  function stubQueries(detail: AdminUserDetailResponse) {
+    vi.spyOn(sdk, 'adminGetUser').mockResolvedValue({ data: detail, error: undefined } as Awaited<
+      ReturnType<typeof sdk.adminGetUser>
+    >)
+    vi.spyOn(sdk, 'adminListUserSearchRequests').mockResolvedValue({
+      data: [] as SearchRequestResponse[],
+      error: undefined
+    } as Awaited<ReturnType<typeof sdk.adminListUserSearchRequests>>)
+    vi.spyOn(sdk, 'adminListUserPermitSearchRequests').mockResolvedValue({
+      data: [] as PermitSearchRequestResponse[],
+      error: undefined
+    } as Awaited<ReturnType<typeof sdk.adminListUserPermitSearchRequests>>)
+    vi.spyOn(sdk, 'adminListGroups').mockResolvedValue({ data: [], error: undefined } as Awaited<
+      ReturnType<typeof sdk.adminListGroups>
+    >)
+  }
+
+  it('shows group membership and quota management inline, with no separate config tab to click', async () => {
+    stubQueries(user)
+    renderAt('/admin/users/5')
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'target@test.com' })).toBeInTheDocument())
+
+    // Visible immediately — no tab click required.
+    expect(screen.getByText('Group membership')).toBeInTheDocument()
+    expect(screen.getByText('Combined active alert limit')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^user config$/i })).not.toBeInTheDocument()
+  })
+
+  it('shows a visually distinct pill color for a per-user override vs an inherited default', async () => {
+    const overriddenUser: AdminUserDetailResponse = {
+      ...user,
+      effectiveCombinedQuota: { value: 3, source: 'USER_OVERRIDE' }
+    }
+    stubQueries(overriddenUser)
+    renderAt('/admin/users/5')
+
+    await waitFor(() => expect(screen.getByText('per-user override')).toBeInTheDocument())
+
+    const overridePill = screen.getByText('per-user override')
+    const inheritedPill = screen.getAllByText('global default')[0]
+
+    expect(overridePill.className).not.toEqual(inheritedPill.className)
+    expect(overridePill.className).toContain('amber')
+    expect(inheritedPill.className).not.toContain('amber')
+  })
+})

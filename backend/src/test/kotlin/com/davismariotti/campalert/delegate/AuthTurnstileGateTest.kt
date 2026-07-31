@@ -47,7 +47,10 @@ class AuthTurnstileGateTest {
         forgotPasswordRateLimiter = mock(ForgotPasswordRateLimiter::class.java),
         turnstileService = turnstileService,
         groupMembershipService = mock(com.davismariotti.campalert.security.GroupMembershipService::class.java),
+        inviteService = mock(com.davismariotti.campalert.service.invite.InviteService::class.java),
+        platformSettingsRepository = mock(com.davismariotti.campalert.repository.PlatformSettingsRepository::class.java),
         frontendBaseUrl = "http://localhost:5173",
+        self = mock(AuthDelegateImpl::class.java),
     )
 
     @Test

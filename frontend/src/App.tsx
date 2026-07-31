@@ -16,7 +16,6 @@ import { RequestsPage } from './features/requests/RequestsPage'
 import { PhoneNumbersPage } from './features/phones/PhoneNumbersPage'
 import { AccountSettingsPage } from './features/account/AccountSettingsPage'
 import { AdminHomePage } from './features/admin/AdminHomePage'
-import { AdminUsersPage } from './features/admin/AdminUsersPage'
 import { AdminUserDetailPage } from './features/admin/AdminUserDetailPage'
 import { TermsPage } from './pages/TermsPage'
 import { PrivacyPage } from './pages/PrivacyPage'
@@ -112,14 +111,6 @@ function AuthGate() {
           element={
             <AdminRoute>
               <AdminHomePage />
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="/admin/users"
-          element={
-            <AdminRoute>
-              <AdminUsersPage />
             </AdminRoute>
           }
         />

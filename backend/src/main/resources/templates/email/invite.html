@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en"
+      th:replace="~{email/layout :: shell(~{::title}, ~{::div#email-body})}">
+<head>
+  <title>You're invited to CampAlert</title>
+</head>
+<body>
+<div id="email-body">
+  <h2 style="margin: 0 0 8px 0; color: #1a3d2e; font-size: 20px; font-weight: 700;">You're invited to CampAlert</h2>
+  <p style="margin: 0 0 24px 0; color: #374151; font-size: 15px; line-height: 1.5;">
+    An admin has invited you to join CampAlert. Click the button below to create your account.
+  </p>
+  <div style="text-align: center; margin-bottom: 24px;">
+    <a th:href="${inviteUrl}"
+       href="#"
+       style="display: inline-block; padding: 12px 28px; background-color: #f59e0b; color: #1a3d2e; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 700; letter-spacing: 0.2px;">
+      Create your account
+    </a>
+  </div>
+  <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+    This invitation expires in <span th:text="${expiryDays}">7</span> days.
+    If you weren't expecting this invitation, you can safely ignore this email.
+  </p>
+</div>
+</body>
+</html>
