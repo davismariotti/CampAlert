@@ -383,3 +383,49 @@ CREATE TABLE "public"."admin_audit_log" (
 );
 CREATE INDEX ON "public"."admin_audit_log" ("target_user_id");
 CREATE INDEX ON "public"."admin_audit_log" ("created_at");
+-- Create "platform_settings" table
+-- Singleton row (id always 1) holding platform-wide toggles.
+CREATE TABLE "public"."platform_settings" (
+  "id" smallint NOT NULL DEFAULT 1,
+  "invite_only_enabled" boolean NOT NULL DEFAULT false,
+  PRIMARY KEY ("id"),
+  CONSTRAINT "chk_platform_settings_singleton" CHECK (id = 1)
+);
+-- Create "invites" table
+-- Unified model for both targeted email invites (email NOT NULL, max_uses = 1) and
+-- capacity-based public links (email NULL, max_uses >= 1). Status is derived at query
+-- time from deactivated_at / expires_at / used_count, not stored.
+CREATE TABLE "public"."invites" (
+  "id" uuid NOT NULL,
+  "email" character varying(255) NULL,
+  "token_hash" text NOT NULL,
+  "max_uses" integer NOT NULL DEFAULT 1,
+  "used_count" integer NOT NULL DEFAULT 0,
+  "created_by_user_id" bigint NOT NULL,
+  "created_at" timestamptz NOT NULL,
+  "expires_at" timestamptz NOT NULL,
+  "deactivated_at" timestamptz NULL,
+  PRIMARY KEY ("id"),
+  CONSTRAINT "fk_invites_created_by" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."users" ("id"),
+  CONSTRAINT "chk_invites_max_uses_positive" CHECK (max_uses >= 1),
+  CONSTRAINT "chk_invites_used_count_nonnegative" CHECK (used_count >= 0)
+);
+CREATE INDEX ON "public"."invites" ("email");
+CREATE INDEX ON "public"."invites" ("deactivated_at", "expires_at", "used_count");
+CREATE INDEX ON "public"."invites" ("created_by_user_id");
+-- Create "invite_redemptions" table
+-- One row per successful signup against an invite. Drives the "5 of 100 redeemed"
+-- count (COUNT(*) per invite_id) and gives a per-user audit trail without denormalizing
+-- used_count as the source of truth (used_count on invites is maintained alongside this,
+-- inside the same locked transaction, purely as a fast-path guard on the capacity check).
+CREATE TABLE "public"."invite_redemptions" (
+  "id" uuid NOT NULL,
+  "invite_id" uuid NOT NULL,
+  "user_id" bigint NOT NULL,
+  "redeemed_at" timestamptz NOT NULL,
+  PRIMARY KEY ("id"),
+  CONSTRAINT "fk_invite_redemptions_invite" FOREIGN KEY ("invite_id") REFERENCES "public"."invites" ("id"),
+  CONSTRAINT "fk_invite_redemptions_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
+  UNIQUE ("user_id")
+);
+CREATE INDEX ON "public"."invite_redemptions" ("invite_id");

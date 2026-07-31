@@ -4,6 +4,7 @@ import com.davismariotti.campalert.api.AdminGlobalSettingsApiDelegate
 import com.davismariotti.campalert.api.model.AdminGlobalProviderAccess
 import com.davismariotti.campalert.api.model.AdminGlobalProviderQuota
 import com.davismariotti.campalert.api.model.AdminGlobalSettingsResponse
+import com.davismariotti.campalert.api.model.AdminSetInviteOnlyBody
 import com.davismariotti.campalert.api.model.AdminSetProviderAccessBody
 import com.davismariotti.campalert.api.model.AdminSetQuotaBody
 import com.davismariotti.campalert.api.model.ProviderType
@@ -11,10 +12,12 @@ import com.davismariotti.campalert.model.AdminAuditAction
 import com.davismariotti.campalert.model.GlobalProviderAccess
 import com.davismariotti.campalert.model.GlobalProviderQuotaDefault
 import com.davismariotti.campalert.model.GlobalQuotaDefault
+import com.davismariotti.campalert.model.PlatformSettings
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.repository.GlobalProviderAccessRepository
 import com.davismariotti.campalert.repository.GlobalProviderQuotaDefaultRepository
 import com.davismariotti.campalert.repository.GlobalQuotaDefaultRepository
+import com.davismariotti.campalert.repository.PlatformSettingsRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.service.AdminAuditService
 import com.davismariotti.campalert.util.currentUserId
@@ -32,6 +35,7 @@ class AdminGlobalSettingsDelegateImpl(
     private val globalQuotaDefaultRepository: GlobalQuotaDefaultRepository,
     private val globalProviderQuotaDefaultRepository: GlobalProviderQuotaDefaultRepository,
     private val globalProviderAccessRepository: GlobalProviderAccessRepository,
+    private val platformSettingsRepository: PlatformSettingsRepository,
     private val adminAuditService: AdminAuditService,
 ) : AdminGlobalSettingsApiDelegate {
     private fun currentUserId(): Long = currentUserId(userRepository)
@@ -45,7 +49,19 @@ class AdminGlobalSettingsDelegateImpl(
         val providerAccess = Provider.entries.map { provider ->
             AdminGlobalProviderAccess(provider.toApiType(), globalProviderAccessRepository.findById(provider).map { it.enabled }.orElse(false))
         }
-        return ResponseEntity.ok(AdminGlobalSettingsResponse(combined, providerQuotas, providerAccess))
+        val inviteOnlyEnabled = platformSettingsRepository
+            .findById(PlatformSettings.SINGLETON_ID)
+            .map { it.inviteOnlyEnabled }
+            .orElse(false)
+        return ResponseEntity.ok(AdminGlobalSettingsResponse(combined, providerQuotas, providerAccess, inviteOnlyEnabled))
+    }
+
+    @Transactional
+    @PreAuthorize("hasAuthority('MANAGE_GLOBAL_SETTINGS')")
+    override fun adminSetInviteOnly(adminSetInviteOnlyBody: AdminSetInviteOnlyBody): ResponseEntity<Unit> {
+        platformSettingsRepository.save(PlatformSettings(inviteOnlyEnabled = adminSetInviteOnlyBody.enabled))
+        adminAuditService.record(currentUserId(), null, AdminAuditAction.INVITE_ONLY_MODE_CHANGED, "enabled=${adminSetInviteOnlyBody.enabled}")
+        return ResponseEntity.noContent().build()
     }
 
     @Transactional

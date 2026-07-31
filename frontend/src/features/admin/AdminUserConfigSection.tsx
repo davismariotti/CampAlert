@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  adminGetUser,
   adminListGroups,
   adminAddUserToGroup,
   adminRemoveUserFromGroup,
@@ -30,12 +29,11 @@ function sourceLabel(source: AdminEffectiveValueSource): string {
   }
 }
 
+// Per-user overrides get a visually distinct color from inherited (group/global) defaults, so an
+// admin can tell at a glance whether a value has been customized for this one person.
 function SourceBadge({ source }: { source: AdminEffectiveValueSource }) {
-  return (
-    <span className="rounded-full bg-forest-100 px-2 py-0.5 text-xs font-medium text-forest-600">
-      {sourceLabel(source)}
-    </span>
-  )
+  const style = source === 'USER_OVERRIDE' ? 'bg-amber-100 text-amber-800' : 'bg-forest-100 text-forest-600'
+  return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${style}`}>{sourceLabel(source)}</span>
 }
 
 function GroupMembershipSection({ user, userId }: { user: AdminUserDetailResponse; userId: number }) {
@@ -292,23 +290,8 @@ function ProviderOverrideRow({
   )
 }
 
-export function AdminUserConfigTab({ userId }: { userId: number }) {
-  const {
-    data: user,
-    isLoading,
-    isError
-  } = useQuery({
-    queryKey: ['admin-user', userId],
-    queryFn: async () => {
-      const result = await adminGetUser({ path: { id: userId } })
-      if (result.error) throw result
-      return result.data!
-    }
-  })
-
-  if (isLoading) return <p className="text-sm text-forest-500">Loading…</p>
-  if (isError || !user) return <p className="text-sm text-red-600">Failed to load user config.</p>
-
+/** Group membership and per-user quota/provider-access overrides, shown inline on the user detail page (no separate tab). */
+export function AdminUserConfigSection({ user, userId }: { user: AdminUserDetailResponse; userId: number }) {
   return (
     <div className="flex flex-col gap-6">
       <GroupMembershipSection user={user} userId={userId} />

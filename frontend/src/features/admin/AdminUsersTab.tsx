@@ -11,7 +11,7 @@ function formatDate(dateStr: string | null | undefined) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-export function AdminUsersPage() {
+export function AdminUsersTab() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get('query') ?? ''
@@ -51,14 +51,12 @@ export function AdminUsersPage() {
   }
 
   function goToUser(id: number) {
-    const from = `/admin/users?${searchParams.toString()}`
+    const from = `/admin?${searchParams.toString()}`
     navigate(`/admin/users/${id}?from=${encodeURIComponent(from)}`)
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-semibold text-forest-900">Users</h1>
-
+    <div>
       <div className="relative mb-4 max-w-sm">
         <Input placeholder="Search by email or phone" value={query} onChange={(e) => setQuery(e.target.value)} />
         {query !== '' && (

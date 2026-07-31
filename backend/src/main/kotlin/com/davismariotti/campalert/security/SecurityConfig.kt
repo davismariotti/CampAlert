@@ -77,6 +77,8 @@ class SecurityConfig(
                 auth
                     .requestMatchers(HttpMethod.POST, "/api/auth/register")
                     .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/auth/registration-config")
+                    .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/login")
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/resend-verification")
