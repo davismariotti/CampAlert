@@ -109,7 +109,7 @@ class InviteServiceTest {
         service.createEmailInvites(listOf("new@example.com"), expiresInDays = null, actingAdminId = 1L)
 
         val url = ((sent[0] as InviteNotification).email() as EmailContent.Templated).params["inviteUrl"] as String
-        val token = url.substringAfter("&token=")
+        val token = url.substringAfter("&token=").substringBefore("&")
         assertEquals(CryptoUtils.sha256(token), savedInvites[0].tokenHash)
         assertFalse(savedInvites[0].tokenHash.contains(token))
     }
