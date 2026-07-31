@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AdminUserDetailPage } from '../features/admin/AdminUserDetailPage'
 import * as sdk from '../api/generated/sdk.gen'
 import type {
+  AdminGroupSummary,
   AdminUserDetailResponse,
   PermitSearchRequestResponse,
   SearchRequestResponse
@@ -94,9 +95,10 @@ describe('AdminUserDetailPage group/override management', () => {
       data: [] as PermitSearchRequestResponse[],
       error: undefined
     } as Awaited<ReturnType<typeof sdk.adminListUserPermitSearchRequests>>)
-    vi.spyOn(sdk, 'adminListGroups').mockResolvedValue({ data: [], error: undefined } as Awaited<
-      ReturnType<typeof sdk.adminListGroups>
-    >)
+    vi.spyOn(sdk, 'adminListGroups').mockResolvedValue({
+      data: [] as AdminGroupSummary[],
+      error: undefined
+    } as Awaited<ReturnType<typeof sdk.adminListGroups>>)
   }
 
   it('shows group membership and quota management inline, with no separate config tab to click', async () => {
