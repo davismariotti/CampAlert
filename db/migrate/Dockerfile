@@ -24,7 +24,25 @@ USER migrate
 # Pre-cache the embedded Postgres binaries at build time (network access is
 # fine here — this runs in CI) so the deploy-time container never needs to
 # reach the binary distribution host. See db/migrate: task 2.2 / design.md.
-RUN /migrate -warm-cache
+#
+# embedded-postgres's own fetch has no retry (a single non-200 from Maven
+# Central is treated as "no version found" and fails outright — confirmed via
+# a real CI failure where the exact version/platform artifact existed on
+# Maven Central moments later). Retry with backoff here rather than in the Go
+# binary, since only this build-time fetch is ever exposed to that network
+# call — the deploy-time container never re-downloads.
+RUN set -e; \
+    n=0; \
+    until [ "$n" -ge 5 ]; do \
+      /migrate -warm-cache && break; \
+      n=$((n + 1)); \
+      if [ "$n" -ge 5 ]; then \
+        echo "warm-cache failed after $n attempts"; \
+        exit 1; \
+      fi; \
+      echo "warm-cache attempt $n failed, retrying in $((n * 5))s..."; \
+      sleep $((n * 5)); \
+    done
 
 FROM debian:bookworm-slim
 
@@ -39,8 +57,6 @@ COPY --from=build --chown=migrate:migrate /opt/embedded-postgres/binaries /opt/e
 RUN mkdir -p /opt/embedded-postgres/runtime /opt/embedded-postgres/data \
     && chown -R migrate:migrate /opt/embedded-postgres
 
-# NOTE: assumes the atlas binary lives at /atlas in arigaio/atlas — unverified,
-# needs confirming against a real pull before this Dockerfile is trusted.
 COPY --from=arigaio/atlas:latest /atlas /app/atlas
 
 COPY --chown=migrate:migrate schema.sql /app/schema.sql
