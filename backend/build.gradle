@@ -89,7 +89,7 @@ sourceSets {
             runtimeClasspath += main.output + test.output
             srcDir 'src/integrationTest/kotlin'
         }
-        resources.srcDirs = ['src/integrationTest/resources', 'db']
+        resources.srcDirs = ['src/integrationTest/resources', '../db']
     }
     main {
         kotlin {
