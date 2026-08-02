@@ -9,7 +9,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCHEMA_FILE="$SCRIPT_DIR/../db/schema.sql"
+SCHEMA_FILE="$SCRIPT_DIR/../schema.sql"
 COMPOSE=(docker-compose -f "$SCRIPT_DIR/../../docker/docker-compose-dev.yaml" --profile migrate)
 COMMAND=${1:-diff}
 
