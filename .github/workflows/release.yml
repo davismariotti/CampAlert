@@ -7,6 +7,7 @@ on:
       - 'backend/**'
       - 'frontend/**'
       - 'api/**'
+      - 'db/**'
       - '.releaserc.json'
   workflow_dispatch:
     inputs:
@@ -101,6 +102,36 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  build-and-push-migrate-image:
+    needs: release-check
+    if: needs.release-check.outputs.new-release-published == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - if: inputs.dry_run != true
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: davismariotti/campalert-migrate
+          tags: |
+            type=raw,value=${{ needs.release-check.outputs.new-release-version }}
+            type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: db
+          file: db/migrate/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ inputs.dry_run != true }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   build-frontend:
     needs: release-check
     if: needs.release-check.outputs.new-release-published == 'true'
@@ -134,7 +165,7 @@ jobs:
           retention-days: 1
 
   release:
-    needs: [release-check, build-and-push-docker, build-frontend]
+    needs: [release-check, build-and-push-docker, build-and-push-migrate-image, build-frontend]
     if: needs.release-check.outputs.new-release-published == 'true' && inputs.dry_run != true
     runs-on: ubuntu-latest
     permissions:

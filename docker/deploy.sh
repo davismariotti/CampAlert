@@ -1,6 +1,8 @@
 #!/bin/bash
 # Usage: ./docker/deploy.sh [--allow-unsafe] [--migrate-only] [--frontend-only]
-#   --allow-unsafe    Allow schema changes that drop tables or columns (data loss)
+#   --allow-unsafe    Prints a warning only; destructive schema changes are governed by
+#                     db/atlas.hcl's destructive-lint policy, unaffected by this flag
+#                     (preserved as-is from before the migrate-image change — not new)
 #   --migrate-only    Run migrations only; skip app and frontend deployment
 #   --frontend-only   Deploy frontend only; skip migrations and app deployment
 
@@ -34,25 +36,23 @@ source "$ENV_FILE"
 set +a
 
 if [ "$FRONTEND_ONLY" = "false" ]; then
-  echo "Pulling latest migrate images..."
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate pull
+  MIGRATE_IMAGE="davismariotti/campalert-migrate:latest"
 
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate rm --stop --force atlas-dev-db 2>/dev/null || true
+  echo "Pulling latest migrate image..."
+  docker pull "$MIGRATE_IMAGE"
+
+  if [ "$ALLOW_UNSAFE" = "true" ]; then
+    echo "WARNING: --allow-unsafe passed; destructive schema changes are still governed by db/atlas.hcl's destructive-lint policy, not by this flag."
+  fi
 
   echo "Running migrations..."
-  if [ "$ALLOW_UNSAFE" = "true" ]; then
-    echo "WARNING: --allow-unsafe passed; destructive schema changes will not be blocked."
-    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate run --rm migrate \
-      schema apply \
-      --url "postgres://${DB_USERNAME}:${DB_PASSWORD}@localhost:5432/campalert?sslmode=disable" \
-      --to "file:///db/schema.sql" \
-      --dev-url "postgres://dev:dev@localhost:5433/dev?sslmode=disable" \
-      --config file:///db/atlas.hcl \
-      --auto-approve
-  else
-    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate run --rm migrate
-  fi
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile migrate rm --stop --force atlas-dev-db
+  # Self-contained image (see db/migrate) — carries its own isolated embedded
+  # Postgres for diffing, so this is the only container involved. Joins the
+  # same external network the `app` service uses to reach the real database
+  # by the same "postgres" hostname `SPRING_DATASOURCE_URL` already uses.
+  docker run --rm --network services_backend \
+    -e MIGRATE_TARGET_DB_URL="postgres://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/campalert?sslmode=disable" \
+    "$MIGRATE_IMAGE" apply
 
   if [ "$MIGRATE_ONLY" = "true" ]; then
     echo "Migrations complete. Skipping app and frontend deployment."

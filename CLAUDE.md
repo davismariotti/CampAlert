@@ -12,7 +12,7 @@ Frontend is organized by feature under `frontend/src/features/` (e.g. `permit/`,
 
 - Backend: Kotlin 1.9.25 / Spring Boot 3.3.3 / Gradle (Groovy DSL) / Java 21
 - Frontend: React 19 / TypeScript / Vite / Tailwind CSS 4 / TanStack Query / react-router-dom
-- PostgreSQL — schema managed by Atlas (`backend/db/schema.sql` is the source of truth)
+- PostgreSQL — schema managed by Atlas (`db/schema.sql` is the source of truth)
 - OpenAPI spec-first — `api/campalert-api.yaml` drives code generation for both sides: `openApiGenerate` (Gradle) on the backend, `npm run generate` (`@hey-api/openapi-ts`) on the frontend
 - Retrofit2 — internal client for Recreation.gov API only (not used for the app's own API)
 
@@ -55,9 +55,10 @@ Vite proxies `/api` to `http://localhost:8080`, so run the backend (above) along
 | OpenAPI spec | `api/campalert-api.yaml` |
 | Generated interfaces + models | `backend/build/generated/openapi/` (never edit directly) |
 | Delegate implementations | `backend/src/main/kotlin/.../delegate/` |
-| Database schema | `backend/db/schema.sql` |
-| Atlas config | `backend/db/atlas.hcl` |
-| Atlas + build scripts | `backend/scripts/` |
+| Database schema | `db/schema.sql` |
+| Atlas config | `db/atlas.hcl` |
+| Atlas script | `db/scripts/atlas.sh` |
+| Backend build/release script | `backend/scripts/build.sh` |
 
 ## Environment variable workflow
 
@@ -67,11 +68,11 @@ Vite proxies `/api` to `http://localhost:8080`, so run the backend (above) along
 
 When making any schema change:
 
-1. Edit `backend/db/schema.sql` to reflect the desired state
-2. `./backend/scripts/atlas.sh diff` — review the DDL Atlas would execute
-3. `./backend/scripts/atlas.sh apply` — apply to local DB
+1. Edit `db/schema.sql` to reflect the desired state
+2. `./db/scripts/atlas.sh diff` — review the DDL Atlas would execute
+3. `./db/scripts/atlas.sh apply` — apply to local DB
 4. Run the app — Hibernate `validate` on startup confirms the entity mappings still match
-5. Commit `backend/db/schema.sql` in the same commit as any entity changes
+5. Commit `db/schema.sql` in the same commit as any entity changes
 
 ## API change workflow
 

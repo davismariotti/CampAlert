@@ -51,7 +51,7 @@ services:
       atlas-dev-db:
         condition: service_healthy
     volumes:
-      - ../backend/db:/db
+      - ../db:/db
     command: >
       schema apply
       --url "postgres://campalert:campalert@db:5432/campalert?sslmode=disable"
