@@ -122,6 +122,11 @@ jobs:
           git show ${{ github.event.pull_request.base.sha }}:db/schema.sql > /tmp/base-schema.sql \
             || echo "-- (db/schema.sql did not exist on the base branch)" > /tmp/base-schema.sql
 
+      # Pulled as its own step so the pull's progress output never ends up mixed
+      # into the diff output captured below (learned the hard way — see PR #76).
+      - name: Pull atlas image
+        run: docker pull arigaio/atlas:latest
+
       - name: Compute schema diff
         id: diff
         run: |
