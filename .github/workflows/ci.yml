@@ -13,6 +13,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      db: ${{ steps.filter.outputs.db }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -25,6 +26,8 @@ jobs:
             frontend:
               - 'frontend/**'
               - 'api/**'
+            db:
+              - 'db/**'
 
   backend-lint:
     needs: changes
@@ -66,7 +69,7 @@ jobs:
 
   backend-integration-test:
     needs: changes
-    if: needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.db == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -82,6 +85,89 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Run integration tests
         run: ./gradlew integrationTest
+
+  # Informational only — not part of the `ci` gate. Posts (or updates) a single
+  # PR comment showing the DDL Atlas would apply going from the base branch's
+  # db/schema.sql to this branch's, using a throwaway dev-db exactly like
+  # db/scripts/atlas.sh does locally — no live database involved, so this is
+  # safe to run against every PR that touches the schema.
+  schema-diff-comment:
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.db == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: dev
+          POSTGRES_PASSWORD: dev
+          POSTGRES_DB: dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dev -d dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get base branch's schema.sql
+        run: |
+          git show ${{ github.event.pull_request.base.sha }}:db/schema.sql > /tmp/base-schema.sql \
+            || echo "-- (db/schema.sql did not exist on the base branch)" > /tmp/base-schema.sql
+
+      - name: Compute schema diff
+        id: diff
+        run: |
+          DIFF_OUTPUT=$(docker run --rm --network host \
+            -v /tmp/base-schema.sql:/base/schema.sql:ro \
+            -v "${{ github.workspace }}/db/schema.sql:/head/schema.sql:ro" \
+            arigaio/atlas schema diff \
+              --from file:///base/schema.sql \
+              --to file:///head/schema.sql \
+              --dev-url "postgres://dev:dev@localhost:5432/dev?sslmode=disable" 2>&1)
+
+          echo "output<<SCHEMA_DIFF_EOF" >> "$GITHUB_OUTPUT"
+          echo "$DIFF_OUTPUT" >> "$GITHUB_OUTPUT"
+          echo "SCHEMA_DIFF_EOF" >> "$GITHUB_OUTPUT"
+
+          if echo "$DIFF_OUTPUT" | grep -q "Schemas are synced, no changes to be made"; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Find existing schema-diff comment
+        if: steps.diff.outputs.has_changes == 'true'
+        uses: peter-evans/find-comment@v3
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: '<!-- schema-diff-comment -->'
+
+      - name: Create or update schema diff comment
+        if: steps.diff.outputs.has_changes == 'true'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          edit-mode: replace
+          body: |
+            <!-- schema-diff-comment -->
+            ### Schema diff
+
+            This PR changes `db/schema.sql`. Here's the DDL Atlas would apply going from the base branch to this one:
+
+            ```sql
+            ${{ steps.diff.outputs.output }}
+            ```
 
   frontend-lint:
     needs: changes
