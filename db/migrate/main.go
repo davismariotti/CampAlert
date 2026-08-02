@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -42,6 +43,12 @@ func main() {
 }
 
 func run(warmCache bool, mode string) int {
+	// Postgres's own initdb/startup/shutdown chatter is noise on the common
+	// path (a deploy where nothing goes wrong) — buffer it instead of piping
+	// straight to stdout, and only dump it if Start() actually fails, so the
+	// diagnostic detail is still there exactly when it's needed.
+	var postgresLog bytes.Buffer
+
 	config := embeddedpostgres.DefaultConfig().
 		Version(embeddedpostgres.V16).
 		Username(devUser).
@@ -52,7 +59,7 @@ func run(warmCache bool, mode string) int {
 		RuntimePath(runtimePath).
 		DataPath(dataPath).
 		StartTimeout(45 * time.Second).
-		Logger(os.Stdout)
+		Logger(&postgresLog)
 
 	postgres := embeddedpostgres.NewDatabase(config)
 
@@ -61,6 +68,7 @@ func run(warmCache bool, mode string) int {
 	// cache at image-build time and to run the real dev-db at deploy time.
 	if err := postgres.Start(); err != nil {
 		log.Printf("failed to start embedded postgres: %v", err)
+		os.Stderr.Write(postgresLog.Bytes())
 		return 1
 	}
 	defer func() {
