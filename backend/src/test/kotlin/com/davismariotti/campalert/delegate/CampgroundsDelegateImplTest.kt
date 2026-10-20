@@ -19,6 +19,7 @@ private class FakeCatalogProvider(
     private val results: () -> List<CampgroundSearchResult> = { emptyList() },
     private val campground: () -> CampgroundResponse? = { null },
     private val loops: () -> List<LoopInfo> = { emptyList() },
+    override val includeInUnscopedSearch: Boolean = true,
 ) : CampgroundCatalogProvider {
     override fun search(query: String): List<CampgroundSearchResult> = results()
 
@@ -56,6 +57,19 @@ class CampgroundsDelegateImplTest {
         val response = d.searchCampgrounds("elkmont", ProviderType.RECREATION_GOV)
 
         assertEquals(listOf(1), response.body?.map { it.id })
+    }
+
+    @Test
+    fun `unscoped search excludes providers that opt out, while a scoped search still returns them`() {
+        val recreationResults = listOf(CampgroundSearchResult(id = 1, name = "San Francisco KOA", provider = Provider.RECREATION_GOV.toApi()))
+        val globalEntryResults = listOf(CampgroundSearchResult(id = 5446, name = "SF Enrollment Center — San Francisco, CA", provider = Provider.GLOBAL_ENTRY.toApi()))
+        val d = delegate(
+            FakeCatalogProvider(Provider.RECREATION_GOV, results = { recreationResults }),
+            FakeCatalogProvider(Provider.GLOBAL_ENTRY, results = { globalEntryResults }, includeInUnscopedSearch = false),
+        )
+
+        assertEquals(listOf(1), d.searchCampgrounds("san francisco", null).body?.map { it.id })
+        assertEquals(listOf(5446), d.searchCampgrounds("san francisco", ProviderType.GLOBAL_ENTRY).body?.map { it.id })
     }
 
     @Test

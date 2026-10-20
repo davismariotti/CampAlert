@@ -9,9 +9,11 @@ import com.davismariotti.campalert.model.RequestType
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchType
 import com.davismariotti.campalert.notification.CampsiteAlertNotification
+import com.davismariotti.campalert.notification.GlobalEntryAlertNotification
 import com.davismariotti.campalert.notification.PendingNotification
 import com.davismariotti.campalert.notification.PendingPermitNotification
 import com.davismariotti.campalert.notification.PermitAlertNotification
+import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.PermitSearchRequestRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
@@ -120,14 +122,22 @@ class CampsiteAlertOutboxProcessor(
         val channel = if (pushoverTarget != null) "PUSHOVER" else "SMS"
         val smsContextIds = mutableListOf<Long>()
 
-        if (campgroundToSend.isNotEmpty()) {
-            val available = campgroundToSend.filter { it.type == OutboxType.AVAILABLE || it.type == OutboxType.REMINDER }
-            val gone = campgroundToSend.filter { it.type == OutboxType.UNAVAILABLE }
-            val notification = CampsiteAlertNotification(available, gone)
-            val outboxRows = campgroundToSend.map { rowById[it.outboxId]!! }
+        // Campground-type requests are split by provider: each provider's wording is its own notification
+        // (a Global Entry alert shares nothing with the campsite text), sent as its own group like permits.
+        val (globalEntryToSend, campsiteToSend) = campgroundToSend.partition { it.request.provider == Provider.GLOBAL_ENTRY }
+        val campgroundGroups: List<Pair<List<PendingNotification>, (List<PendingNotification>, List<PendingNotification>) -> Notification>> = listOf(
+            campsiteToSend to { available, gone -> CampsiteAlertNotification(available, gone) },
+            globalEntryToSend to { available, gone -> GlobalEntryAlertNotification(available, gone) },
+        )
+        campgroundGroups.forEach { (group, buildNotification) ->
+            if (group.isEmpty()) return@forEach
+            val available = group.filter { it.type == OutboxType.AVAILABLE || it.type == OutboxType.REMINDER }
+            val gone = group.filter { it.type == OutboxType.UNAVAILABLE }
+            val notification = buildNotification(available, gone)
+            val outboxRows = group.map { rowById[it.outboxId]!! }
             val sent = sendGroup(userId, notification, outboxRows, channel, pushoverTarget, recipient, now, available.size, gone.size)
             if (sent) {
-                campgroundToSend.forEach { n ->
+                group.forEach { n ->
                     if (n.type == OutboxType.AVAILABLE || n.type == OutboxType.REMINDER) {
                         n.request.lastNotifiedAt = now
                         searchRequestRepository.save(n.request)

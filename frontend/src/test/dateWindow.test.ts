@@ -21,6 +21,38 @@ describe('dateWindow helpers', () => {
   it('maxRangeWidthDaysFor mirrors the backend caps', () => {
     expect(maxRangeWidthDaysFor('RECREATION_GOV')).toBe(30)
     expect(maxRangeWidthDaysFor('CAMPLIFE')).toBe(9)
+    expect(maxRangeWidthDaysFor('RESERVE_CALIFORNIA')).toBe(9)
+    expect(maxRangeWidthDaysFor('GLOBAL_ENTRY')).toBe(60)
+  })
+
+  describe('Global Entry', () => {
+    const base = { mode: 'flexible' as const, nights: 1, providerType: 'GLOBAL_ENTRY' as const }
+
+    it('allows a 60-day range and rejects 61 days', () => {
+      expect(validateDateWindow({ ...base, startDay: '2026-07-01', latestStartDay: '2026-08-30' })).toBeNull()
+      expect(validateDateWindow({ ...base, startDay: '2026-07-01', latestStartDay: '2026-08-31' })).toBe(
+        "Range can't be more than 60 days for Global Entry"
+      )
+    })
+
+    it('uses day wording instead of arrival wording', () => {
+      expect(validateDateWindow({ ...base, startDay: '', latestStartDay: '' })).toBe('Date is required')
+      expect(validateDateWindow({ ...base, startDay: '2026-07-01', latestStartDay: '' })).toBe(
+        'Latest day is required for a flexible search'
+      )
+      expect(validateDateWindow({ ...base, startDay: '2026-07-10', latestStartDay: '2026-07-01' })).toBe(
+        'Latest day must be on or after Jul 10'
+      )
+    })
+
+    it('summarizes appointment days rather than stays', () => {
+      expect(dateWindowSummary({ ...base, mode: 'exact', startDay: '2026-07-01', latestStartDay: '' })).toBe(
+        'Watching Jul 1'
+      )
+      expect(dateWindowSummary({ ...base, startDay: '2026-07-01', latestStartDay: '2026-07-08' })).toBe(
+        'Watching any day between Jul 1 and Jul 8'
+      )
+    })
   })
 
   describe('candidateArrivalCount', () => {

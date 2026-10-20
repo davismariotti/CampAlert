@@ -4,6 +4,7 @@ import com.davismariotti.campalert.api.model.LoginBody
 import com.davismariotti.campalert.api.model.RegisterBody
 import com.davismariotti.campalert.api.model.VerifyEmailBody
 import com.davismariotti.campalert.provider.camplife.CampLifeApi
+import com.davismariotti.campalert.provider.globalentry.GlobalEntryApi
 import com.davismariotti.campalert.provider.recreation.RecreationApi
 import com.davismariotti.campalert.provider.recreation.RidbApi
 import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaApi
@@ -102,6 +103,12 @@ open class IntegrationTestBase {
     // fetch (caught, logged, empty/null result).
     @MockitoBean
     protected lateinit var reserveCaliforniaApi: ReserveCaliforniaApi
+
+    // Same reasoning as campLifeApi/reserveCaliforniaApi above — the directory refresh job fires at
+    // startup, and an unstubbed mock's null Retrofit Call is treated as a failed fetch, so no test
+    // hits the real Trusted Traveler scheduler unless it explicitly stubs this.
+    @MockitoBean
+    protected lateinit var globalEntryApi: GlobalEntryApi
 
     // Replaces the real Cloudflare Turnstile client so no real network call is made during tests —
     // mirrors how recreationApi/ridbApi/campLifeApi are mocked above rather than pointed at a real

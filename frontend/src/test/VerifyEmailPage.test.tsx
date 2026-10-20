@@ -15,7 +15,8 @@ const verifiedAuth: AuthResponse = {
   timezone: 'America/Los_Angeles',
   verificationStatus: 'VERIFIED',
   pushoverOverrideEnabled: false,
-  permissions: []
+  permissions: [],
+  enabledProviders: ['RECREATION_GOV']
 }
 
 function Wrapper({ initialEntry = `/verify-email?verificationId=${verificationId}` }: { initialEntry?: string }) {

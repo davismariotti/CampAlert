@@ -1,9 +1,12 @@
 package com.davismariotti.campalert.service.state
 
 import com.davismariotti.campalert.model.AvailabilityState
+import com.davismariotti.campalert.model.GlobalEntrySearchRequestState
 import com.davismariotti.campalert.model.NotificationOutbox
 import com.davismariotti.campalert.model.OutboxType
+import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.service.availability.AvailabilityResult
@@ -43,6 +46,7 @@ class AvailabilityStateService(
         // deliberately not its own notification trigger — see design.md decision 6.
         state.matchedStartDay = if (hasAvailable) result.matchedStartDay else null
         state.matchedEndDay = if (hasAvailable) result.matchedEndDay else null
+        applyGlobalEntryMatch(request, result)
 
         if (!hasAvailable && currentState == AvailabilityState.AVAILABLE) {
             val becameAt = state.becameAvailableAt
@@ -113,6 +117,24 @@ class AvailabilityStateService(
                 ),
             )
         }
+    }
+
+    /**
+     * Global Entry's earliest matching slot time and slot count live in their own table (not the shared
+     * state table), written on every check that finds availability and cleared when it doesn't — like the
+     * matched dates, a count/time change while continuously available is never its own notification trigger.
+     */
+    private fun applyGlobalEntryMatch(request: SearchRequest, result: AvailabilityResult) {
+        if (request.provider != Provider.GLOBAL_ENTRY) return
+        val match = result.globalEntryMatch
+        val existing = request.globalEntryState
+        if (match == null && existing == null) return
+        val state = existing ?: GlobalEntrySearchRequestState().also {
+            it.searchRequest = request
+            request.globalEntryState = it
+        }
+        state.matchedStartTime = match?.earliestStartTime
+        state.matchedSlotCount = match?.slotCount
     }
 
     /** Returns `now()` outside quiet hours (1am–6am local) or the next 6am if inside. */

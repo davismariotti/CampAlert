@@ -15,6 +15,13 @@ import com.davismariotti.campalert.provider.Provider
 interface CampgroundCatalogProvider {
     val provider: Provider
 
+    /**
+     * Whether this provider's results are merged into an unscoped (no `provider` parameter) campground
+     * search. Providers that aren't campgrounds (e.g. Global Entry enrollment centers) opt out so they
+     * only appear when searched for explicitly via their own provider-scoped search.
+     */
+    val includeInUnscopedSearch: Boolean get() = true
+
     fun search(query: String): List<CampgroundSearchResult>
 
     fun getCampground(id: Int): CampgroundResponse?

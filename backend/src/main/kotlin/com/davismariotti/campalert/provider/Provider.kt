@@ -15,6 +15,10 @@ enum class Provider(
         // ReserveCalifornia's booking URL needs the parent park id, which a bare campsiteId can't
         // supply (design.md D11/D21) — placeId is always populated on reserveCaliforniaDetails.
         override fun bookingLink(request: SearchRequest) = "https://www.reservecalifornia.com/park/${request.reserveCaliforniaDetails?.placeId}/${request.campsiteId}"
+    },
+    GLOBAL_ENTRY("Global Entry") {
+        // The scheduler UI has no per-center deep link, so every request shares the one entry URL.
+        override fun bookingLink(request: SearchRequest) = "https://ttp.dhs.gov/schedulerui/schedule-interview/location?lang=en&vo=true&returnUrl=ttp-external&service=up"
     };
 
     /** The URL a user follows to book [request]'s campsite once it's available, shown in SMS alerts. */

@@ -9,6 +9,7 @@ import com.davismariotti.campalert.exception.FlexibleSearchValidationException
 import com.davismariotti.campalert.exception.NoVerifiedPhoneException
 import com.davismariotti.campalert.exception.NotFoundException
 import com.davismariotti.campalert.model.CampLifeSearchRequestDetails
+import com.davismariotti.campalert.model.GlobalEntrySearchRequestDetails
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.RecreationGovSearchRequestDetails
 import com.davismariotti.campalert.model.RequestType
@@ -17,6 +18,10 @@ import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.provider.camplife.CampLifeCatalogCache
+import com.davismariotti.campalert.provider.globalentry.GlobalEntryCatalogCache
+import com.davismariotti.campalert.provider.globalentry.GlobalEntryLocation
+import com.davismariotti.campalert.provider.globalentry.GlobalEntryTimeWindow
+import com.davismariotti.campalert.provider.globalentry.displayName
 import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaCatalogCache
 import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaOccupancyService
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
@@ -48,6 +53,7 @@ class SearchRequestsDelegateImpl(
     private val timezoneResolutionService: TimezoneResolutionService,
     private val pollTargetRegistrationService: PollTargetRegistrationService,
     private val campLifeCatalogCache: CampLifeCatalogCache,
+    private val globalEntryCatalogCache: GlobalEntryCatalogCache,
     private val reserveCaliforniaCatalogCache: ReserveCaliforniaCatalogCache,
     private val reserveCaliforniaOccupancyService: ReserveCaliforniaOccupancyService,
     private val providerSearchWindowProperties: ProviderSearchWindowProperties,
@@ -113,13 +119,19 @@ class SearchRequestsDelegateImpl(
         val provider = createSearchRequestBody.provider?.type?.toModel() ?: Provider.RECREATION_GOV
         searchRequestCreationGuard.checkCanCreate(userId, provider)
         validateLatestStartDay(createSearchRequestBody.startDay, createSearchRequestBody.latestStartDay, provider)
+        val isGlobalEntry = provider == Provider.GLOBAL_ENTRY
+        val globalEntryCenter = if (isGlobalEntry) requireGlobalEntryCenter(createSearchRequestBody.campsiteId) else null
+        val globalEntryWindow = if (isGlobalEntry) GlobalEntryTimeWindow.parse(createSearchRequestBody.earliestTime, createSearchRequestBody.latestTime) else null
         val entity = SearchRequest(
             startDay = createSearchRequestBody.startDay,
-            nights = createSearchRequestBody.nights,
-            groupSize = createSearchRequestBody.groupSize,
+            // Global Entry has no nights or group size; the contract keeps them required, so force the neutral values.
+            nights = if (isGlobalEntry) 1 else createSearchRequestBody.nights,
+            groupSize = if (isGlobalEntry) 1 else createSearchRequestBody.groupSize,
             campsiteId = createSearchRequestBody.campsiteId,
-            campgroundName = createSearchRequestBody.campgroundName,
-            siteIds = createSearchRequestBody.siteIds,
+            campgroundName = globalEntryCenter?.displayName() ?: createSearchRequestBody.campgroundName,
+            // Set synchronously from the catalog: Global Entry has no coordinates for the async resolver, and the poll check needs it immediately.
+            campgroundTimezone = globalEntryCenter?.tzData,
+            siteIds = if (isGlobalEntry) null else createSearchRequestBody.siteIds,
             name = createSearchRequestBody.name,
             userId = userId,
             provider = provider,
@@ -128,11 +140,13 @@ class SearchRequestsDelegateImpl(
         val state = SearchRequestState()
         state.searchRequest = entity
         entity.state = state
-        applyProviderDetails(entity, provider, createSearchRequestBody.loops, createSearchRequestBody.amenityIds)
+        applyProviderDetails(entity, provider, createSearchRequestBody.loops, createSearchRequestBody.amenityIds, globalEntryWindow)
         val savedRequest = searchRequestRepository.save(entity)
         log.info("Search request created userId={} requestId={} campsiteId={} nights={}", userId, savedRequest.id, savedRequest.campsiteId, savedRequest.nights)
         pollTargetRegistrationService.ensureCampgroundTarget(savedRequest.campsiteId, savedRequest.provider)
-        timezoneResolutionService.resolveAndPersistAsync(savedRequest.id!!, createSearchRequestBody.campsiteId, savedRequest.provider)
+        if (!isGlobalEntry) {
+            timezoneResolutionService.resolveAndPersistAsync(savedRequest.id!!, createSearchRequestBody.campsiteId, savedRequest.provider)
+        }
         return ResponseEntity.status(201).body(savedRequest.toResponse(fetchStats(savedRequest)))
     }
 
@@ -170,12 +184,14 @@ class SearchRequestsDelegateImpl(
             ?: throw NotFoundException("Search request not found")
         val provider = updateSearchRequestBody.provider?.type?.toModel() ?: existing.provider
         validateLatestStartDay(updateSearchRequestBody.startDay, updateSearchRequestBody.latestStartDay, provider)
+        val isGlobalEntry = provider == Provider.GLOBAL_ENTRY
+        val globalEntryWindow = if (isGlobalEntry) GlobalEntryTimeWindow.parse(updateSearchRequestBody.earliestTime, updateSearchRequestBody.latestTime) else null
         val updated = existing.copy(
             startDay = updateSearchRequestBody.startDay,
-            nights = updateSearchRequestBody.nights,
-            groupSize = updateSearchRequestBody.groupSize,
+            nights = if (isGlobalEntry) 1 else updateSearchRequestBody.nights,
+            groupSize = if (isGlobalEntry) 1 else updateSearchRequestBody.groupSize,
             campsiteId = updateSearchRequestBody.campsiteId,
-            siteIds = updateSearchRequestBody.siteIds,
+            siteIds = if (isGlobalEntry) null else updateSearchRequestBody.siteIds,
             name = updateSearchRequestBody.name,
             provider = provider,
             latestStartDay = updateSearchRequestBody.latestStartDay,
@@ -188,7 +204,9 @@ class SearchRequestsDelegateImpl(
         updated.recreationGovDetails = existing.recreationGovDetails
         updated.campLifeDetails = existing.campLifeDetails
         updated.reserveCaliforniaDetails = existing.reserveCaliforniaDetails
-        applyProviderDetails(updated, provider, updateSearchRequestBody.loops, updateSearchRequestBody.amenityIds)
+        updated.globalEntryDetails = existing.globalEntryDetails
+        updated.globalEntryState = existing.globalEntryState
+        applyProviderDetails(updated, provider, updateSearchRequestBody.loops, updateSearchRequestBody.amenityIds, globalEntryWindow)
         val saved = searchRequestRepository.save(updated)
         pollTargetRegistrationService.ensureCampgroundTarget(saved.campsiteId, saved.provider)
         return ResponseEntity.ok(saved.toResponse(fetchStats(saved)))
@@ -223,6 +241,8 @@ class SearchRequestsDelegateImpl(
         updated.recreationGovDetails = existing.recreationGovDetails
         updated.campLifeDetails = existing.campLifeDetails
         updated.reserveCaliforniaDetails = existing.reserveCaliforniaDetails
+        updated.globalEntryDetails = existing.globalEntryDetails
+        updated.globalEntryState = existing.globalEntryState
         searchRequestRepository.save(updated)
     }
 
@@ -273,8 +293,13 @@ class SearchRequestsDelegateImpl(
         entity: SearchRequest,
         provider: Provider,
         loops: List<String>?,
-        amenityIds: List<Int>?
+        amenityIds: List<Int>?,
+        globalEntryWindow: GlobalEntryTimeWindow? = null,
     ) {
+        if (provider != Provider.GLOBAL_ENTRY) {
+            entity.globalEntryDetails = null
+            entity.globalEntryState = null
+        }
         when (provider) {
             Provider.RECREATION_GOV -> {
                 entity.campLifeDetails = null
@@ -329,8 +354,25 @@ class SearchRequestsDelegateImpl(
                     }
                 }
             }
+            Provider.GLOBAL_ENTRY -> {
+                entity.recreationGovDetails = null
+                entity.campLifeDetails = null
+                entity.reserveCaliforniaDetails = null
+                entity.globalEntryDetails = if (globalEntryWindow != null && !globalEntryWindow.isEmpty) {
+                    val details = entity.globalEntryDetails ?: GlobalEntrySearchRequestDetails()
+                    details.searchRequest = entity
+                    details.earliestTime = globalEntryWindow.earliest
+                    details.latestTime = globalEntryWindow.latest
+                    details
+                } else {
+                    null
+                }
+            }
         }
     }
+
+    /** The directory entry for [centerId], or a not-found error if no such enrollment center exists. */
+    private fun requireGlobalEntryCenter(centerId: Int): GlobalEntryLocation = globalEntryCatalogCache.findLocation(centerId) ?: throw NotFoundException("Global Entry enrollment center not found")
 
     private fun resolveCampLifeSiteTypeId(campgroundId: Int, groupingName: String): Int? =
         campLifeCatalogCache
@@ -382,6 +424,7 @@ class SearchRequestsDelegateImpl(
                     ?.takeIf { it.isNotEmpty() }
                     ?.let { resolveReserveCaliforniaGroupNames(campsiteId, it) }
                     ?.takeIf { it.isNotEmpty() }
+            Provider.GLOBAL_ENTRY -> null
         }
 
     private fun SearchRequest.toResponse(stats: SearchRequestStats): SearchRequestResponse =
@@ -397,7 +440,7 @@ class SearchRequestsDelegateImpl(
             amenityIds = when (this.provider) {
                 Provider.CAMPLIFE -> this.campLifeDetails?.amenityIds
                 Provider.RESERVE_CALIFORNIA -> this.reserveCaliforniaDetails?.amenityIds
-                Provider.RECREATION_GOV -> null
+                Provider.RECREATION_GOV, Provider.GLOBAL_ENTRY -> null
             },
             name = this.name,
             completed = this.state.completed,
@@ -407,5 +450,9 @@ class SearchRequestsDelegateImpl(
             latestStartDay = this.latestStartDay,
             matchedStartDay = this.state.matchedStartDay,
             matchedEndDay = this.state.matchedEndDay,
+            earliestTime = GlobalEntryTimeWindow.format(this.globalEntryDetails?.earliestTime),
+            latestTime = GlobalEntryTimeWindow.format(this.globalEntryDetails?.latestTime),
+            matchedStartTime = GlobalEntryTimeWindow.format(this.globalEntryState?.matchedStartTime),
+            matchedSlotCount = this.globalEntryState?.matchedSlotCount,
         )
 }

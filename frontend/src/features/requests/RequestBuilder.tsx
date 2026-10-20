@@ -11,9 +11,11 @@ import { EquipmentTypeFilter } from './EquipmentTypeFilter'
 import { AmenityFilter } from './AmenityFilter'
 import { CampsitePickerModal } from './CampsitePickerModal'
 import { DateWindowFields } from './DateWindowFields'
+import { TimeWindowFields } from './TimeWindowFields'
 import type { CampgroundResponse, CampgroundSearchResult } from '../../api/generated/types.gen'
 import type { AxiosError } from 'axios'
-import { validateDateWindow, type DateMode } from '../../utils/dateWindow'
+import { isGlobalEntry, validateDateWindow, type DateMode } from '../../utils/dateWindow'
+import { timeOrUndefined, validateTimeWindow } from '../../utils/timeWindow'
 
 interface Props {
   campground: CampgroundSearchResult
@@ -21,9 +23,10 @@ interface Props {
   onSuccess?: () => void
 }
 
-function defaultAlertName(campgroundName: string): string {
+function defaultAlertName(campgroundName: string, globalEntry: boolean): string {
   const year = new Date().getFullYear()
-  const base = campgroundName
+  // Global Entry result names carry a "— City, ST" suffix ("SF Enrollment Center — San Francisco, CA"); the center name alone reads better as an alert name.
+  const base = (globalEntry ? campgroundName.split(' — ')[0] : campgroundName)
     .replace(/\bcampgrounds?\b\s*/gi, '') // remove "Campground(s)" anywhere
     .replace(/\s*\([A-Z]{2}\)\s*$/, '') // strip trailing state abbrevs like (UT)
     .replace(/\s{2,}/g, ' ')
@@ -33,7 +36,8 @@ function defaultAlertName(campgroundName: string): string {
 
 export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
   const navigate = useNavigate()
-  const [name, setName] = useState(() => defaultAlertName(campground.name))
+  const globalEntry = isGlobalEntry(campground.provider.type)
+  const [name, setName] = useState(() => defaultAlertName(campground.name, globalEntry))
   const [dateMode, setDateMode] = useState<DateMode>('exact')
   const [startDay, setStartDay] = useState('')
   const [latestStartDay, setLatestStartDay] = useState('')
@@ -43,6 +47,8 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
   const [siteIds, setSiteIds] = useState<string[] | null>(null)
   const [equipmentType, setEquipmentType] = useState<string | null>(null)
   const [amenityIds, setAmenityIds] = useState<number[] | null>(null)
+  const [earliestTime, setEarliestTime] = useState('')
+  const [latestTime, setLatestTime] = useState('')
   const [showCampsiteModal, setShowCampsiteModal] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<{ noPhone?: boolean; message?: string } | null>(null)
@@ -83,19 +89,24 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
     providerType: campground.provider.type
   })
 
+  const timeWindowError = globalEntry ? validateTimeWindow(earliestTime, latestTime) : null
+
   const mutation = useApiMutation({
     mutationFn: async () => {
       const result = await createSearchRequest({
         body: {
           name,
           startDay,
-          nights,
-          groupSize,
+          // Global Entry has no nights or group size; the API contract still requires them.
+          nights: globalEntry ? 1 : nights,
+          groupSize: globalEntry ? 1 : groupSize,
           campsiteId: campground.id,
           campgroundName: campground.name,
-          loops,
-          siteIds,
-          amenityIds,
+          loops: globalEntry ? undefined : loops,
+          siteIds: globalEntry ? undefined : siteIds,
+          amenityIds: globalEntry ? undefined : amenityIds,
+          earliestTime: globalEntry ? timeOrUndefined(earliestTime) : undefined,
+          latestTime: globalEntry ? timeOrUndefined(latestTime) : undefined,
           provider: campground.provider,
           latestStartDay: dateMode === 'flexible' ? latestStartDay : undefined,
           turnstileToken: turnstileToken!
@@ -121,12 +132,18 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
     const e: Record<string, string> = {}
     if (!name.trim()) e.name = 'Alert name is required'
     if (dateWindowError) e.startDay = dateWindowError
-    if (groupSize < 1) e.groupSize = 'Group size must be at least 1'
+    if (timeWindowError) e.timeWindow = timeWindowError
+    if (!globalEntry && groupSize < 1) e.groupSize = 'Group size must be at least 1'
     setErrors(e)
     return Object.keys(e).length === 0
   }
 
-  const canSubmit = name.trim() !== '' && !dateWindowError && groupSize >= 1 && turnstileToken !== null
+  const canSubmit =
+    name.trim() !== '' &&
+    !dateWindowError &&
+    !timeWindowError &&
+    (globalEntry || groupSize >= 1) &&
+    turnstileToken !== null
 
   return (
     <div className="mt-4 overflow-hidden transition-all duration-250">
@@ -164,101 +181,121 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
             error={dateWindowError}
           />
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-forest-600">Nights</label>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setNights((n) => Math.max(1, n - 1))}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
-                >
-                  −
-                </button>
-                <span className="w-6 text-center text-sm font-medium">{nights}</span>
-                <button
-                  type="button"
-                  onClick={() => setNights((n) => n + 1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
-                >
-                  +
-                </button>
-              </div>
-            </div>
+          {globalEntry && (
+            <TimeWindowFields
+              earliestTime={earliestTime}
+              onEarliestTimeChange={setEarliestTime}
+              latestTime={latestTime}
+              onLatestTimeChange={setLatestTime}
+              error={timeWindowError}
+            />
+          )}
 
-            <div>
-              <label className="mb-1 block text-xs font-medium text-forest-600">Group size</label>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setGroupSize((n) => Math.max(1, n - 1))}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
-                >
-                  −
-                </button>
-                <span className="w-6 text-center text-sm font-medium">{groupSize}</span>
-                <button
-                  type="button"
-                  onClick={() => setGroupSize((n) => n + 1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <EquipmentTypeFilter equipmentTypes={equipmentTypes} selected={equipmentType} onChange={setEquipmentType} />
-
-          <AmenityFilter amenities={amenities} selected={amenityIds} onChange={setAmenityIds} />
-
-          <LoopPicker
-            campgroundId={campground.id}
-            provider={campground.provider}
-            selectedLoops={loops}
-            onChange={setLoops}
-            allowedGroupings={allowedGroupings}
-          />
-
-          <div>
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-medium text-forest-600">Specific campsites</label>
-              <button
-                type="button"
-                onClick={() => setShowCampsiteModal(true)}
-                className="text-xs font-medium text-forest-600 hover:text-forest-800"
-              >
-                Choose specific campsites
-              </button>
-            </div>
-            {siteIds && siteIds.length > 0 ? (
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {siteIds.map((id) => (
-                  <span
-                    key={id}
-                    className="flex items-center gap-1 rounded-full bg-forest-700 px-2.5 py-0.5 text-xs font-medium text-white"
-                  >
-                    {id}
+          {!globalEntry && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-forest-600">Nights</label>
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() =>
-                        setSiteIds((prev) => {
-                          const next = (prev ?? []).filter((s) => s !== id)
-                          return next.length === 0 ? null : next
-                        })
-                      }
-                      aria-label={`Remove site ${id}`}
-                      className="hover:text-forest-200"
+                      onClick={() => setNights((n) => Math.max(1, n - 1))}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
                     >
-                      ×
+                      −
                     </button>
-                  </span>
-                ))}
+                    <span className="w-6 text-center text-sm font-medium">{nights}</span>
+                    <button
+                      type="button"
+                      onClick={() => setNights((n) => n + 1)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-forest-600">Group size</label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setGroupSize((n) => Math.max(1, n - 1))}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
+                    >
+                      −
+                    </button>
+                    <span className="w-6 text-center text-sm font-medium">{groupSize}</span>
+                    <button
+                      type="button"
+                      onClick={() => setGroupSize((n) => n + 1)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
               </div>
-            ) : (
-              <p className="mt-1 text-xs text-forest-400">No specific sites selected — watching by grouping above</p>
-            )}
-          </div>
+
+              <EquipmentTypeFilter
+                equipmentTypes={equipmentTypes}
+                selected={equipmentType}
+                onChange={setEquipmentType}
+              />
+
+              <AmenityFilter amenities={amenities} selected={amenityIds} onChange={setAmenityIds} />
+
+              <LoopPicker
+                campgroundId={campground.id}
+                provider={campground.provider}
+                selectedLoops={loops}
+                onChange={setLoops}
+                allowedGroupings={allowedGroupings}
+              />
+
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-forest-600">Specific campsites</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowCampsiteModal(true)}
+                    className="text-xs font-medium text-forest-600 hover:text-forest-800"
+                  >
+                    Choose specific campsites
+                  </button>
+                </div>
+                {siteIds && siteIds.length > 0 ? (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {siteIds.map((id) => (
+                      <span
+                        key={id}
+                        className="flex items-center gap-1 rounded-full bg-forest-700 px-2.5 py-0.5 text-xs font-medium text-white"
+                      >
+                        {id}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSiteIds((prev) => {
+                              const next = (prev ?? []).filter((s) => s !== id)
+                              return next.length === 0 ? null : next
+                            })
+                          }
+                          aria-label={`Remove site ${id}`}
+                          className="hover:text-forest-200"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-forest-400">
+                    No specific sites selected — watching by grouping above
+                  </p>
+                )}
+              </div>
+            </>
+          )}
 
           {submitError?.noPhone && (
             <p className="text-sm text-amber-700">
@@ -287,7 +324,7 @@ export function RequestBuilder({ campground, onClear, onSuccess }: Props) {
         </div>
       </div>
 
-      {showCampsiteModal && (
+      {showCampsiteModal && !globalEntry && (
         <CampsitePickerModal
           campgroundId={campground.id}
           provider={campground.provider}

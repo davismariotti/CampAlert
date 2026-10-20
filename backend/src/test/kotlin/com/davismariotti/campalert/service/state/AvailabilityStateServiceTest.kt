@@ -6,9 +6,11 @@ import com.davismariotti.campalert.model.OutboxType
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
+import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.service.availability.AvailabilityResult
+import com.davismariotti.campalert.service.availability.GlobalEntryMatch
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
@@ -20,6 +22,7 @@ import org.mockito.Mockito.`when`
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 
 class AvailabilityStateServiceTest {
     private val searchRequestRepository = mock(SearchRequestRepository::class.java)
@@ -206,5 +209,78 @@ class AvailabilityStateServiceTest {
         val tenAm = Instant.parse("2024-06-15T10:00:00Z")
         val sendAfter = service.computeSendAfter(tenAm, "UTC")
         assertEquals(tenAm, sendAfter)
+    }
+
+    private fun globalEntryRequest(state: AvailabilityState? = null, lastNotified: Instant? = null): SearchRequest {
+        val base = request(state = state, lastNotified = lastNotified)
+        val req = base.copy(provider = Provider.GLOBAL_ENTRY, nights = 1, groupSize = 1)
+        req.state = base.state
+        base.state.searchRequest = req
+        return req
+    }
+
+    private fun globalEntryResult(
+        req: SearchRequest,
+        available: Boolean,
+        time: LocalTime = LocalTime.of(11, 40),
+        count: Int = 1
+    ) = AvailabilityResult(
+        searchRequest = req,
+        hasAvailableSites = available,
+        availableSiteCount = if (available) count else 0,
+        matchedStartDay = if (available) req.startDay else null,
+        matchedEndDay = if (available) req.startDay else null,
+        globalEntryMatch = if (available) GlobalEntryMatch(time, count) else null,
+    )
+
+    @Test
+    fun `global entry available result persists the earliest slot time and count`() {
+        val req = globalEntryRequest(state = AvailabilityState.UNAVAILABLE)
+        `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
+        `when`(outboxRepository.save(any(NotificationOutbox::class.java))).thenAnswer { it.arguments[0] }
+
+        service.processUserResults(listOf(globalEntryResult(req, true, LocalTime.of(11, 40), 3)), user)
+
+        assertEquals(LocalTime.of(11, 40), req.globalEntryState!!.matchedStartTime)
+        assertEquals(3, req.globalEntryState!!.matchedSlotCount)
+        assertEquals(req.startDay, req.state.matchedStartDay)
+    }
+
+    @Test
+    fun `global entry unavailable result clears the slot time and count`() {
+        val req = globalEntryRequest(state = AvailabilityState.AVAILABLE)
+        `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
+        `when`(outboxRepository.save(any(NotificationOutbox::class.java))).thenAnswer { it.arguments[0] }
+        service.processUserResults(listOf(globalEntryResult(req, true, LocalTime.of(11, 40), 2)), user)
+
+        service.processUserResults(listOf(globalEntryResult(req, false)), user)
+
+        assertNull(req.globalEntryState!!.matchedStartTime)
+        assertNull(req.globalEntryState!!.matchedSlotCount)
+    }
+
+    @Test
+    fun `global entry slot count changing while continuously available updates the count without a new outbox row`() {
+        val req = globalEntryRequest(state = AvailabilityState.AVAILABLE, lastNotified = Instant.now().minus(Duration.ofMinutes(10)))
+        `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
+        service.processUserResults(listOf(globalEntryResult(req, true, LocalTime.of(11, 40), 1)), user)
+
+        service.processUserResults(listOf(globalEntryResult(req, true, LocalTime.of(11, 40), 2)), user)
+
+        assertEquals(2, req.globalEntryState!!.matchedSlotCount)
+        org.mockito.Mockito
+            .verify(outboxRepository, org.mockito.Mockito.never())
+            .save(any(NotificationOutbox::class.java))
+    }
+
+    @Test
+    fun `a non global entry request never gets a global entry state row`() {
+        val req = request(state = AvailabilityState.UNAVAILABLE)
+        `when`(searchRequestRepository.save(any(SearchRequest::class.java))).thenAnswer { it.arguments[0] }
+        `when`(outboxRepository.save(any(NotificationOutbox::class.java))).thenAnswer { it.arguments[0] }
+
+        service.processUserResults(listOf(globalEntryResult(req, true)), user)
+
+        assertNull(req.globalEntryState)
     }
 }

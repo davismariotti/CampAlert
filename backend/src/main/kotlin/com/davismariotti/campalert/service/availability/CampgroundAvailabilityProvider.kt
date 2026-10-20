@@ -15,6 +15,13 @@ interface CampgroundAvailabilityProvider {
      */
     fun newCheckCycleCache(): CheckCycleCache<*, *>? = null
 
+    /**
+     * Variant for providers whose shared fetch depends on every request about to be evaluated (e.g. one
+     * call covering the union of all their date ranges). Defaults to the argument-free factory, so
+     * providers that don't care are unaffected; the scheduler calls this one.
+     */
+    fun newCheckCycleCache(requests: List<SearchRequest>): CheckCycleCache<*, *>? = newCheckCycleCache()
+
     fun checkAvailability(
         searchRequest: SearchRequest,
         user: User,

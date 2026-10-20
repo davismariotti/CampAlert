@@ -54,8 +54,8 @@ class CampgroundsDelegateImpl(
             return ResponseEntity.ok(results)
         }
 
-        // Unscoped: merge every registered provider's results; one provider failing doesn't blank the others.
-        val results = campgroundCatalogProviderRegistry.all().flatMap { searchProvider ->
+        // Unscoped: merge every opted-in provider's results; one provider failing doesn't blank the others.
+        val results = campgroundCatalogProviderRegistry.all().filter { it.includeInUnscopedSearch }.flatMap { searchProvider ->
             try {
                 searchProvider.search(q)
             } catch (ex: Exception) {

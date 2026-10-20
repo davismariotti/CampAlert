@@ -1,6 +1,6 @@
 import { Input } from '../../components/ui/Input'
 import type { ProviderType } from '../../api/generated/types.gen'
-import { candidateArrivalCount, dateWindowSummary, type DateMode } from '../../utils/dateWindow'
+import { candidateArrivalCount, dateWindowSummary, isGlobalEntry, type DateMode } from '../../utils/dateWindow'
 
 interface Props {
   mode: DateMode
@@ -34,6 +34,12 @@ export function DateWindowFields({
 }: Props) {
   const summary = dateWindowSummary({ mode, startDay, nights, latestStartDay, providerType })
   const candidateCount = mode === 'flexible' ? candidateArrivalCount(startDay, latestStartDay) : null
+  // Global Entry appointments are single days, not stays, so "arrival" wording becomes plain day wording.
+  const globalEntry = isGlobalEntry(providerType)
+  const exactLabel = globalEntry ? 'Date' : 'Arrival date'
+  const earliestLabel = globalEntry ? 'Earliest day' : 'Earliest arrival'
+  const latestLabel = globalEntry ? 'Latest day' : 'Latest arrival'
+  const candidateNoun = globalEntry ? 'day' : 'arrival date'
 
   return (
     <div className="flex flex-col gap-2">
@@ -58,26 +64,26 @@ export function DateWindowFields({
           type="date"
           value={startDay}
           onChange={(e) => onStartDayChange(e.target.value)}
-          aria-label="Arrival date"
+          aria-label={exactLabel}
         />
       ) : (
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-forest-600">Earliest arrival</label>
+            <label className="mb-1 block text-xs font-medium text-forest-600">{earliestLabel}</label>
             <Input
               type="date"
               value={startDay}
               onChange={(e) => onStartDayChange(e.target.value)}
-              aria-label="Earliest arrival"
+              aria-label={earliestLabel}
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-forest-600">Latest arrival</label>
+            <label className="mb-1 block text-xs font-medium text-forest-600">{latestLabel}</label>
             <Input
               type="date"
               value={latestStartDay}
               onChange={(e) => onLatestStartDayChange(e.target.value)}
-              aria-label="Latest arrival"
+              aria-label={latestLabel}
             />
           </div>
         </div>
@@ -86,7 +92,7 @@ export function DateWindowFields({
       {summary && !error && (
         <p className="text-xs text-forest-500">
           {summary}
-          {candidateCount != null && ` — ${candidateCount} possible arrival date${candidateCount !== 1 ? 's' : ''}`}
+          {candidateCount != null && ` — ${candidateCount} possible ${candidateNoun}${candidateCount !== 1 ? 's' : ''}`}
         </p>
       )}
       {error && <p className="text-xs text-red-600">{error}</p>}

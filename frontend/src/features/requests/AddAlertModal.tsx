@@ -4,19 +4,28 @@ import { CampgroundSearch } from '../campground/CampgroundSearch'
 import { RequestBuilder } from './RequestBuilder'
 import { PermitSearch } from '../permit/PermitSearch'
 import { PermitRequestBuilder } from '../permit/PermitRequestBuilder'
+import { useAuth } from '../auth/useAuth'
 import type { CampgroundSearchResult, PermitSearchResult } from '../../api/generated/types.gen'
 
 interface Props {
   onClose: () => void
 }
 
-type AlertType = 'campground' | 'permit'
+type AlertType = 'campground' | 'permit' | 'globalEntry'
 
 export function AddAlertModal({ onClose }: Props) {
   const [alertType, setAlertType] = useState<AlertType>('campground')
   const [selectedCampground, setSelectedCampground] = useState<CampgroundSearchResult | null>(null)
   const [selectedPermit, setSelectedPermit] = useState<PermitSearchResult | null>(null)
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  // The Global Entry tab only exists for users whose effective provider access includes it.
+  const globalEntryEnabled = user?.enabledProviders.includes('GLOBAL_ENTRY') ?? false
+  const tabs: { type: AlertType; label: string }[] = [
+    { type: 'campground', label: 'Campground' },
+    { type: 'permit', label: 'Permit' },
+    ...(globalEntryEnabled ? [{ type: 'globalEntry' as const, label: 'Global Entry' }] : [])
+  ]
 
   function handleSuccess() {
     queryClient.invalidateQueries({ queryKey: ['search-requests'] })
@@ -43,26 +52,20 @@ export function AddAlertModal({ onClose }: Props) {
 
         {!hasSelection && (
           <div className="mb-4 flex gap-1 rounded-xl bg-forest-100 p-1">
-            <button
-              type="button"
-              onClick={() => setAlertType('campground')}
-              className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                alertType === 'campground'
-                  ? 'bg-white text-forest-900 shadow-sm'
-                  : 'text-forest-500 hover:text-forest-700'
-              }`}
-            >
-              Campground
-            </button>
-            <button
-              type="button"
-              onClick={() => setAlertType('permit')}
-              className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                alertType === 'permit' ? 'bg-white text-forest-900 shadow-sm' : 'text-forest-500 hover:text-forest-700'
-              }`}
-            >
-              Permit
-            </button>
+            {tabs.map((tab) => (
+              <button
+                key={tab.type}
+                type="button"
+                onClick={() => setAlertType(tab.type)}
+                className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  alertType === tab.type
+                    ? 'bg-white text-forest-900 shadow-sm'
+                    : 'text-forest-500 hover:text-forest-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
         )}
 
@@ -70,6 +73,19 @@ export function AddAlertModal({ onClose }: Props) {
           <>
             <p className="mb-4 text-sm text-forest-600">Search for a campground to start watching.</p>
             <CampgroundSearch onSelect={(cg) => setSelectedCampground(cg)} />
+          </>
+        )}
+
+        {!hasSelection && alertType === 'globalEntry' && globalEntryEnabled && (
+          <>
+            <p className="mb-4 text-sm text-forest-600">Search for an enrollment center to start watching.</p>
+            <CampgroundSearch
+              provider="GLOBAL_ENTRY"
+              minChars={2}
+              placeholder="Search by center, city, or state..."
+              emptyMessage="No enrollment centers found"
+              onSelect={(center) => setSelectedCampground(center)}
+            />
           </>
         )}
 

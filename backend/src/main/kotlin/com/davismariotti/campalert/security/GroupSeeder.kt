@@ -99,13 +99,16 @@ class GroupSeeder(
         if (!globalQuotaDefaultRepository.existsById(GlobalQuotaDefault.SINGLETON_ID)) {
             globalQuotaDefaultRepository.save(GlobalQuotaDefault(maxActive = 5))
         }
-        if (!globalProviderQuotaDefaultRepository.existsById(Provider.RESERVE_CALIFORNIA)) {
-            globalProviderQuotaDefaultRepository.save(GlobalProviderQuotaDefault(Provider.RESERVE_CALIFORNIA, maxActive = 1))
+        listOf(Provider.RESERVE_CALIFORNIA, Provider.GLOBAL_ENTRY).forEach { provider ->
+            if (!globalProviderQuotaDefaultRepository.existsById(provider)) {
+                globalProviderQuotaDefaultRepository.save(GlobalProviderQuotaDefault(provider, maxActive = 1))
+            }
         }
         val defaultAccess = mapOf(
             Provider.RECREATION_GOV to true,
             Provider.CAMPLIFE to true,
             Provider.RESERVE_CALIFORNIA to false,
+            Provider.GLOBAL_ENTRY to false,
         )
         defaultAccess.forEach { (provider, enabled) ->
             if (!globalProviderAccessRepository.existsById(provider)) {

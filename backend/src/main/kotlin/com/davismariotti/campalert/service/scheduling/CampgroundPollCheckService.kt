@@ -71,7 +71,7 @@ class CampgroundPollCheckService(
         val valid = active.filter { userMap.containsKey(it.userId) }
         if (valid.isEmpty()) return 0
 
-        val cache = availabilityProvider.newCheckCycleCache()
+        val cache = availabilityProvider.newCheckCycleCache(valid)
         val resultsByUser = valid
             .mapNotNull { it.userId }
             .distinct()

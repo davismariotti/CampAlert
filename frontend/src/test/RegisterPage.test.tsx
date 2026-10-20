@@ -177,7 +177,8 @@ describe('RegisterPage', () => {
         timezone: 'America/Denver',
         verificationStatus: 'VERIFIED',
         pushoverOverrideEnabled: false,
-        permissions: ['VIEW_PROFILE']
+        permissions: ['VIEW_PROFILE'],
+        enabledProviders: ['RECREATION_GOV']
       },
       error: undefined
     } as Awaited<ReturnType<typeof sdk.getMe>>)
