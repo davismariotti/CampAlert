@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.core.task.TaskExecutor
 import org.springframework.stereotype.Component
+import java.io.IOException
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.TimeUnit
@@ -54,8 +55,13 @@ class GlobalEntryCatalogCache(
     /** Fetches the directory and replaces the cached value. On failure, the prior cached value (if any) is left untouched. */
     fun refreshDirectory(): List<GlobalEntryLocation>? =
         try {
-            val locations = (callProtection.execute { globalEntryApi.getLocations().execute().body() } ?: emptyList())
-                .filterNot { it.remoteInd }
+            val locations = callProtection
+                .execute {
+                    // Retrofit doesn't throw on HTTP errors: a null body must fail here (so retry and the circuit
+                    // breaker see it and the prior cached directory is kept), not be cached as an empty directory.
+                    val response = globalEntryApi.getLocations().execute()
+                    response.body() ?: throw IOException("Global Entry locations request failed status=${response.code()}")
+                }.filterNot { it.remoteInd }
             redisJsonCache.set(DIRECTORY_KEY, GlobalEntryCachedEntry(Instant.now(), locations), properties.ttlDays, TimeUnit.DAYS)
             locations
         } catch (e: Exception) {

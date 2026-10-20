@@ -1,6 +1,7 @@
 package com.davismariotti.campalert.provider.globalentry
 
 import java.time.Instant
+import java.time.ZoneId
 
 /**
  * One enrollment center from `GET locations/`. Only the fields CampAlert uses are mapped (the payload
@@ -16,6 +17,9 @@ data class GlobalEntryLocation(
     val tzData: String? = null,
     val remoteInd: Boolean = false,
 )
+
+/** The center's IANA zone id, or null when the catalog's `tzData` is blank or not a zone this JVM knows — an unusable value must never be stored on a request. */
+fun GlobalEntryLocation.usableTimezone(): String? = tzData?.takeIf { it.isNotBlank() && runCatching { ZoneId.of(it) }.isSuccess }
 
 /** The name shown in search results and stored as the request's `campground_name`: `"<name> — <city>, <state>"`, omitting blank parts (a few international centers have no state). */
 fun GlobalEntryLocation.displayName(): String {

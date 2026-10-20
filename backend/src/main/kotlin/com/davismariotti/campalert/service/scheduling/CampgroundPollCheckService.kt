@@ -102,7 +102,7 @@ class CampgroundPollCheckService(
         return valid.size
     }
 
-    private fun today(campgroundTimezone: String?): LocalDate = LocalDate.now(campgroundTimezone?.let { ZoneId.of(it) } ?: ZoneOffset.UTC)
+    private fun today(campgroundTimezone: String?): LocalDate = LocalDate.now(campgroundTimezone?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneOffset.UTC)
 
     /**
      * The last arrival date any candidate stay could still use — for an exact-date request this is

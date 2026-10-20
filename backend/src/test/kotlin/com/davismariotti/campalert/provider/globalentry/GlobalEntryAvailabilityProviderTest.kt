@@ -170,6 +170,34 @@ class GlobalEntryAvailabilityProviderTest {
     }
 
     @Test
+    fun `a failed fetch is shared across the cycle instead of retried for every request at the center`() {
+        @Suppress("UNCHECKED_CAST")
+        val call = mock(Call::class.java) as Call<ResponseBody>
+        `when`(call.execute()).thenReturn(Response.error(500, "boom".toResponseBody("text/plain".toMediaType())))
+        `when`(api.getSlots(org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString())).thenReturn(call)
+        val a = request(id = 1L)
+        val b = request(id = 2L)
+        val cache = provider.newCheckCycleCache(listOf(a, b))
+
+        assertFailsWith<IOException> { provider.checkAvailability(a, user, cache) }
+        assertFailsWith<IOException> { provider.checkAvailability(b, user, cache) }
+
+        verify(api, times(1)).getSlots(org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString())
+    }
+
+    @Test
+    fun `days that can never match are not re-downloaded once a flexible range has started`() {
+        stubSlots(slotsJson("2026-10-27T11:40" to 1))
+        // Clock is 2026-10-20 (UTC 19:55); a range that began on Oct 1 is clamped to yesterday in UTC.
+        val flexible = request(startDay = LocalDate.of(2026, 10, 1), latestStartDay = LocalDate.of(2026, 10, 30))
+
+        provider.checkAvailability(flexible, user, provider.newCheckCycleCache(listOf(flexible)))
+        provider.checkAvailability(flexible, user)
+
+        verify(api, times(2)).getSlots(centerId, "2026-10-19T00:00:00", "2026-10-31T00:00:00")
+    }
+
+    @Test
     fun `no cycle cache for an empty request list`() {
         assertNull(provider.newCheckCycleCache(emptyList()))
     }
