@@ -2,13 +2,18 @@ package com.davismariotti.campalert.delegate
 
 import com.davismariotti.campalert.api.model.CreateSearchRequestBody
 import com.davismariotti.campalert.api.model.UpdateSearchRequestBody
+import com.davismariotti.campalert.exception.BadRequestException
 import com.davismariotti.campalert.exception.FlexibleSearchValidationException
+import com.davismariotti.campalert.exception.NotFoundException
+import com.davismariotti.campalert.model.GlobalEntrySearchRequestDetails
 import com.davismariotti.campalert.model.PhoneNumberStatus
 import com.davismariotti.campalert.model.SearchRequest
 import com.davismariotti.campalert.model.SearchRequestState
 import com.davismariotti.campalert.model.User
 import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.provider.camplife.CampLifeCatalogCache
+import com.davismariotti.campalert.provider.globalentry.GlobalEntryCatalogCache
+import com.davismariotti.campalert.provider.globalentry.GlobalEntryLocation
 import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaCatalogCache
 import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaOccupancyService
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
@@ -35,6 +40,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
 import java.time.LocalDate
+import java.time.LocalTime
 import com.davismariotti.campalert.api.model.Provider as ApiProvider
 import com.davismariotti.campalert.api.model.ProviderType as ApiProviderType
 
@@ -46,11 +52,13 @@ class SearchRequestsDelegateImplTest {
     private val timezoneResolutionService = mock(TimezoneResolutionService::class.java)
     private val pollTargetRegistrationService = mock(PollTargetRegistrationService::class.java)
     private val campLifeCatalogCache = mock(CampLifeCatalogCache::class.java)
+    private val globalEntryCatalogCache = mock(GlobalEntryCatalogCache::class.java)
     private val reserveCaliforniaCatalogCache = mock(ReserveCaliforniaCatalogCache::class.java)
     private val reserveCaliforniaOccupancyService = mock(ReserveCaliforniaOccupancyService::class.java)
     private val providerSearchWindowProperties = mock(ProviderSearchWindowProperties::class.java).also {
         `when`(it.maxRangeWidthDaysFor(Provider.RECREATION_GOV)).thenReturn(30)
         `when`(it.maxRangeWidthDaysFor(Provider.CAMPLIFE)).thenReturn(9)
+        `when`(it.maxRangeWidthDaysFor(Provider.GLOBAL_ENTRY)).thenReturn(60)
     }
     private val turnstileService = mock(TurnstileService::class.java)
     private val searchRequestCreationGuard = mock(SearchRequestCreationGuard::class.java)
@@ -64,6 +72,7 @@ class SearchRequestsDelegateImplTest {
         timezoneResolutionService,
         pollTargetRegistrationService,
         campLifeCatalogCache,
+        globalEntryCatalogCache,
         reserveCaliforniaCatalogCache,
         reserveCaliforniaOccupancyService,
         providerSearchWindowProperties,
@@ -86,6 +95,8 @@ class SearchRequestsDelegateImplTest {
             val req = invocation.arguments[0] as SearchRequest
             val saved = if (req.id == null) req.copy(id = 100L) else req
             saved.state = req.state
+            saved.globalEntryDetails = req.globalEntryDetails
+            saved.globalEntryState = req.globalEntryState
             saved
         }
     }
@@ -260,6 +271,169 @@ class SearchRequestsDelegateImplTest {
 
         assertEquals(existing.startDay.plusDays(1), result.body!!.matchedStartDay)
         assertEquals(existing.startDay.plusDays(3), result.body!!.matchedEndDay)
+    }
+
+    // ---- Global Entry ----
+
+    private val sfCenter = GlobalEntryLocation(5446, "SF Enrollment Center", "SF Enrollment Center", "San Francisco", "CA", "America/Los_Angeles")
+
+    private fun globalEntryCreateBody(
+        earliestTime: String? = null,
+        latestTime: String? = null,
+        latestStartDay: LocalDate? = null,
+    ) = CreateSearchRequestBody(
+        startDay = LocalDate.now().plusDays(5),
+        nights = 3,
+        groupSize = 4,
+        campsiteId = 5446,
+        campgroundName = "client supplied name",
+        name = "GE",
+        provider = ApiProvider(type = ApiProviderType.GLOBAL_ENTRY, name = "ignored"),
+        siteIds = listOf("A1"),
+        loops = listOf("loop"),
+        earliestTime = earliestTime,
+        latestTime = latestTime,
+        latestStartDay = latestStartDay,
+        turnstileToken = "test-token",
+    )
+
+    @Test
+    fun `creating a Global Entry request forces nights and group size, takes name and timezone from the directory, and persists the window`() {
+        `when`(globalEntryCatalogCache.findLocation(5446)).thenReturn(sfCenter)
+
+        val result = delegate.createSearchRequest(globalEntryCreateBody(earliestTime = "11:30", latestTime = "14:00"))
+
+        val saved = org.mockito.kotlin
+            .argumentCaptor<SearchRequest>()
+            .also { verify(searchRequestRepository).save(it.capture()) }
+            .firstValue
+        assertEquals(Provider.GLOBAL_ENTRY, saved.provider)
+        assertEquals(1, saved.nights)
+        assertEquals(1, saved.groupSize)
+        assertNull(saved.siteIds)
+        assertEquals("SF Enrollment Center — San Francisco, CA", saved.campgroundName)
+        assertEquals("America/Los_Angeles", saved.campgroundTimezone)
+        assertEquals(LocalTime.of(11, 30), saved.globalEntryDetails!!.earliestTime)
+        assertEquals(LocalTime.of(14, 0), saved.globalEntryDetails!!.latestTime)
+        assertNull(saved.recreationGovDetails)
+
+        val body = result.body!!
+        assertEquals(1, body.nights)
+        assertEquals(1, body.groupSize)
+        assertEquals("11:30", body.earliestTime)
+        assertEquals("14:00", body.latestTime)
+        assertNull(body.loops)
+        assertNull(body.matchedStartTime)
+        assertNull(body.matchedSlotCount)
+        verify(pollTargetRegistrationService).ensureCampgroundTarget(5446, Provider.GLOBAL_ENTRY)
+    }
+
+    @Test
+    fun `creating a Global Entry request never invokes the async coordinate timezone resolver`() {
+        `when`(globalEntryCatalogCache.findLocation(5446)).thenReturn(sfCenter)
+
+        delegate.createSearchRequest(globalEntryCreateBody())
+
+        verify(timezoneResolutionService, org.mockito.Mockito.never())
+            .resolveAndPersistAsync(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyInt(), anyKt())
+    }
+
+    @Test
+    fun `a Global Entry request with no window has no details row`() {
+        `when`(globalEntryCatalogCache.findLocation(5446)).thenReturn(sfCenter)
+
+        val result = delegate.createSearchRequest(globalEntryCreateBody())
+
+        val saved = org.mockito.kotlin
+            .argumentCaptor<SearchRequest>()
+            .also { verify(searchRequestRepository).save(it.capture()) }
+            .firstValue
+        assertNull(saved.globalEntryDetails)
+        assertNull(result.body!!.earliestTime)
+        assertNull(result.body!!.latestTime)
+    }
+
+    @Test
+    fun `creating a Global Entry request for an unknown center is rejected and nothing is persisted`() {
+        `when`(globalEntryCatalogCache.findLocation(5446)).thenReturn(null)
+
+        assertThrows(NotFoundException::class.java) { delegate.createSearchRequest(globalEntryCreateBody()) }
+
+        verify(searchRequestRepository, org.mockito.Mockito.never()).save(anyKt())
+    }
+
+    @Test
+    fun `an inverted or malformed Global Entry window is rejected`() {
+        `when`(globalEntryCatalogCache.findLocation(5446)).thenReturn(sfCenter)
+
+        assertThrows(BadRequestException::class.java) { delegate.createSearchRequest(globalEntryCreateBody(earliestTime = "14:00", latestTime = "11:30")) }
+        assertThrows(BadRequestException::class.java) { delegate.createSearchRequest(globalEntryCreateBody(earliestTime = "12:00", latestTime = "12:00")) }
+        assertThrows(BadRequestException::class.java) { delegate.createSearchRequest(globalEntryCreateBody(earliestTime = "25:00")) }
+
+        verify(searchRequestRepository, org.mockito.Mockito.never()).save(anyKt())
+    }
+
+    @Test
+    fun `a Global Entry range wider than 60 days is rejected and 60 is accepted`() {
+        `when`(globalEntryCatalogCache.findLocation(5446)).thenReturn(sfCenter)
+        val start = LocalDate.now().plusDays(5)
+
+        assertThrows(FlexibleSearchValidationException.RangeTooWide::class.java) {
+            delegate.createSearchRequest(globalEntryCreateBody(latestStartDay = start.plusDays(61)))
+        }
+        assertEquals(201, delegate.createSearchRequest(globalEntryCreateBody(latestStartDay = start.plusDays(60))).statusCode.value())
+    }
+
+    @Test
+    fun `other providers ignore the time window fields`() {
+        val result = delegate.createSearchRequest(createBody().copy(earliestTime = "11:30", latestTime = "14:00"))
+
+        assertEquals(201, result.statusCode.value())
+        assertNull(result.body!!.earliestTime)
+        assertNull(result.body!!.latestTime)
+    }
+
+    @Test
+    fun `updating a Global Entry request keeps its state row and clears an omitted bound`() {
+        val existing = existingRequest().copy(provider = Provider.GLOBAL_ENTRY, campsiteId = 5446, nights = 1, groupSize = 1)
+        existing.state = SearchRequestState().also { it.searchRequest = existing }
+        existing.globalEntryDetails = GlobalEntrySearchRequestDetails().also {
+            it.searchRequest = existing
+            it.earliestTime = LocalTime.of(11, 30)
+            it.latestTime = LocalTime.of(14, 0)
+        }
+        val geState = com.davismariotti.campalert.model.GlobalEntrySearchRequestState().also {
+            it.searchRequest = existing
+            it.matchedStartTime = LocalTime.of(11, 40)
+            it.matchedSlotCount = 2
+        }
+        existing.globalEntryState = geState
+        `when`(searchRequestRepository.findById(10L)).thenReturn(java.util.Optional.of(existing))
+
+        val result = delegate.updateSearchRequest(
+            10L,
+            UpdateSearchRequestBody(
+                startDay = existing.startDay,
+                nights = 5,
+                groupSize = 6,
+                campsiteId = 5446,
+                name = "renamed",
+                completed = false,
+                earliestTime = "12:00",
+            ),
+        )
+
+        val saved = org.mockito.kotlin
+            .argumentCaptor<SearchRequest>()
+            .also { verify(searchRequestRepository).save(it.capture()) }
+            .firstValue
+        assertEquals(LocalTime.of(12, 0), saved.globalEntryDetails!!.earliestTime)
+        assertNull(saved.globalEntryDetails!!.latestTime)
+        assertEquals(1, saved.nights)
+        assertEquals(1, saved.groupSize)
+        assertEquals(geState, saved.globalEntryState)
+        assertEquals("11:40", result.body!!.matchedStartTime)
+        assertEquals(2, result.body!!.matchedSlotCount)
     }
 
     private fun existingRequest(latestStartDay: LocalDate? = null): SearchRequest {

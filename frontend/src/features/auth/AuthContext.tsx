@@ -22,7 +22,9 @@ function loadFromStorage(): AuthUser | null {
       pushoverUserKey: parsed.pushoverUserKey ?? null,
       pushoverApiToken: parsed.pushoverApiToken ?? null,
       pushoverOverrideEnabled: parsed.pushoverOverrideEnabled ?? false,
-      permissions: parsed.permissions ?? []
+      permissions: parsed.permissions ?? [],
+      // A session cached before this field existed has none; empty until the next /auth/me refresh fills it in.
+      enabledProviders: parsed.enabledProviders ?? []
     }
   } catch {
     return null

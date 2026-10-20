@@ -66,6 +66,16 @@ class CampFinderApplication {
             initialize()
         }
 
+    @Bean("globalEntryCatalogExecutor")
+    fun globalEntryCatalogExecutor(): TaskExecutor =
+        ThreadPoolTaskExecutor().apply {
+            corePoolSize = 1
+            maxPoolSize = 2
+            queueCapacity = 10
+            setThreadNamePrefix("globalentry-catalog-")
+            initialize()
+        }
+
     @Bean("reserveCaliforniaCatalogExecutor")
     fun reserveCaliforniaCatalogExecutor(): TaskExecutor =
         ThreadPoolTaskExecutor().apply {

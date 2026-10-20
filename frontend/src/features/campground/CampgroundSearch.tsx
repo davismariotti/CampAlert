@@ -1,19 +1,31 @@
 import { useState, useRef } from 'react'
 import { useCampgroundSearch } from './useCampgroundSearch'
 import { Spinner } from '../../components/ui/Spinner'
-import type { CampgroundSearchResult } from '../../api/generated/types.gen'
+import type { CampgroundSearchResult, ProviderType } from '../../api/generated/types.gen'
 
 interface Props {
   onSelect: (campground: CampgroundSearchResult) => void
+  /** Scope results to one provider (e.g. the Global Entry tab); omitted searches campgrounds across providers. */
+  provider?: ProviderType
+  /** Minimum characters before searching (default 3). */
+  minChars?: number
+  placeholder?: string
+  emptyMessage?: string
 }
 
-export function CampgroundSearch({ onSelect }: Props) {
+export function CampgroundSearch({
+  onSelect,
+  provider,
+  minChars = 3,
+  placeholder = 'Search for a campground...',
+  emptyMessage = 'No campgrounds found'
+}: Props) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const { data, isFetching, isError } = useCampgroundSearch(query)
+  const { data, isFetching, isError } = useCampgroundSearch(query, { provider, minChars })
 
-  const showDropdown = open && query.trim().length >= 3
+  const showDropdown = open && query.trim().length >= minChars
 
   return (
     <div className="relative w-full">
@@ -22,7 +34,7 @@ export function CampgroundSearch({ onSelect }: Props) {
           ref={inputRef}
           type="text"
           className="w-full rounded-xl border border-forest-200 bg-white py-3.5 pl-4 pr-10 text-forest-900 placeholder:text-forest-300 focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-500/30"
-          placeholder="Search for a campground..."
+          placeholder={placeholder}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)
@@ -43,7 +55,7 @@ export function CampgroundSearch({ onSelect }: Props) {
         <div className="absolute z-10 mt-1 w-full rounded-2xl bg-white shadow-md">
           {isError && <p className="px-4 py-3 text-sm text-red-600">Failed to load results. Try again.</p>}
           {!isError && !isFetching && data?.length === 0 && (
-            <p className="px-4 py-3 text-sm text-forest-400">No campgrounds found</p>
+            <p className="px-4 py-3 text-sm text-forest-400">{emptyMessage}</p>
           )}
           {!isError &&
             (data ?? []).map((cg) => (

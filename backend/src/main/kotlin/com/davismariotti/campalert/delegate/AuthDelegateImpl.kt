@@ -20,12 +20,14 @@ import com.davismariotti.campalert.exception.RateLimitExceededException
 import com.davismariotti.campalert.exception.UnauthorizedException
 import com.davismariotti.campalert.model.PlatformSettings
 import com.davismariotti.campalert.notification.PasswordChangedNotification
+import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.repository.PlatformSettingsRepository
 import com.davismariotti.campalert.repository.UserRepository
 import com.davismariotti.campalert.security.GroupMembershipService
 import com.davismariotti.campalert.security.RememberMeServices
 import com.davismariotti.campalert.security.UserDetailsServiceImpl
 import com.davismariotti.campalert.service.SessionRevocationService
+import com.davismariotti.campalert.service.UserResourceLimitsService
 import com.davismariotti.campalert.service.email.EmailNotVerifiedException
 import com.davismariotti.campalert.service.email.EmailVerificationException
 import com.davismariotti.campalert.service.email.EmailVerificationService
@@ -78,6 +80,7 @@ class AuthDelegateImpl(
     private val groupMembershipService: GroupMembershipService,
     private val inviteService: InviteService,
     private val platformSettingsRepository: PlatformSettingsRepository,
+    private val userResourceLimitsService: UserResourceLimitsService,
     @Value("\${campfinder.email.frontend-base-url}") private val frontendBaseUrl: String,
     @Lazy private val self: AuthDelegateImpl,
 ) : AuthApiDelegate {
@@ -288,5 +291,8 @@ class AuthDelegateImpl(
             pushoverApiToken = pushoverApiToken,
             pushoverOverrideEnabled = pushoverOverrideEnabled,
             permissions = authorities.mapNotNull { name -> runCatching { Permission.valueOf(name) }.getOrNull() },
+            enabledProviders = Provider.entries
+                .filter { userResourceLimitsService.isProviderAllowed(id!!, it).value }
+                .map { it.toApiType() },
         )
 }

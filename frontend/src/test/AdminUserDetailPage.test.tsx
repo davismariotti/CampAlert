@@ -21,12 +21,14 @@ const user: AdminUserDetailResponse = {
   effectiveProviderQuotas: [
     { provider: 'RECREATION_GOV', value: null, source: 'GLOBAL_DEFAULT' },
     { provider: 'CAMPLIFE', value: null, source: 'GLOBAL_DEFAULT' },
-    { provider: 'RESERVE_CALIFORNIA', value: 1, source: 'GLOBAL_DEFAULT' }
+    { provider: 'RESERVE_CALIFORNIA', value: 1, source: 'GLOBAL_DEFAULT' },
+    { provider: 'GLOBAL_ENTRY', value: 1, source: 'GLOBAL_DEFAULT' }
   ],
   effectiveProviderAccess: [
     { provider: 'RECREATION_GOV', value: true, source: 'GLOBAL_DEFAULT' },
     { provider: 'CAMPLIFE', value: true, source: 'GLOBAL_DEFAULT' },
-    { provider: 'RESERVE_CALIFORNIA', value: false, source: 'GLOBAL_DEFAULT' }
+    { provider: 'RESERVE_CALIFORNIA', value: false, source: 'GLOBAL_DEFAULT' },
+    { provider: 'GLOBAL_ENTRY', value: false, source: 'GLOBAL_DEFAULT' }
   ]
 }
 

@@ -4,7 +4,8 @@ import type { Provider, ProviderType } from '../api/generated/types.gen'
 export const ALL_PROVIDERS: Provider[] = [
   { type: 'RECREATION_GOV', name: 'Recreation.gov' },
   { type: 'CAMPLIFE', name: 'CampLife' },
-  { type: 'RESERVE_CALIFORNIA', name: 'ReserveCalifornia' }
+  { type: 'RESERVE_CALIFORNIA', name: 'ReserveCalifornia' },
+  { type: 'GLOBAL_ENTRY', name: 'Global Entry' }
 ]
 
 // Permit search only ever supports Recreation.gov (CampLife permit support is out of scope) — kept

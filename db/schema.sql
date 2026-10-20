@@ -37,7 +37,7 @@ CREATE TABLE "public"."search_requests" (
   PRIMARY KEY ("id"),
   -- atlas:renamed_from fk_search_requests_v2_user
   CONSTRAINT "fk_search_requests_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id"),
-  CONSTRAINT "chk_search_requests_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
+  CONSTRAINT "chk_search_requests_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA', 'GLOBAL_ENTRY'))
 );
 CREATE INDEX ON "public"."search_requests" ("user_id");
 -- Create "recreation_gov_search_request_details" table
@@ -68,6 +68,23 @@ CREATE TABLE "public"."reserve_california_search_request_details" (
   "place_id" integer NOT NULL,
   PRIMARY KEY ("search_request_id"),
   CONSTRAINT "fk_reserve_california_search_request_details_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests" ("id") ON DELETE CASCADE
+);
+-- Create "global_entry_search_request_details" table
+CREATE TABLE "public"."global_entry_search_request_details" (
+  "search_request_id" bigint NOT NULL,
+  "earliest_time" time NULL,
+  "latest_time" time NULL,
+  PRIMARY KEY ("search_request_id"),
+  CONSTRAINT "fk_global_entry_search_request_details_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests" ("id") ON DELETE CASCADE,
+  CONSTRAINT "chk_global_entry_time_window" CHECK (earliest_time IS NULL OR latest_time IS NULL OR earliest_time < latest_time)
+);
+-- Create "global_entry_search_request_state" table
+CREATE TABLE "public"."global_entry_search_request_state" (
+  "search_request_id" bigint NOT NULL,
+  "matched_start_time" time NULL,
+  "matched_slot_count" integer NULL,
+  PRIMARY KEY ("search_request_id"),
+  CONSTRAINT "fk_global_entry_search_request_state_request" FOREIGN KEY ("search_request_id") REFERENCES "public"."search_requests" ("id") ON DELETE CASCADE
 );
 -- Create "reserve_california_unit_occupancy" table
 CREATE TABLE "public"."reserve_california_unit_occupancy" (
@@ -206,7 +223,7 @@ CREATE TABLE "public"."poll_target_state" (
   "last_error" text NULL,
   PRIMARY KEY ("target_type", "provider", "target_id"),
   CONSTRAINT "chk_poll_target_state_target_type" CHECK (target_type IN ('CAMPGROUND', 'PERMIT')),
-  CONSTRAINT "chk_poll_target_state_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
+  CONSTRAINT "chk_poll_target_state_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA', 'GLOBAL_ENTRY'))
 );
 CREATE INDEX ON "public"."poll_target_state" ("next_due_at", "locked_until");
 -- Create "shedlock" table
@@ -309,7 +326,7 @@ CREATE TABLE "public"."group_provider_quota_defaults" (
   "max_active" integer NOT NULL,
   PRIMARY KEY ("group_id", "provider"),
   CONSTRAINT "fk_group_provider_quota_defaults_group" FOREIGN KEY ("group_id") REFERENCES "public"."groups" ("id") ON DELETE CASCADE,
-  CONSTRAINT "chk_group_provider_quota_defaults_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
+  CONSTRAINT "chk_group_provider_quota_defaults_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA', 'GLOBAL_ENTRY'))
 );
 -- Create "group_provider_access" table
 CREATE TABLE "public"."group_provider_access" (
@@ -318,7 +335,7 @@ CREATE TABLE "public"."group_provider_access" (
   "enabled" boolean NOT NULL,
   PRIMARY KEY ("group_id", "provider"),
   CONSTRAINT "fk_group_provider_access_group" FOREIGN KEY ("group_id") REFERENCES "public"."groups" ("id") ON DELETE CASCADE,
-  CONSTRAINT "chk_group_provider_access_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
+  CONSTRAINT "chk_group_provider_access_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA', 'GLOBAL_ENTRY'))
 );
 -- Create "global_quota_defaults" table
 -- Singleton row (id always 1) holding the combined active-search-request default used when no
@@ -335,14 +352,14 @@ CREATE TABLE "public"."global_provider_quota_defaults" (
   "provider" character varying(32) NOT NULL,
   "max_active" integer NOT NULL,
   PRIMARY KEY ("provider"),
-  CONSTRAINT "chk_global_provider_quota_defaults_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
+  CONSTRAINT "chk_global_provider_quota_defaults_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA', 'GLOBAL_ENTRY'))
 );
 -- Create "global_provider_access" table
 CREATE TABLE "public"."global_provider_access" (
   "provider" character varying(32) NOT NULL,
   "enabled" boolean NOT NULL,
   PRIMARY KEY ("provider"),
-  CONSTRAINT "chk_global_provider_access_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
+  CONSTRAINT "chk_global_provider_access_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA', 'GLOBAL_ENTRY'))
 );
 -- Create "user_quota_overrides" table
 CREATE TABLE "public"."user_quota_overrides" (
@@ -358,7 +375,7 @@ CREATE TABLE "public"."user_provider_quota_overrides" (
   "max_active" integer NOT NULL,
   PRIMARY KEY ("user_id", "provider"),
   CONSTRAINT "fk_user_provider_quota_overrides_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id") ON DELETE CASCADE,
-  CONSTRAINT "chk_user_provider_quota_overrides_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
+  CONSTRAINT "chk_user_provider_quota_overrides_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA', 'GLOBAL_ENTRY'))
 );
 -- Create "user_provider_access" table
 CREATE TABLE "public"."user_provider_access" (
@@ -367,7 +384,7 @@ CREATE TABLE "public"."user_provider_access" (
   "enabled" boolean NOT NULL,
   PRIMARY KEY ("user_id", "provider"),
   CONSTRAINT "fk_user_provider_access_user" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id") ON DELETE CASCADE,
-  CONSTRAINT "chk_user_provider_access_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA'))
+  CONSTRAINT "chk_user_provider_access_provider" CHECK (provider IN ('RECREATION_GOV', 'CAMPLIFE', 'RESERVE_CALIFORNIA', 'GLOBAL_ENTRY'))
 );
 -- Create "admin_audit_log" table
 CREATE TABLE "public"."admin_audit_log" (

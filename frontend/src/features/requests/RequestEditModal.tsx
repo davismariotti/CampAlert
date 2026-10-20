@@ -9,8 +9,10 @@ import { EquipmentTypeFilter } from './EquipmentTypeFilter'
 import { AmenityFilter } from './AmenityFilter'
 import { CampsitePickerModal } from './CampsitePickerModal'
 import { DateWindowFields } from './DateWindowFields'
+import { TimeWindowFields } from './TimeWindowFields'
 import type { CampgroundResponse, SearchRequestResponse } from '../../api/generated/types.gen'
-import { validateDateWindow, type DateMode } from '../../utils/dateWindow'
+import { isGlobalEntry, validateDateWindow, type DateMode } from '../../utils/dateWindow'
+import { timeOrUndefined, validateTimeWindow } from '../../utils/timeWindow'
 
 interface Props {
   request: SearchRequestResponse
@@ -31,6 +33,9 @@ export function RequestEditModal({ request, onClose, userId }: Props) {
   const [siteIds, setSiteIds] = useState<string[] | null>(request.siteIds ?? null)
   const [equipmentType, setEquipmentType] = useState<string | null>(null)
   const [amenityIds, setAmenityIds] = useState<number[] | null>(request.amenityIds ?? null)
+  const globalEntry = isGlobalEntry(request.provider.type)
+  const [earliestTime, setEarliestTime] = useState(request.earliestTime ?? '')
+  const [latestTime, setLatestTime] = useState(request.latestTime ?? '')
   const [showCampsiteModal, setShowCampsiteModal] = useState(false)
   const [completed, setCompleted] = useState(request.completed)
   const [error, setError] = useState<string | null>(null)
@@ -42,6 +47,8 @@ export function RequestEditModal({ request, onClose, userId }: Props) {
     latestStartDay,
     providerType: request.provider.type
   })
+
+  const timeWindowError = globalEntry ? validateTimeWindow(earliestTime, latestTime) : null
 
   // Only fetched for providers that might expose equipment-type/amenity data (CampLife).
   const { data: catalog } = useQuery({
@@ -76,12 +83,16 @@ export function RequestEditModal({ request, onClose, userId }: Props) {
       const body = {
         name,
         startDay,
-        nights,
-        groupSize,
+        // Global Entry has no nights or group size; the API contract still requires them.
+        nights: globalEntry ? 1 : nights,
+        groupSize: globalEntry ? 1 : groupSize,
         campsiteId: request.campsiteId,
-        loops: loops ?? undefined,
-        siteIds: siteIds ?? undefined,
-        amenityIds: amenityIds ?? undefined,
+        loops: globalEntry ? undefined : (loops ?? undefined),
+        siteIds: globalEntry ? undefined : (siteIds ?? undefined),
+        amenityIds: globalEntry ? undefined : (amenityIds ?? undefined),
+        // An omitted bound clears it server-side, so a blanked field is simply left out.
+        earliestTime: globalEntry ? timeOrUndefined(earliestTime) : undefined,
+        latestTime: globalEntry ? timeOrUndefined(latestTime) : undefined,
         completed,
         latestStartDay: dateMode === 'flexible' ? latestStartDay : undefined
       }
@@ -117,100 +128,120 @@ export function RequestEditModal({ request, onClose, userId }: Props) {
             error={dateWindowError}
           />
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-forest-600">Nights</label>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setNights((n) => Math.max(1, n - 1))}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
-                >
-                  −
-                </button>
-                <span className="w-6 text-center text-sm font-medium">{nights}</span>
-                <button
-                  type="button"
-                  onClick={() => setNights((n) => n + 1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-forest-600">Group size</label>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setGroupSize((n) => Math.max(1, n - 1))}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
-                >
-                  −
-                </button>
-                <span className="w-6 text-center text-sm font-medium">{groupSize}</span>
-                <button
-                  type="button"
-                  onClick={() => setGroupSize((n) => n + 1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          </div>
+          {globalEntry && (
+            <TimeWindowFields
+              earliestTime={earliestTime}
+              onEarliestTimeChange={setEarliestTime}
+              latestTime={latestTime}
+              onLatestTimeChange={setLatestTime}
+              error={timeWindowError}
+            />
+          )}
 
-          <EquipmentTypeFilter equipmentTypes={equipmentTypes} selected={equipmentType} onChange={setEquipmentType} />
-
-          <AmenityFilter amenities={amenities} selected={amenityIds} onChange={setAmenityIds} />
-
-          <LoopPicker
-            campgroundId={request.campsiteId}
-            provider={request.provider}
-            selectedLoops={loops}
-            onChange={setLoops}
-            allowedGroupings={allowedGroupings}
-          />
-
-          <div>
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-medium text-forest-600">Specific campsites</label>
-              <button
-                type="button"
-                onClick={() => setShowCampsiteModal(true)}
-                className="text-xs font-medium text-forest-600 hover:text-forest-800"
-              >
-                Choose specific campsites
-              </button>
-            </div>
-            {siteIds && siteIds.length > 0 ? (
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {siteIds.map((id) => (
-                  <span
-                    key={id}
-                    className="flex items-center gap-1 rounded-full bg-forest-700 px-2.5 py-0.5 text-xs font-medium text-white"
-                  >
-                    {id}
+          {!globalEntry && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-forest-600">Nights</label>
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() =>
-                        setSiteIds((prev) => {
-                          const next = (prev ?? []).filter((s) => s !== id)
-                          return next.length === 0 ? null : next
-                        })
-                      }
-                      aria-label={`Remove site ${id}`}
-                      className="hover:text-forest-200"
+                      onClick={() => setNights((n) => Math.max(1, n - 1))}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
                     >
-                      ×
+                      −
                     </button>
-                  </span>
-                ))}
+                    <span className="w-6 text-center text-sm font-medium">{nights}</span>
+                    <button
+                      type="button"
+                      onClick={() => setNights((n) => n + 1)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-forest-600">Group size</label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setGroupSize((n) => Math.max(1, n - 1))}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
+                    >
+                      −
+                    </button>
+                    <span className="w-6 text-center text-sm font-medium">{groupSize}</span>
+                    <button
+                      type="button"
+                      onClick={() => setGroupSize((n) => n + 1)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-forest-200 text-forest-600 hover:bg-forest-100"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
               </div>
-            ) : (
-              <p className="mt-1 text-xs text-forest-400">No specific sites selected — watching by grouping above</p>
-            )}
-          </div>
+
+              <EquipmentTypeFilter
+                equipmentTypes={equipmentTypes}
+                selected={equipmentType}
+                onChange={setEquipmentType}
+              />
+
+              <AmenityFilter amenities={amenities} selected={amenityIds} onChange={setAmenityIds} />
+
+              <LoopPicker
+                campgroundId={request.campsiteId}
+                provider={request.provider}
+                selectedLoops={loops}
+                onChange={setLoops}
+                allowedGroupings={allowedGroupings}
+              />
+
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-forest-600">Specific campsites</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowCampsiteModal(true)}
+                    className="text-xs font-medium text-forest-600 hover:text-forest-800"
+                  >
+                    Choose specific campsites
+                  </button>
+                </div>
+                {siteIds && siteIds.length > 0 ? (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {siteIds.map((id) => (
+                      <span
+                        key={id}
+                        className="flex items-center gap-1 rounded-full bg-forest-700 px-2.5 py-0.5 text-xs font-medium text-white"
+                      >
+                        {id}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSiteIds((prev) => {
+                              const next = (prev ?? []).filter((s) => s !== id)
+                              return next.length === 0 ? null : next
+                            })
+                          }
+                          aria-label={`Remove site ${id}`}
+                          className="hover:text-forest-200"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-forest-400">
+                    No specific sites selected — watching by grouping above
+                  </p>
+                )}
+              </div>
+            </>
+          )}
 
           <label className="flex items-center gap-2 text-sm text-forest-700">
             <input
@@ -228,14 +259,18 @@ export function RequestEditModal({ request, onClose, userId }: Props) {
             <Button variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button loading={mutation.isPending} disabled={!!dateWindowError} onClick={() => mutation.mutate()}>
+            <Button
+              loading={mutation.isPending}
+              disabled={!!dateWindowError || !!timeWindowError}
+              onClick={() => mutation.mutate()}
+            >
               Save
             </Button>
           </div>
         </div>
       </div>
 
-      {showCampsiteModal && (
+      {showCampsiteModal && !globalEntry && (
         <CampsitePickerModal
           campgroundId={request.campsiteId}
           provider={request.provider}

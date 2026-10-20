@@ -17,7 +17,8 @@ function AuthDisplay() {
             timezone: 'America/Los_Angeles',
             verificationStatus: 'VERIFIED',
             pushoverOverrideEnabled: false,
-            permissions: []
+            permissions: [],
+            enabledProviders: ['RECREATION_GOV']
           })
         }
       >

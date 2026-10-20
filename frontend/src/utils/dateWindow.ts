@@ -13,11 +13,19 @@ export const MAX_NIGHTS = 21
 const MAX_RANGE_WIDTH_DAYS: Record<ProviderType, number> = {
   RECREATION_GOV: 30,
   CAMPLIFE: 9,
-  RESERVE_CALIFORNIA: 9
+  RESERVE_CALIFORNIA: 9,
+  // Global Entry's single slots call covers any range, so this is a product limit rather than an API
+  // constraint — it mirrors campfinder.search.providers.global-entry.max-range-width-days.
+  GLOBAL_ENTRY: 60
 }
 
 export function maxRangeWidthDaysFor(providerType: ProviderType): number {
   return MAX_RANGE_WIDTH_DAYS[providerType]
+}
+
+/** Global Entry appointments are single-day events with no nights, group size, or campsites — the UI words and shapes its forms differently. */
+export function isGlobalEntry(providerType: ProviderType): boolean {
+  return providerType === 'GLOBAL_ENTRY'
 }
 
 function providerFriendlyName(providerType: ProviderType): string {
@@ -74,12 +82,19 @@ export function validateDateWindow({
   latestStartDay,
   providerType
 }: DateWindowInput): string | null {
-  if (!startDay) return 'Start date is required'
+  const globalEntry = isGlobalEntry(providerType)
+  if (!startDay) return globalEntry ? 'Date is required' : 'Start date is required'
   if (nights < 1 || nights > MAX_NIGHTS) return `Nights must be between 1 and ${MAX_NIGHTS}`
   if (mode === 'exact') return null
 
-  if (!latestStartDay) return 'Latest arrival date is required for a flexible search'
-  if (latestStartDay < startDay) return `Latest arrival must be on or after ${formatShortDate(startDay)}`
+  if (!latestStartDay) {
+    return globalEntry
+      ? 'Latest day is required for a flexible search'
+      : 'Latest arrival date is required for a flexible search'
+  }
+  if (latestStartDay < startDay) {
+    return `${globalEntry ? 'Latest day' : 'Latest arrival'} must be on or after ${formatShortDate(startDay)}`
+  }
 
   const maxWidth = maxRangeWidthDaysFor(providerType)
   const rangeWidth = daysBetween(startDay, latestStartDay)
@@ -90,8 +105,20 @@ export function validateDateWindow({
 }
 
 /** Plain-language summary shown below the date controls — arrival-only, so no derived checkout math is shown. */
-export function dateWindowSummary({ mode, startDay, nights, latestStartDay }: DateWindowInput): string | null {
+export function dateWindowSummary({
+  mode,
+  startDay,
+  nights,
+  latestStartDay,
+  providerType
+}: DateWindowInput): string | null {
   if (!startDay || nights < 1) return null
+
+  if (isGlobalEntry(providerType)) {
+    if (mode === 'exact') return `Watching ${formatShortDate(startDay)}`
+    if (!latestStartDay || latestStartDay < startDay) return null
+    return `Watching any day between ${formatShortDate(startDay)} and ${formatShortDate(latestStartDay)}`
+  }
 
   if (mode === 'exact') {
     return `Watching ${formatShortDate(startDay)} to ${formatShortDate(addDays(startDay, nights))}`

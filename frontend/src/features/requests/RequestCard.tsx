@@ -12,7 +12,8 @@ import { RequestEditModal } from './RequestEditModal'
 import { PermitRequestEditModal } from '../permit/PermitRequestEditModal'
 import { usePermit } from '../permit/usePermit'
 import { useApiMutation } from '../../hooks/useApiMutation'
-import { formatShortDate } from '../../utils/dateWindow'
+import { formatShortDate, isGlobalEntry } from '../../utils/dateWindow'
+import { formatTimeOfDay, formatTimeWindow } from '../../utils/timeWindow'
 import type {
   SearchRequestResponse,
   SearchRequestStats,
@@ -39,6 +40,20 @@ function formatDate(dateStr: string) {
     day: 'numeric',
     year: 'numeric'
   })
+}
+
+/** "Oct 27" or "Oct 27–Nov 3": the days a Global Entry request watches. */
+function globalEntryDays(request: SearchRequestResponse): string {
+  return request.latestStartDay
+    ? `${formatShortDate(request.startDay)}–${formatShortDate(request.latestStartDay)}`
+    : formatShortDate(request.startDay)
+}
+
+/** "3 appointments · earliest Oct 27, 11:40 AM" while a match is held; null otherwise. */
+function globalEntryMatchSummary(request: SearchRequestResponse): string | null {
+  if (!request.matchedStartDay || !request.matchedStartTime || request.matchedSlotCount == null) return null
+  const noun = request.matchedSlotCount === 1 ? 'appointment' : 'appointments'
+  return `${request.matchedSlotCount} ${noun} · earliest ${formatShortDate(request.matchedStartDay)}, ${formatTimeOfDay(request.matchedStartTime)}`
 }
 
 function OverflowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
@@ -127,7 +142,15 @@ function StatsModal({
           <div>
             <h2 className="font-semibold text-forest-900">Alert stats</h2>
             <p className="mt-0.5 text-sm text-forest-500">{request.name}</p>
-            {!isPermitRequest(request) && request.latestStartDay && (
+            {!isPermitRequest(request) && isGlobalEntry(request.provider.type) && (
+              <p className="mt-0.5 text-xs text-forest-400">
+                {[globalEntryDays(request), formatTimeWindow(request.earliestTime, request.latestTime)]
+                  .filter(Boolean)
+                  .join(' · ')}
+                {globalEntryMatchSummary(request) ? ` · ${globalEntryMatchSummary(request)}` : ''}
+              </p>
+            )}
+            {!isPermitRequest(request) && !isGlobalEntry(request.provider.type) && request.latestStartDay && (
               <p className="mt-0.5 text-xs text-forest-400">
                 Any {request.nights} night{request.nights !== 1 ? 's' : ''}, arriving{' '}
                 {formatShortDate(request.startDay)}-{formatShortDate(request.latestStartDay)}
@@ -241,17 +264,19 @@ export function RequestCard({ request, userId, readOnly }: Props) {
               `${request.groupSize} ${request.groupSize !== 1 ? 'people' : 'person'}`
             ].join(' · ')
           : ''
-    : request.latestStartDay
-      ? [
-          `Any ${request.nights} night${request.nights !== 1 ? 's' : ''}`,
-          `arriving ${formatShortDate(request.startDay)}-${formatShortDate(request.latestStartDay)}`,
-          `${request.groupSize} ${request.groupSize !== 1 ? 'people' : 'person'}`
-        ].join(' · ')
-      : [
-          formatDate(request.startDay),
-          `${request.nights} night${request.nights !== 1 ? 's' : ''}`,
-          `${request.groupSize} ${request.groupSize !== 1 ? 'people' : 'person'}`
-        ].join(' · ')
+    : isGlobalEntry(request.provider.type)
+      ? [globalEntryDays(request), formatTimeWindow(request.earliestTime, request.latestTime) ?? 'any time'].join(' · ')
+      : request.latestStartDay
+        ? [
+            `Any ${request.nights} night${request.nights !== 1 ? 's' : ''}`,
+            `arriving ${formatShortDate(request.startDay)}-${formatShortDate(request.latestStartDay)}`,
+            `${request.groupSize} ${request.groupSize !== 1 ? 'people' : 'person'}`
+          ].join(' · ')
+        : [
+            formatDate(request.startDay),
+            `${request.nights} night${request.nights !== 1 ? 's' : ''}`,
+            `${request.groupSize} ${request.groupSize !== 1 ? 'people' : 'person'}`
+          ].join(' · ')
 
   const watching = !request.completed
 
@@ -315,11 +340,18 @@ export function RequestCard({ request, userId, readOnly }: Props) {
         )}
 
         {/* Flexible campground match state */}
-        {!isPermit && request.latestStartDay && request.matchedStartDay && request.matchedEndDay && (
-          <p className="mt-2 text-xs font-medium text-forest-700">
-            Matched {formatShortDate(request.matchedStartDay)}–{formatShortDate(request.matchedEndDay)}
-          </p>
+        {!isPermit && isGlobalEntry(request.provider.type) && globalEntryMatchSummary(request) && (
+          <p className="mt-2 text-xs font-medium text-forest-700">{globalEntryMatchSummary(request)}</p>
         )}
+        {!isPermit &&
+          !isGlobalEntry(request.provider.type) &&
+          request.latestStartDay &&
+          request.matchedStartDay &&
+          request.matchedEndDay && (
+            <p className="mt-2 text-xs font-medium text-forest-700">
+              Matched {formatShortDate(request.matchedStartDay)}–{formatShortDate(request.matchedEndDay)}
+            </p>
+          )}
 
         {/* Permit match/blocking state */}
         {isPermit && request.searchType === 'ZONE' && request.zoneTarget?.matchedDivisionId && (

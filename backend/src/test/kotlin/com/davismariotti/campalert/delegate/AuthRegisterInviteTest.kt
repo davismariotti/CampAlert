@@ -72,6 +72,7 @@ class AuthRegisterInviteTest {
         groupMembershipService = groupMembershipService,
         inviteService = inviteService,
         platformSettingsRepository = platformSettingsRepository,
+        userResourceLimitsService = userResourceLimitsServiceAllowingAllProviders(),
         frontendBaseUrl = "http://localhost:5173",
         self = mock(AuthDelegateImpl::class.java),
     )

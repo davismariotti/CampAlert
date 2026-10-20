@@ -1990,6 +1990,7 @@ components:
         - verificationStatus
         - pushoverOverrideEnabled
         - permissions
+        - enabledProviders
       properties:
         id:
           type: integer
@@ -2012,6 +2013,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Permission'
+        enabledProviders:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProviderType'
+          description: Providers the user's effective provider access currently allows (user override, then group defaults, then global default). Drives which provider-specific UI is shown; creation is still enforced server-side.
 
     RegisterResponse:
       type: object
@@ -2283,6 +2289,25 @@ components:
           format: date
           nullable: true
           description: Checkout date of the candidate stay currently matched within the configured range. Null when unavailable or when the request is exact-date.
+        earliestTime:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          nullable: true
+          description: Global Entry only. The request's earliest acceptable appointment start time (HH:mm), local to the enrollment center. Null otherwise.
+        latestTime:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          nullable: true
+          description: Global Entry only. Appointments must start strictly before this time (HH:mm), local to the enrollment center. Null otherwise.
+        matchedStartTime:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          nullable: true
+          description: Global Entry only. Local start time of the earliest currently matching appointment slot (on matchedStartDay). Null when unavailable or for other providers.
+        matchedSlotCount:
+          type: integer
+          nullable: true
+          description: Global Entry only. Number of currently matching appointment slots. Null when unavailable or for other providers.
 
     SearchRequestStats:
       type: object
@@ -2393,6 +2418,16 @@ components:
           format: date
           nullable: true
           description: Latest acceptable arrival date for a flexible search. Omit for an exact-date search.
+        earliestTime:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          nullable: true
+          description: Global Entry only. Earliest acceptable appointment start time (HH:mm, 24-hour), local to the enrollment center. Null means no lower bound. Ignored for other providers.
+        latestTime:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          nullable: true
+          description: Global Entry only. Appointments must start strictly before this time (HH:mm, 24-hour), local to the enrollment center. Null means no upper bound. Must be after earliestTime when both are set. Ignored for other providers.
         turnstileToken:
           type: string
 
@@ -2457,6 +2492,16 @@ components:
           format: date
           nullable: true
           description: Latest acceptable arrival date for a flexible search. Omit or set to null to clear it and revert to an exact-date search.
+        earliestTime:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          nullable: true
+          description: Global Entry only. Earliest acceptable appointment start time (HH:mm, 24-hour), local to the enrollment center. Null means no lower bound. Ignored for other providers.
+        latestTime:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          nullable: true
+          description: Global Entry only. Appointments must start strictly before this time (HH:mm, 24-hour), local to the enrollment center. Null means no upper bound. Must be after earliestTime when both are set. Ignored for other providers.
 
     CampgroundSearchResult:
       type: object
@@ -2478,7 +2523,7 @@ components:
 
     ProviderType:
       type: string
-      enum: [RECREATION_GOV, CAMPLIFE, RESERVE_CALIFORNIA]
+      enum: [RECREATION_GOV, CAMPLIFE, RESERVE_CALIFORNIA, GLOBAL_ENTRY]
 
     Permission:
       type: string

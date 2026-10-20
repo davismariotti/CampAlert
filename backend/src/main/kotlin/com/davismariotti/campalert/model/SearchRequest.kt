@@ -81,6 +81,12 @@ data class SearchRequest(
     @OneToOne(mappedBy = "searchRequest", cascade = [CascadeType.ALL], fetch = FetchType.EAGER, orphanRemoval = true)
     var reserveCaliforniaDetails: ReserveCaliforniaSearchRequestDetails? = null
 
+    @OneToOne(mappedBy = "searchRequest", cascade = [CascadeType.ALL], fetch = FetchType.EAGER, orphanRemoval = true)
+    var globalEntryDetails: GlobalEntrySearchRequestDetails? = null
+
+    @OneToOne(mappedBy = "searchRequest", cascade = [CascadeType.ALL], fetch = FetchType.EAGER, orphanRemoval = true)
+    var globalEntryState: GlobalEntrySearchRequestState? = null
+
     override var lastAvailabilityState: AvailabilityState?
         get() = state.lastAvailabilityState
         set(value) {
