@@ -11,7 +11,9 @@ services:
       # Sized for the 961 MiB / 1 vCPU production droplet: Serial GC avoids G1's concurrent-thread
       # overhead on a single core, metaspace/code-cache/heap are capped explicitly instead of left
       # to MaxRAMPercentage ergonomics (which recomputes if a cgroup memory limit is ever added).
-      JAVA_TOOL_OPTIONS: "-XX:+UseSerialGC -XX:MaxMetaspaceSize=192m -XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=64m -Xmx192m -Xms64m"
+      # The heap was raised from 192m after java.lang.OutOfMemoryError in production; the heap dump
+      # on OOM is there to tell an undersized cap apart from a leak the next time it happens.
+      JAVA_TOOL_OPTIONS: "-XX:+UseSerialGC -XX:MaxMetaspaceSize=192m -XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=64m -Xmx256m -Xms64m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp"
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
       interval: 10s
