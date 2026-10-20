@@ -1,6 +1,7 @@
 package com.davismariotti.campalert.service.sms
 
 import com.davismariotti.campalert.model.PhoneNumberStatus
+import com.davismariotti.campalert.provider.Provider
 import com.davismariotti.campalert.repository.PhoneNumberRepository
 import com.davismariotti.campalert.repository.SearchRequestRepository
 import com.davismariotti.campalert.service.PhoneNumberService
@@ -56,7 +57,8 @@ class SmsWebhookService(
         val requests = contextIds.mapNotNull { searchRequestRepository.findById(it).orElse(null) }
         val lines = requests
             .mapIndexed { idx, req ->
-                val endDay = req.startDay.plusDays(req.nights.toLong())
+                // A stay's checkout is startDay + nights; a Global Entry request watches days startDay..latestStartDay.
+                val endDay = if (req.provider == Provider.GLOBAL_ENTRY) req.latestStartDay ?: req.startDay else req.startDay.plusDays(req.nights.toLong())
                 "${idx + 1}. ${req.campgroundName} ${req.startDay}–$endDay"
             }.joinToString("\n")
 

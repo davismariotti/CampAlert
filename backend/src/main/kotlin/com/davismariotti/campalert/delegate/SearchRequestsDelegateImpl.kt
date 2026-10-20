@@ -22,6 +22,7 @@ import com.davismariotti.campalert.provider.globalentry.GlobalEntryCatalogCache
 import com.davismariotti.campalert.provider.globalentry.GlobalEntryLocation
 import com.davismariotti.campalert.provider.globalentry.GlobalEntryTimeWindow
 import com.davismariotti.campalert.provider.globalentry.displayName
+import com.davismariotti.campalert.provider.globalentry.usableTimezone
 import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaCatalogCache
 import com.davismariotti.campalert.provider.reservecalifornia.ReserveCaliforniaOccupancyService
 import com.davismariotti.campalert.repository.NotificationOutboxRepository
@@ -130,7 +131,7 @@ class SearchRequestsDelegateImpl(
             campsiteId = createSearchRequestBody.campsiteId,
             campgroundName = globalEntryCenter?.displayName() ?: createSearchRequestBody.campgroundName,
             // Set synchronously from the catalog: Global Entry has no coordinates for the async resolver, and the poll check needs it immediately.
-            campgroundTimezone = globalEntryCenter?.tzData,
+            campgroundTimezone = globalEntryCenter?.usableTimezone(),
             siteIds = if (isGlobalEntry) null else createSearchRequestBody.siteIds,
             name = createSearchRequestBody.name,
             userId = userId,
@@ -186,7 +187,11 @@ class SearchRequestsDelegateImpl(
         validateLatestStartDay(updateSearchRequestBody.startDay, updateSearchRequestBody.latestStartDay, provider)
         val isGlobalEntry = provider == Provider.GLOBAL_ENTRY
         val globalEntryWindow = if (isGlobalEntry) GlobalEntryTimeWindow.parse(updateSearchRequestBody.earliestTime, updateSearchRequestBody.latestTime) else null
+        // The center can change (or the request can be switched to Global Entry) on update, so it is validated and its name/timezone refreshed exactly as on create.
+        val globalEntryCenter = if (isGlobalEntry) requireGlobalEntryCenter(updateSearchRequestBody.campsiteId) else null
         val updated = existing.copy(
+            campgroundName = globalEntryCenter?.displayName() ?: existing.campgroundName,
+            campgroundTimezone = if (isGlobalEntry) globalEntryCenter?.usableTimezone() else existing.campgroundTimezone,
             startDay = updateSearchRequestBody.startDay,
             nights = if (isGlobalEntry) 1 else updateSearchRequestBody.nights,
             groupSize = if (isGlobalEntry) 1 else updateSearchRequestBody.groupSize,

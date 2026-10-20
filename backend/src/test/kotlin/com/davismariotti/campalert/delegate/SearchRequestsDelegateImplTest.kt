@@ -409,6 +409,7 @@ class SearchRequestsDelegateImplTest {
         }
         existing.globalEntryState = geState
         `when`(searchRequestRepository.findById(10L)).thenReturn(java.util.Optional.of(existing))
+        `when`(globalEntryCatalogCache.findLocation(5446)).thenReturn(sfCenter)
 
         val result = delegate.updateSearchRequest(
             10L,
@@ -434,6 +435,56 @@ class SearchRequestsDelegateImplTest {
         assertEquals(geState, saved.globalEntryState)
         assertEquals("11:40", result.body!!.matchedStartTime)
         assertEquals(2, result.body!!.matchedSlotCount)
+    }
+
+    @Test
+    fun `updating a request to a Global Entry center validates it and refreshes the name and timezone`() {
+        val existing = existingRequest().copy(provider = Provider.GLOBAL_ENTRY, campsiteId = 5140, campgroundName = "Old", campgroundTimezone = "America/Chicago")
+        existing.state = SearchRequestState().also { it.searchRequest = existing }
+        `when`(searchRequestRepository.findById(10L)).thenReturn(java.util.Optional.of(existing))
+        `when`(globalEntryCatalogCache.findLocation(5446)).thenReturn(sfCenter)
+
+        val result = delegate.updateSearchRequest(
+            10L,
+            UpdateSearchRequestBody(startDay = existing.startDay, nights = 1, groupSize = 1, campsiteId = 5446, name = "n", completed = false),
+        )
+
+        val saved = org.mockito.kotlin
+            .argumentCaptor<SearchRequest>()
+            .also { verify(searchRequestRepository).save(it.capture()) }
+            .firstValue
+        assertEquals("SF Enrollment Center — San Francisco, CA", saved.campgroundName)
+        assertEquals("America/Los_Angeles", saved.campgroundTimezone)
+        assertEquals("SF Enrollment Center — San Francisco, CA", result.body!!.campgroundName)
+    }
+
+    @Test
+    fun `updating a Global Entry request to an unknown center is rejected`() {
+        val existing = existingRequest().copy(provider = Provider.GLOBAL_ENTRY, campsiteId = 5446)
+        existing.state = SearchRequestState().also { it.searchRequest = existing }
+        `when`(searchRequestRepository.findById(10L)).thenReturn(java.util.Optional.of(existing))
+        `when`(globalEntryCatalogCache.findLocation(1)).thenReturn(null)
+
+        assertThrows(NotFoundException::class.java) {
+            delegate.updateSearchRequest(
+                10L,
+                UpdateSearchRequestBody(startDay = existing.startDay, nights = 1, groupSize = 1, campsiteId = 1, name = "n", completed = false),
+            )
+        }
+        verify(searchRequestRepository, org.mockito.Mockito.never()).save(anyKt())
+    }
+
+    @Test
+    fun `a center with an unusable timezone is created without one rather than storing the bad value`() {
+        `when`(globalEntryCatalogCache.findLocation(5446)).thenReturn(sfCenter.copy(tzData = "Not/AZone"))
+
+        delegate.createSearchRequest(globalEntryCreateBody())
+
+        val saved = org.mockito.kotlin
+            .argumentCaptor<SearchRequest>()
+            .also { verify(searchRequestRepository).save(it.capture()) }
+            .firstValue
+        assertNull(saved.campgroundTimezone)
     }
 
     private fun existingRequest(latestStartDay: LocalDate? = null): SearchRequest {

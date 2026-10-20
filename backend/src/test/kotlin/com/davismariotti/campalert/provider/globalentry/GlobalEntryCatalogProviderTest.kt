@@ -91,6 +91,15 @@ class GlobalEntryCatalogProviderTest {
     }
 
     @Test
+    fun `an unusable timezone is never stored on a request`() {
+        assertEquals("America/Los_Angeles", directory[0].usableTimezone())
+        assertNull(directory[0].copy(tzData = "").usableTimezone())
+        assertNull(directory[0].copy(tzData = "   ").usableTimezone())
+        assertNull(directory[0].copy(tzData = "Not/AZone").usableTimezone())
+        assertNull(directory[0].copy(tzData = null).usableTimezone())
+    }
+
+    @Test
     fun `getLoops is always empty`() {
         assertTrue(provider.getLoops(5446).isEmpty())
     }

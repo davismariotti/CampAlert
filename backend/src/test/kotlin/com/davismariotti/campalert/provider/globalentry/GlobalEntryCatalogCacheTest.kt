@@ -97,6 +97,19 @@ class GlobalEntryCatalogCacheTest {
     }
 
     @Test
+    fun `an HTTP error response is a failure, never cached as an empty directory`() {
+        stubCached(GlobalEntryCachedEntry(Instant.now().minus(java.time.Duration.ofDays(4)), listOf(GlobalEntryLocation(9, "Previous"))))
+        @Suppress("UNCHECKED_CAST")
+        val call = mock(Call::class.java) as Call<List<GlobalEntryLocation>>
+        `when`(call.execute()).thenReturn(Response.error(503, okhttp3.ResponseBody.create(null, "down")))
+        `when`(api.getLocations(any(), any(), any(), any())).thenReturn(call)
+
+        assertEquals(null, cache.refreshDirectory())
+
+        verify(redisJsonCache, never()).set(any(), any(), org.mockito.kotlin.any<Long>(), any())
+    }
+
+    @Test
     fun `refresh is due when the cache is empty or older than the interval`() {
         stubCached(null)
         assertTrue(cache.isDirectoryRefreshDue(1000))
